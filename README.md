@@ -88,7 +88,6 @@ Base path: `http://localhost:3000`
 | `/api/categories`       | CRUD                                                          |
 | `/api/courses`          | CRUD (delete cleans up orphan modules/items) + `GET /:id/modules`, `GET /:id/tree` |
 | `/api/modules`          | CRUD (delete cleans up orphan items) + `GET /:id/lessons` |
-| `/api/course-modules`   | CRUD                                                          |
 | `/api/module-items`     | CRUD                                                          |
 | `/api/module-lessons`   | CRUD                                                          |
 | `/api/assignments`      | CRUD                                                          |
@@ -107,12 +106,14 @@ Responses: success returns JSON (or `204` on delete); errors return `{ "error": 
 
 ## Database Schema
 
-10 tables in the `unisole` database:
+9 tables in the `unisole` database:
 
 ```
-assignment_submissions  assignments  categories  course_modules  courses
-module_item  module_lessons  modules  quiz  users
+assignment_submissions  assignments  categories  courses  module_item
+module_lessons  modules  quiz  users
 ```
+
+Modules link to a course via `modules.course_id`.
 
 Migrations live in `drizzle/`; schema definition in `src/db/schema.ts`.
 

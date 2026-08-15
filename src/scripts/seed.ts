@@ -3,7 +3,6 @@ import {
   assignmentSubmissions,
   assignments,
   categories,
-  courseModules,
   courses,
   moduleItems,
   moduleLessons,
@@ -15,7 +14,6 @@ import {
   seedAssignmentSubmissions,
   seedAssignments,
   seedCategories,
-  seedCourseModules,
   seedCourses,
   seedModuleItems,
   seedModuleLessons,
@@ -32,7 +30,6 @@ async function seed() {
         assignments,
         quizzes,
         moduleLessons,
-        courseModules,
         moduleItems,
         modules,
         courses,
@@ -77,12 +74,16 @@ async function seed() {
       }
 
       const moduleIds = new Map<string, string>();
-      for (const { key, ...data } of seedModules) {
+      for (const module of seedModules) {
         const [row] = await tx
           .insert(modules)
-          .values(data)
+          .values({
+            title: module.title,
+            course_id: courseIds.get(module.courseKey),
+            order_index: module.order_index,
+          })
           .returning({ id: modules.id });
-        moduleIds.set(key, row.id);
+        moduleIds.set(module.key, row.id);
       }
 
       const itemIds = new Map<string, string>();
@@ -98,14 +99,6 @@ async function seed() {
           .returning({ id: moduleItems.id });
         itemIds.set(item.key, row.id);
       }
-
-      await tx.insert(courseModules).values(
-        seedCourseModules.map((link) => ({
-          course_id: courseIds.get(link.courseKey)!,
-          module_id: moduleIds.get(link.moduleKey)!,
-          order_index: link.order_index,
-        }))
-      );
 
       await tx.insert(moduleLessons).values(
         seedModuleLessons.map((link) => ({
@@ -152,7 +145,7 @@ async function seed() {
 
     console.log("Seed data inserted successfully.");
     console.log(
-      `Users: ${seedUsers.length}, Categories: ${seedCategories.length}, Courses: ${seedCourses.length}, Modules: ${seedModules.length}, Lessons: ${seedModuleItems.length}, CourseLinks: ${seedCourseModules.length}, LessonLinks: ${seedModuleLessons.length}, Assignments: ${seedAssignments.length}, Submissions: ${seedAssignmentSubmissions.length}, Quizzes: ${seedQuizzes.length}`
+      `Users: ${seedUsers.length}, Categories: ${seedCategories.length}, Courses: ${seedCourses.length}, Modules: ${seedModules.length}, Lessons: ${seedModuleItems.length}, LessonLinks: ${seedModuleLessons.length}, Assignments: ${seedAssignments.length}, Submissions: ${seedAssignmentSubmissions.length}, Quizzes: ${seedQuizzes.length}`
     );
   } catch (err) {
     console.error("Seed failed:", err);

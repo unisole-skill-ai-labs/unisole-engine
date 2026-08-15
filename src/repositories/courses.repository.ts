@@ -3,13 +3,12 @@ import { db } from "../db";
 import {
   Course,
   NewCourse,
-  courseModules,
   courses,
   moduleItems,
   moduleLessons,
   modules,
 } from "../db/schema";
-import { deleteOrphanLessons, deleteOrphanModules } from "../helpers/orphans";
+import { deleteOrphanLessons } from "../helpers/orphans";
 
 export const coursesRepository = {
   async list(): Promise<Course[]> {
@@ -41,12 +40,11 @@ export const coursesRepository = {
   getModulesForCourse(courseId: string) {
     return db
       .select()
-      .from(courseModules)
-      .innerJoin(modules, eq(courseModules.module_id, modules.id))
+      .from(modules)
       .leftJoin(moduleLessons, eq(moduleLessons.module_id, modules.id))
       .leftJoin(moduleItems, eq(moduleLessons.module_item_id, moduleItems.id))
-      .where(eq(courseModules.course_id, courseId))
-      .orderBy(asc(courseModules.order_index), asc(moduleLessons.order_index));
+      .where(eq(modules.course_id, courseId))
+      .orderBy(asc(modules.order_index), asc(moduleLessons.order_index));
   },
   removeWithCleanup(id: string) {
     return db.transaction(async (tx) => {
@@ -55,7 +53,6 @@ export const coursesRepository = {
         .where(eq(courses.id, id))
         .returning();
       if (deleted.length === 0) return null;
-      await deleteOrphanModules(tx);
       await deleteOrphanLessons(tx);
       return deleted[0];
     });

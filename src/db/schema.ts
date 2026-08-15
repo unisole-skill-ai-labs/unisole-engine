@@ -49,17 +49,7 @@ export const courses = pgTable("courses", {
 export const modules = pgTable("modules", {
   id: uuid("id").defaultRandom().primaryKey(),
   title: varchar("title", { length: 200 }).notNull(),
-  order_index: smallint("order_index").notNull().default(0),
-});
-
-export const courseModules = pgTable("course_modules", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  course_id: uuid("course_id")
-    .notNull()
-    .references(() => courses.id, { onDelete: "cascade" }),
-  module_id: uuid("module_id")
-    .notNull()
-    .references(() => modules.id, { onDelete: "cascade" }),
+  course_id: uuid("course_id").references(() => courses.id, { onDelete: "cascade" }),
   order_index: smallint("order_index").notNull().default(0),
 });
 
@@ -119,7 +109,6 @@ export type User = InferSelectModel<typeof users>;
 export type Course = InferSelectModel<typeof courses>;
 export type Category = InferSelectModel<typeof categories>;
 export type Module = InferSelectModel<typeof modules>;
-export type CourseModule = InferSelectModel<typeof courseModules>;
 export type ModuleItem = InferSelectModel<typeof moduleItems>;
 export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Assignment = InferSelectModel<typeof assignments>;
@@ -130,7 +119,6 @@ export type NewUser = InferInsertModel<typeof users>;
 export type NewCourse = InferInsertModel<typeof courses>;
 export type NewCategory = InferInsertModel<typeof categories>;
 export type NewModule = InferInsertModel<typeof modules>;
-export type NewCourseModule = InferInsertModel<typeof courseModules>;
 export type NewModuleItem = InferInsertModel<typeof moduleItems>;
 export type NewModuleLesson = InferInsertModel<typeof moduleLessons>;
 export type NewAssignment = InferInsertModel<typeof assignments>;

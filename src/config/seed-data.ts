@@ -27,6 +27,7 @@ export interface SeedCourse {
 export interface SeedModule {
   key: string;
   title: string;
+  courseKey: string;
   order_index: number;
 }
 
@@ -35,12 +36,6 @@ export interface SeedModuleItem {
   title: string;
   type: "video" | "pdf" | "article" | "quiz" | "assignment";
   content_url: string | null;
-  order_index: number;
-}
-
-export interface SeedCourseModule {
-  courseKey: string;
-  moduleKey: string;
   order_index: number;
 }
 
@@ -144,11 +139,36 @@ export const seedCourses: SeedCourse[] = [
 ];
 
 export const seedModules: SeedModule[] = [
-  { key: "getting-started", title: "Getting Started", order_index: 0 },
-  { key: "ts-basics", title: "TypeScript Basics", order_index: 1 },
-  { key: "advanced-types", title: "Advanced Types", order_index: 2 },
-  { key: "react-essentials", title: "React Essentials", order_index: 0 },
-  { key: "color-theory", title: "Color Theory", order_index: 0 },
+  {
+    key: "getting-started",
+    title: "Getting Started",
+    courseKey: "typescript-bootcamp",
+    order_index: 0,
+  },
+  {
+    key: "ts-basics",
+    title: "TypeScript Basics",
+    courseKey: "typescript-bootcamp",
+    order_index: 1,
+  },
+  {
+    key: "advanced-types",
+    title: "Advanced Types",
+    courseKey: "typescript-bootcamp",
+    order_index: 2,
+  },
+  {
+    key: "react-essentials",
+    title: "React Essentials",
+    courseKey: "react-hooks",
+    order_index: 0,
+  },
+  {
+    key: "color-theory",
+    title: "Color Theory",
+    courseKey: "ui-design",
+    order_index: 0,
+  },
 ];
 
 export const seedModuleItems: SeedModuleItem[] = [
@@ -194,23 +214,6 @@ export const seedModuleItems: SeedModuleItem[] = [
     content_url: "https://cdn.unisole.test/color-wheel.mp4",
     order_index: 0,
   },
-];
-
-export const seedCourseModules: SeedCourseModule[] = [
-  {
-    courseKey: "typescript-bootcamp",
-    moduleKey: "getting-started",
-    order_index: 0,
-  },
-  { courseKey: "typescript-bootcamp", moduleKey: "ts-basics", order_index: 1 },
-  {
-    courseKey: "typescript-bootcamp",
-    moduleKey: "advanced-types",
-    order_index: 2,
-  },
-  { courseKey: "react-hooks", moduleKey: "getting-started", order_index: 0 },
-  { courseKey: "react-hooks", moduleKey: "react-essentials", order_index: 1 },
-  { courseKey: "ui-design", moduleKey: "color-theory", order_index: 0 },
 ];
 
 export const seedModuleLessons: SeedModuleLesson[] = [
