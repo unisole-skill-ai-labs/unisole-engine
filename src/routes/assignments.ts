@@ -1,7 +1,15 @@
 import { Router } from "express";
-import { createCrudRouter } from "../crud";
-import { assignments } from "../db/schema";
+import { assignmentsController } from "../controllers/assignments.controller";
+import { validateBody } from "../middleware/validate";
 
-export const assignmentsRouter: Router = createCrudRouter({
-  table: assignments,
-});
+export const assignmentsRouter: Router = Router();
+
+assignmentsRouter.get("/", assignmentsController.list);
+assignmentsRouter.get("/:id", assignmentsController.getById);
+assignmentsRouter.post(
+  "/",
+  validateBody({ required: ["title"] }),
+  assignmentsController.create
+);
+assignmentsRouter.put("/:id", assignmentsController.update);
+assignmentsRouter.delete("/:id", assignmentsController.remove);

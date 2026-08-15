@@ -1,7 +1,15 @@
 import { Router } from "express";
-import { createCrudRouter } from "../crud";
-import { categories } from "../db/schema";
+import { categoriesController } from "../controllers/categories.controller";
+import { validateBody } from "../middleware/validate";
 
-export const categoriesRouter: Router = createCrudRouter({
-  table: categories,
-});
+export const categoriesRouter: Router = Router();
+
+categoriesRouter.get("/", categoriesController.list);
+categoriesRouter.get("/:id", categoriesController.getById);
+categoriesRouter.post(
+  "/",
+  validateBody({ required: ["name"] }),
+  categoriesController.create
+);
+categoriesRouter.put("/:id", categoriesController.update);
+categoriesRouter.delete("/:id", categoriesController.remove);

@@ -11,6 +11,8 @@ import { moduleItemsRouter } from "./routes/moduleItems";
 import { assignmentsRouter } from "./routes/assignments";
 import { assignmentSubmissionsRouter } from "./routes/assignmentSubmissions";
 import { quizzesRouter } from "./routes/quizzes";
+import { notFound } from "./middleware/not-found";
+import { errorHandler } from "./middleware/error-handler";
 
 dotenv.config();
 
@@ -31,7 +33,8 @@ app.use("/api/assignments", assignmentsRouter);
 app.use("/api/assignment-submissions", assignmentSubmissionsRouter);
 app.use("/api/quizzes", quizzesRouter);
 
-app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = Number(process.env.PORT ?? 3000);
 app.listen(PORT, () => {

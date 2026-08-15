@@ -1,7 +1,15 @@
 import { Router } from "express";
-import { createCrudRouter } from "../crud";
-import { courseModules } from "../db/schema";
+import { courseModulesController } from "../controllers/courseModules.controller";
+import { validateBody } from "../middleware/validate";
 
-export const courseModulesRouter: Router = createCrudRouter({
-  table: courseModules,
-});
+export const courseModulesRouter: Router = Router();
+
+courseModulesRouter.get("/", courseModulesController.list);
+courseModulesRouter.get("/:id", courseModulesController.getById);
+courseModulesRouter.post(
+  "/",
+  validateBody({ required: ["course_id", "module_id"] }),
+  courseModulesController.create
+);
+courseModulesRouter.put("/:id", courseModulesController.update);
+courseModulesRouter.delete("/:id", courseModulesController.remove);

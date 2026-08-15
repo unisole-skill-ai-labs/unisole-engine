@@ -11,6 +11,18 @@ import {
   quizzes,
   users,
 } from "../db/schema";
+import {
+  seedAssignmentSubmissions,
+  seedAssignments,
+  seedCategories,
+  seedCourseModules,
+  seedCourses,
+  seedModuleItems,
+  seedModuleLessons,
+  seedModules,
+  seedQuizzes,
+  seedUsers,
+} from "../config/seed-data";
 
 async function seed() {
   try {
@@ -30,187 +42,117 @@ async function seed() {
         await tx.delete(table);
       }
 
-      await tx.insert(users).values({
-        name: "Admin User",
-        email: "admin@unisole.test",
-        phone: "0000000000",
-        password_hash: "placeholder-hash-1",
-        role: "admin",
-        auth_provider: "local",
-        is_verified: true,
-      });
+      const userIds = new Map<string, string>();
+      for (const { key, ...data } of seedUsers) {
+        const [row] = await tx
+          .insert(users)
+          .values(data)
+          .returning({ id: users.id });
+        userIds.set(key, row.id);
+      }
 
-      const studentRows = await tx
-        .insert(users)
-        .values([
-          {
-            name: "John Doe",
-            email: "john@unisole.test",
-            phone: "1111111111",
-            password_hash: "placeholder-hash-2",
-            role: "student",
-            auth_provider: "local",
-            is_verified: true,
-          },
-          {
-            name: "Jane Smith",
-            email: "jane@unisole.test",
-            phone: "2222222222",
-            password_hash: "placeholder-hash-3",
-            role: "student",
-            auth_provider: "local",
-            is_verified: true,
-          },
-        ])
-        .returning({ id: users.id });
-      const studentIds = studentRows.map((r) => r.id);
+      const categoryIds = new Map<string, string>();
+      for (const { key, ...data } of seedCategories) {
+        const [row] = await tx
+          .insert(categories)
+          .values(data)
+          .returning({ id: categories.id });
+        categoryIds.set(key, row.id);
+      }
 
-      const [web] = await tx
-        .insert(categories)
-        .values({ name: "Web Development" })
-        .returning({ id: categories.id });
-      const [design] = await tx
-        .insert(categories)
-        .values({ name: "Design" })
-        .returning({ id: categories.id });
+      const courseIds = new Map<string, string>();
+      for (const course of seedCourses) {
+        const [row] = await tx
+          .insert(courses)
+          .values({
+            title: course.title,
+            slug: course.slug,
+            category_id: categoryIds.get(course.categoryKey),
+            price: course.price,
+            rating_avg: course.rating_avg,
+            total_enrollments: course.total_enrollments,
+          })
+          .returning({ id: courses.id });
+        courseIds.set(course.key, row.id);
+      }
 
-      const courseRows = await tx
-        .insert(courses)
-        .values([
-          {
-            title: "Complete TypeScript Bootcamp",
-            slug: "complete-typescript-bootcamp",
-            category_id: web.id,
-            price: "49.99",
-            rating_avg: "4.5",
-            total_enrollments: 120,
-          },
-          {
-            title: "Modern React with Hooks",
-            slug: "modern-react-hooks",
-            category_id: web.id,
-            price: "39.99",
-            rating_avg: "4.5",
-            total_enrollments: 120,
-          },
-          {
-            title: "UI Design Fundamentals",
-            slug: "ui-design-fundamentals",
-            category_id: design.id,
-            price: "29.99",
-            rating_avg: "4.5",
-            total_enrollments: 120,
-          },
-        ])
-        .returning({ id: courses.id });
-      const courseIds = courseRows.map((r) => r.id);
+      const moduleIds = new Map<string, string>();
+      for (const { key, ...data } of seedModules) {
+        const [row] = await tx
+          .insert(modules)
+          .values(data)
+          .returning({ id: modules.id });
+        moduleIds.set(key, row.id);
+      }
 
-      const moduleRows = await tx
-        .insert(modules)
-        .values([
-          { title: "Getting Started", order_index: 0 },
-          { title: "TypeScript Basics", order_index: 1 },
-          { title: "Advanced Types", order_index: 2 },
-          { title: "React Essentials", order_index: 0 },
-          { title: "Color Theory", order_index: 0 },
-        ])
-        .returning({ id: modules.id });
-      const moduleIds = moduleRows.map((r) => r.id);
+      const itemIds = new Map<string, string>();
+      for (const item of seedModuleItems) {
+        const [row] = await tx
+          .insert(moduleItems)
+          .values({
+            title: item.title,
+            type: item.type,
+            content_url: item.content_url,
+            order_index: item.order_index,
+          })
+          .returning({ id: moduleItems.id });
+        itemIds.set(item.key, row.id);
+      }
 
-      const itemRows = await tx
-        .insert(moduleItems)
-        .values([
-          {
-            title: "Welcome Video",
-            type: "video",
-            content_url: "https://cdn.unisole.test/welcome.mp4",
-            order_index: 0,
-          },
-          {
-            title: "Course Syllabus",
-            type: "pdf",
-            content_url: "https://cdn.unisole.test/syllabus.pdf",
-            order_index: 1,
-          },
-          {
-            title: "Intro to Types",
-            type: "article",
-            content_url: "https://unisole.test/lessons/types-intro",
-            order_index: 0,
-          },
-          {
-            title: "Types Quiz",
-            type: "quiz",
-            content_url: null,
-            order_index: 1,
-          },
-          {
-            title: "Build a To-Do App",
-            type: "assignment",
-            content_url: null,
-            order_index: 2,
-          },
-          {
-            title: "Color Wheel Video",
-            type: "video",
-            content_url: "https://cdn.unisole.test/color-wheel.mp4",
-            order_index: 0,
-          },
-        ])
-        .returning({ id: moduleItems.id });
-      const itemIds = itemRows.map((r) => r.id);
-
-      await tx.insert(courseModules).values([
-        { course_id: courseIds[0], module_id: moduleIds[0], order_index: 0 },
-        { course_id: courseIds[0], module_id: moduleIds[1], order_index: 1 },
-        { course_id: courseIds[0], module_id: moduleIds[2], order_index: 2 },
-        { course_id: courseIds[1], module_id: moduleIds[0], order_index: 0 },
-        { course_id: courseIds[1], module_id: moduleIds[3], order_index: 1 },
-        { course_id: courseIds[2], module_id: moduleIds[4], order_index: 0 },
-      ]);
-
-      await tx.insert(moduleLessons).values([
-        { module_id: moduleIds[0], module_item_id: itemIds[0], order_index: 0 },
-        { module_id: moduleIds[0], module_item_id: itemIds[1], order_index: 1 },
-        { module_id: moduleIds[1], module_item_id: itemIds[2], order_index: 0 },
-        { module_id: moduleIds[1], module_item_id: itemIds[3], order_index: 1 },
-        { module_id: moduleIds[1], module_item_id: itemIds[4], order_index: 2 },
-        { module_id: moduleIds[3], module_item_id: itemIds[0], order_index: 0 },
-        { module_id: moduleIds[4], module_item_id: itemIds[5], order_index: 0 },
-      ]);
-
-      const [assignment] = await tx
-        .insert(assignments)
-        .values({
-          lesson_id: itemIds[4],
-          title: "To-Do App Assignment",
-          max_score: 100,
-          allowed_attempts: 3,
-        })
-        .returning({ id: assignments.id });
-
-      await tx.insert(assignmentSubmissions).values(
-        studentIds.map((userId) => ({
-          assignment_id: assignment.id,
-          user_id: userId,
-          file_url: "https://cdn.unisole.test/submissions/todo-app.zip",
-          status: "pending" as const,
+      await tx.insert(courseModules).values(
+        seedCourseModules.map((link) => ({
+          course_id: courseIds.get(link.courseKey)!,
+          module_id: moduleIds.get(link.moduleKey)!,
+          order_index: link.order_index,
         }))
       );
 
-      await tx.insert(quizzes).values({
-        moduel_item_id: itemIds[3],
-        title: "Intro to Types Quiz",
-        duration_min: 10,
-        total_marks: 20,
-        passing_marks: 12,
-        max_attempts: 2,
-      });
+      await tx.insert(moduleLessons).values(
+        seedModuleLessons.map((link) => ({
+          module_id: moduleIds.get(link.moduleKey)!,
+          module_item_id: itemIds.get(link.itemKey)!,
+          order_index: link.order_index,
+        }))
+      );
+
+      const assignmentIds = new Map<string, string>();
+      for (const assignment of seedAssignments) {
+        const [row] = await tx
+          .insert(assignments)
+          .values({
+            lesson_id: itemIds.get(assignment.lessonItemKey),
+            title: assignment.title,
+            max_score: assignment.max_score,
+            allowed_attempts: assignment.allowed_attempts,
+          })
+          .returning({ id: assignments.id });
+        assignmentIds.set(assignment.key, row.id);
+      }
+
+      await tx.insert(assignmentSubmissions).values(
+        seedAssignmentSubmissions.map((submission) => ({
+          assignment_id: assignmentIds.get(submission.assignmentKey)!,
+          user_id: userIds.get(submission.userKey)!,
+          file_url: submission.file_url,
+          status: submission.status,
+        }))
+      );
+
+      for (const quiz of seedQuizzes) {
+        await tx.insert(quizzes).values({
+          moduel_item_id: itemIds.get(quiz.moduleItemKey),
+          title: quiz.title,
+          duration_min: quiz.duration_min,
+          total_marks: quiz.total_marks,
+          passing_marks: quiz.passing_marks,
+          max_attempts: quiz.max_attempts,
+        });
+      }
     });
 
     console.log("Seed data inserted successfully.");
     console.log(
-      "Users: 3, Categories: 2, Courses: 3, Modules: 5, Lessons: 6, CourseLinks: 6, LessonLinks: 7, Assignments: 1, Submissions: 2, Quizzes: 1"
+      `Users: ${seedUsers.length}, Categories: ${seedCategories.length}, Courses: ${seedCourses.length}, Modules: ${seedModules.length}, Lessons: ${seedModuleItems.length}, CourseLinks: ${seedCourseModules.length}, LessonLinks: ${seedModuleLessons.length}, Assignments: ${seedAssignments.length}, Submissions: ${seedAssignmentSubmissions.length}, Quizzes: ${seedQuizzes.length}`
     );
   } catch (err) {
     console.error("Seed failed:", err);

@@ -1,0 +1,122 @@
+# Unisole Engine
+
+Basic TypeScript backend for the Unisole LMS schema — an Express + Drizzle (PostgreSQL) REST API.
+
+## Tech Stack
+
+- **Runtime:** Node.js 22 (Alpine)
+- **Framework:** Express 4
+- **ORM:** Drizzle ORM 0.45 + `pg`
+- **Database:** PostgreSQL 16
+- **Language:** TypeScript 5 (strict)
+- **Deployment:** Docker (multi-stage build) + Docker Compose
+
+## Getting Started
+
+### Prerequisites
+
+- Node 20+ and PostgreSQL (local dev), or Docker + Docker Compose
+
+### Local development
+
+```bash
+npm install
+cp .env.example .env        # set DATABASE_URL for your local Postgres
+npm run db:migrate          # apply drizzle migrations
+npm run db:seed             # optional: insert sample data
+npm run dev                 # tsx watch, http://localhost:3000
+```
+
+### Docker (recommended)
+
+```bash
+docker compose up -d --build
+```
+
+The `api` service runs migrations, seeds data (when `RUN_SEED=true`), then starts the server.
+
+- API: http://localhost:3000
+- Postgres: `localhost:5433` (mapped to container 5432)
+
+## Configuration
+
+| Variable       | Default                                   | Description              |
+| -------------- | ----------------------------------------- | ------------------------ |
+| `PORT`         | `3000`                                    | API listen port          |
+| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/unisole` | Postgres connection string |
+| `RUN_SEED`     | —                                         | `true` to seed on startup |
+
+## Scripts
+
+| Command                | Description                      |
+| ---------------------- | -------------------------------- |
+| `npm run dev`          | Watch mode dev server            |
+| `npm run build`        | Compile TypeScript to `dist/`    |
+| `npm run start`        | Run compiled server              |
+| `npm run typecheck`    | Type-check without emitting      |
+| `npm run db:generate`  | Generate drizzle migrations      |
+| `npm run db:push`      | Push schema to database          |
+| `npm run db:migrate`   | Apply migrations                 |
+| `npm run db:seed`      | Seed sample data                 |
+
+## Architecture
+
+Layered architecture — each request flows through one direction:
+
+```
+route → middleware → controller → manager (service) → repository → db
+```
+
+| Layer        | Responsibility                                  | Location                |
+| ------------ | ----------------------------------------------- | ----------------------- |
+| Router       | Path mapping, middleware wiring                 | `src/routes/`           |
+| Middleware   | Cross-cutting: errors, validation, 404, async   | `src/middleware/`       |
+| Controller   | HTTP concerns: parse request, shape response    | `src/controllers/`      |
+| Manager      | Business logic: validation, defaults, 404s      | `src/managers/`         |
+| Repository   | Data access only (SQL via Drizzle)              | `src/repositories/`     |
+
+Each resource has generic base factories (`base.*.ts`) plus thin per-resource files as extension seams. Courses and modules add custom endpoints and transactional deletes with orphan cleanup.
+
+## API Endpoints
+
+Base path: `http://localhost:3000`
+
+| Resource                | Routes                                                        |
+| ----------------------- | ------------------------------------------------------------- |
+| `GET /health`           | Health check                                                  |
+| `/api/users`            | CRUD (`hasUpdatedAt`)                                         |
+| `/api/categories`       | CRUD                                                          |
+| `/api/courses`          | CRUD (no delete via base) + `GET /:id/modules`, `GET /:id/tree` |
+| `/api/modules`          | CRUD + `GET /:id/lessons`                                     |
+| `/api/course-modules`   | CRUD                                                          |
+| `/api/module-items`     | CRUD                                                          |
+| `/api/module-lessons`   | CRUD                                                          |
+| `/api/assignments`      | CRUD                                                          |
+| `/api/assignment-submissions` | CRUD                                                   |
+| `/api/quizzes`          | CRUD                                                          |
+
+Every CRUD resource supports:
+
+- `GET /` — list all
+- `GET /:id` — get one
+- `POST /` — create (validates required fields)
+- `PUT /:id` — update (partial)
+- `DELETE /:id` — delete
+
+Responses: success returns JSON (or `204` on delete); errors return `{ "error": "<message>" }` with 400/404/500.
+
+## Database Schema
+
+10 tables in the `unisole` database:
+
+```
+assignment_submissions  assignments  categories  course_modules  courses
+module_item  module_lessons  modules  quiz  users
+```
+
+Migrations live in `drizzle/`; schema definition in `src/db/schema.ts`.
+
+## Documentation
+
+- `decisions.md` — architecture decision records (ADR)
+- `logs.md` — activity / change log

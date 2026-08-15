@@ -1,8 +1,15 @@
 import { Router } from "express";
-import { createCrudRouter } from "../crud";
-import { users } from "../db/schema";
+import { usersController } from "../controllers/users.controller";
+import { validateBody } from "../middleware/validate";
 
-export const usersRouter: Router = createCrudRouter({
-  table: users,
-  hasUpdatedAt: true,
-});
+export const usersRouter: Router = Router();
+
+usersRouter.get("/", usersController.list);
+usersRouter.get("/:id", usersController.getById);
+usersRouter.post(
+  "/",
+  validateBody({ required: ["name", "email"] }),
+  usersController.create
+);
+usersRouter.put("/:id", usersController.update);
+usersRouter.delete("/:id", usersController.remove);
