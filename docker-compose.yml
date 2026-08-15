@@ -22,7 +22,8 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgres://postgres:postgres@db:5432/unisole
-      RUN_SEED: "true"
+      # Set to "true" to wipe & re-insert seed data on startup. Keep "false" to preserve data.
+      RUN_SEED: "false"
     ports:
       - "3000:3000"
     depends_on:

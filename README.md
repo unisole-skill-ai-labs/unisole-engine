@@ -33,7 +33,7 @@ npm run dev                 # tsx watch, http://localhost:3000
 docker compose up -d --build
 ```
 
-The `api` service runs migrations, seeds data (when `RUN_SEED=true`), then starts the server.
+The `api` service runs migrations, then seeds data only when `RUN_SEED=true`, then starts the server. `RUN_SEED` defaults to `false` to avoid wiping data on every restart; run `RUN_SEED=true docker compose up -d api` once (or `docker compose exec api node dist/scripts/seed.js`) to seed.
 
 - API: http://localhost:3000
 - Postgres: `localhost:5433` (mapped to container 5432)
@@ -75,7 +75,7 @@ route → middleware → controller → manager (service) → repository → db
 | Manager      | Business logic: validation, defaults, 404s      | `src/managers/`         |
 | Repository   | Data access only (SQL via Drizzle)              | `src/repositories/`     |
 
-Each resource has generic base factories (`base.*.ts`) plus thin per-resource files as extension seams. Courses and modules add custom endpoints and transactional deletes with orphan cleanup.
+Each resource has its own repository, manager, and controller implementing full CRUD. Courses and modules add custom endpoints and transactional deletes with orphan cleanup. Seed/dummy data lives in `src/config/seed-data.ts`.
 
 ## API Endpoints
 
@@ -86,8 +86,8 @@ Base path: `http://localhost:3000`
 | `GET /health`           | Health check                                                  |
 | `/api/users`            | CRUD (`hasUpdatedAt`)                                         |
 | `/api/categories`       | CRUD                                                          |
-| `/api/courses`          | CRUD (no delete via base) + `GET /:id/modules`, `GET /:id/tree` |
-| `/api/modules`          | CRUD + `GET /:id/lessons`                                     |
+| `/api/courses`          | CRUD (delete cleans up orphan modules/items) + `GET /:id/modules`, `GET /:id/tree` |
+| `/api/modules`          | CRUD (delete cleans up orphan items) + `GET /:id/lessons` |
 | `/api/course-modules`   | CRUD                                                          |
 | `/api/module-items`     | CRUD                                                          |
 | `/api/module-lessons`   | CRUD                                                          |
