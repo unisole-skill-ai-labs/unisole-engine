@@ -303,6 +303,20 @@ export const seedModuleItems: SeedModuleItem[] = [
     content_url: "https://cdn.unisole.test/color-wheel.mp4",
     order_index: 0,
   },
+  {
+    key: "react-quiz",
+    title: "React Hooks Quiz",
+    type: "quiz",
+    content_url: null,
+    order_index: 1,
+  },
+  {
+    key: "react-project",
+    title: "React Project: Portfolio",
+    type: "assignment",
+    content_url: null,
+    order_index: 2,
+  },
 ];
 
 export const seedModuleLessons: SeedModuleLesson[] = [
@@ -312,6 +326,8 @@ export const seedModuleLessons: SeedModuleLesson[] = [
   { moduleKey: "ts-basics", itemKey: "types-quiz", order_index: 1 },
   { moduleKey: "ts-basics", itemKey: "todo-app", order_index: 2 },
   { moduleKey: "react-essentials", itemKey: "welcome-video", order_index: 0 },
+  { moduleKey: "react-essentials", itemKey: "react-quiz", order_index: 1 },
+  { moduleKey: "react-essentials", itemKey: "react-project", order_index: 2 },
   { moduleKey: "color-theory", itemKey: "color-wheel", order_index: 0 },
 ];
 
@@ -322,6 +338,13 @@ export const seedAssignments: SeedAssignment[] = [
     title: "To-Do App Assignment",
     max_score: 100,
     allowed_attempts: 3,
+  },
+  {
+    key: "react-portfolio",
+    lessonItemKey: "react-project",
+    title: "Build a React Portfolio",
+    max_score: 100,
+    allowed_attempts: 2,
   },
 ];
 
@@ -338,6 +361,12 @@ export const seedAssignmentSubmissions: SeedAssignmentSubmission[] = [
     file_url: "https://cdn.unisole.test/submissions/todo-app.zip",
     status: "pending",
   },
+  {
+    assignmentKey: "react-portfolio",
+    userKey: "jane",
+    file_url: "https://cdn.unisole.test/submissions/react-portfolio.zip",
+    status: "pending",
+  },
 ];
 
 export const seedQuizzes: SeedQuiz[] = [
@@ -350,6 +379,15 @@ export const seedQuizzes: SeedQuiz[] = [
     passing_marks: 12,
     max_attempts: 2,
   },
+  {
+    key: "react-hooks-quiz",
+    moduleItemKey: "react-quiz",
+    title: "React Hooks Quiz",
+    duration_min: 15,
+    total_marks: 25,
+    passing_marks: 15,
+    max_attempts: 2,
+  },
 ];
 
 export const seedTests: SeedTest[] = [
@@ -360,6 +398,15 @@ export const seedTests: SeedTest[] = [
     duration_min: 10,
     total_marks: 20,
     passing_marks: 12,
+    max_attempts: 2,
+  },
+  {
+    key: "react-hooks-test",
+    moduleItemKey: "react-quiz",
+    title: "React Hooks Assessment",
+    duration_min: 20,
+    total_marks: 50,
+    passing_marks: 30,
     max_attempts: 2,
   },
 ];
@@ -401,6 +448,24 @@ export const seedQuestions: SeedQuestion[] = [
     correct_answer: null,
     marks: 5,
   },
+  {
+    key: "what-is-usestate",
+    quizKey: "react-hooks-quiz",
+    question_text: "What does useState return?",
+    type: "mcq_single",
+    options: ["An array with the state and a setter", "An object", "A string", "A callback"],
+    correct_answer: ["An array with the state and a setter"],
+    marks: 5,
+  },
+  {
+    key: "hooks-top-level",
+    quizKey: "react-hooks-quiz",
+    question_text: "Hooks can only be called at the top level of a component.",
+    type: "true_false",
+    options: [true, false],
+    correct_answer: [true],
+    marks: 5,
+  },
 ];
 
 export const seedTestAttempts: SeedTestAttempt[] = [
@@ -411,9 +476,16 @@ export const seedTestAttempts: SeedTestAttempt[] = [
     score: null,
     answers: [{ question: "what-is-ts", answer: "A superset of JavaScript" }],
   },
+  {
+    testKey: "react-hooks-test",
+    userKey: "jane",
+    status: "submitted",
+    score: "42",
+    answers: [{ question: "what-is-usestate", answer: "An array with the state and a setter" }],
+  },
 ];
 
-export const seedCarts: SeedCart[] = [{ userKey: "john" }, { userKey: "jane" }];
+export const seedCarts: SeedCart[] = [{ userKey: "john" }, { userKey: "jane" }, { userKey: "admin" }];
 
 export const seedCoupons: SeedCoupon[] = [
   {
@@ -453,6 +525,20 @@ export const seedEnrollments: SeedEnrollment[] = [
     progress_percent: 10,
     status: "active",
   },
+  {
+    userKey: "john",
+    courseKey: "react-hooks",
+    expiry_at: null,
+    progress_percent: 60,
+    status: "active",
+  },
+  {
+    userKey: "jane",
+    courseKey: "ui-design",
+    expiry_at: null,
+    progress_percent: 5,
+    status: "active",
+  },
 ];
 
 export const seedOrders: SeedOrder[] = [
@@ -465,6 +551,15 @@ export const seedOrders: SeedOrder[] = [
     status: "paid",
     couponKey: "welcome10",
   },
+  {
+    key: "order-react",
+    userKey: "jane",
+    razorpay_order_id: "order_1b3d5f7h",
+    amount: "35.99",
+    currency: "INR",
+    status: "paid",
+    couponKey: "flat50",
+  },
 ];
 
 export const seedOrderItems: SeedOrderItem[] = [
@@ -472,6 +567,11 @@ export const seedOrderItems: SeedOrderItem[] = [
     orderKey: "order-ts",
     courseKey: "typescript-bootcamp",
     price_at_purchase: "49.99",
+  },
+  {
+    orderKey: "order-react",
+    courseKey: "react-hooks",
+    price_at_purchase: "39.99",
   },
 ];
 
@@ -484,6 +584,14 @@ export const seedPayments: SeedPayment[] = [
     method: "upi",
     status: "captured",
   },
+  {
+    key: "pay-react",
+    orderKey: "order-react",
+    razorpay_payment_id: "pay_2c4e6g8j",
+    razorpay_signature: "sig_xyz789",
+    method: "card",
+    status: "captured",
+  },
 ];
 
 export const seedCertificates: SeedCertificate[] = [
@@ -491,6 +599,11 @@ export const seedCertificates: SeedCertificate[] = [
     userKey: "john",
     courseKey: "typescript-bootcamp",
     certificate_url: "https://cdn.unisole.test/certs/john-typescript.pdf",
+  },
+  {
+    userKey: "jane",
+    courseKey: "react-hooks",
+    certificate_url: "https://cdn.unisole.test/certs/jane-react.pdf",
   },
 ];
 
@@ -500,5 +613,11 @@ export const seedReviews: SeedReview[] = [
     courseKey: "typescript-bootcamp",
     rating: 5,
     comment: "Great course, highly recommended!",
+  },
+  {
+    userKey: "jane",
+    courseKey: "ui-design",
+    rating: 4,
+    comment: "Loved the color theory section.",
   },
 ];
