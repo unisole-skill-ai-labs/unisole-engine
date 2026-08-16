@@ -4,6 +4,10 @@ Chronological log of changes and notable events. Newest first.
 
 ---
 
+## 2026-08-16
+
+- **Upgrade:** Dockerized Postgres bumped `postgres:16-alpine` → `postgres:18-alpine` (latest stable, 18.x) in `docker-compose.yml`. Credentials and port unchanged (`postgres`/`postgres`, db `unisole`, host port 5433). The local native server on `localhost:5432` was already PostgreSQL 18.4. Data volume was recreated and migrations + seed re-applied.
+
 ## 2026-08-14
 
 - **Deployment:** Provisioned fresh Ubuntu EC2 instance. Containerized app requires only Docker; runbook documented in the session. Public access on port 3000 pending security-group inbound rule (port 22 verified open, 3000/80 still filtered at time of writing).

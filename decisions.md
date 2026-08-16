@@ -16,9 +16,9 @@ Each entry records a decision with a timestamp, context, decision, and consequen
 - Build stage: `npm ci` + `tsc`
 - Runtime stage: production-only dependencies + compiled `dist/`
 
-Use `docker-compose.yml` to run `postgres:16-alpine` and the API together, with the API running migrations and (optionally) seed before starting. Postgres data persists in a named volume.
+Use `docker-compose.yml` to run `postgres:18-alpine` and the API together, with the API running migrations and (optionally) seed before starting. Postgres data persists in a named volume.
 
-**Consequences:** One-command deploys (`docker compose up -d --build`); a compose quirk required escaping `$RUN_SEED` as `$$RUN_SEED` so the container shell — not Compose — evaluates the variable.
+**Consequences:** One-command deploys (`docker compose up -d --build`); a compose quirk required escaping `$RUN_SEED` as `$$RUN_SEED` so the container shell — not Compose — evaluates the variable. The db image tracks the latest stable PostgreSQL major version (18 as of 2026-08); upgrading the image major requires recreating the `pgdata` volume and re-seeding.
 
 ---
 

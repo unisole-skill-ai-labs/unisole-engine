@@ -1,0 +1,2339 @@
+openapi: 3.0.3
+info:
+  title: Unisole Engine API
+  version: 1.0.0
+  description: |
+    REST API for the Unisole LMS. Express + Drizzle (PostgreSQL).
+
+    - Base path for all resources: `/api`
+    - Create returns `201`, delete returns `204` (no body)
+    - Errors return `{ "error": "<message>" }` with 400/404/500
+  contact:
+    name: Unisole
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: http://<ec2-public-ip>:3000
+    description: EC2 deployment
+
+tags:
+  - name: Health
+    description: Service health check
+  - name: Users
+    description: User accounts
+  - name: Categories
+    description: Course categories
+  - name: Courses
+    description: Courses with modules and tree
+  - name: Modules
+    description: Course modules and their lessons
+  - name: Module Items
+    description: Content items (video, pdf, article, quiz, assignment)
+  - name: Module Lessons
+    description: Links a module to a content item
+  - name: Assignments
+    description: Assignments attached to content items
+  - name: Assignment Submissions
+    description: Student submissions for assignments
+  - name: Quizzes
+    description: Quizzes attached to content items
+  - name: Tests
+    description: Standalone tests and their attempts
+  - name: Questions
+    description: Quiz questions
+  - name: Test Attempts
+    description: User attempts at a test
+  - name: Carts
+    description: Per-user shopping carts
+  - name: Coupons
+    description: Discount coupons
+  - name: Enrollments
+    description: Course enrollments
+  - name: Orders
+    description: Orders and payments
+  - name: Order Items
+    description: Courses purchased within an order
+  - name: Payments
+    description: Payment records
+  - name: Certificates
+    description: Completion certificates
+  - name: Reviews
+    description: Course reviews
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List all users
+      operationId: listUsers
+      responses:
+        "200":
+          description: A list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      tags: [Users]
+      summary: Create a user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/UserInput"
+              required: [name, email]
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Users]
+      summary: Get a user by id
+      operationId: getUserById
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Users]
+      summary: Update a user (partial)
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "200":
+          description: The updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Users]
+      summary: Delete a user
+      operationId: deleteUser
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/categories:
+    get:
+      tags: [Categories]
+      summary: List all categories
+      operationId: listCategories
+      responses:
+        "200":
+          description: A list of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      tags: [Categories]
+      summary: Create a category
+      operationId: createCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CategoryInput"
+              required: [name]
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/categories/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Categories]
+      summary: Get a category by id
+      operationId: getCategoryById
+      responses:
+        "200":
+          description: The category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Categories]
+      summary: Update a category
+      operationId: updateCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "200":
+          description: The updated category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Categories]
+      summary: Delete a category
+      operationId: deleteCategory
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/courses:
+    get:
+      tags: [Courses]
+      summary: List all courses
+      operationId: listCourses
+      responses:
+        "200":
+          description: A list of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+    post:
+      tags: [Courses]
+      summary: Create a course
+      operationId: createCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CourseInput"
+              required: [title, slug]
+      responses:
+        "201":
+          description: Course created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/courses/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Courses]
+      summary: Get a course by id
+      operationId: getCourseById
+      responses:
+        "200":
+          description: The course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Courses]
+      summary: Update a course (partial)
+      operationId: updateCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "200":
+          description: The updated course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Courses]
+      summary: Delete a course (cascades to its modules and cleans orphans)
+      operationId: deleteCourse
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/courses/{id}/modules:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Courses]
+      summary: Get modules (with lessons) for a course
+      operationId: getCourseModules
+      responses:
+        "200":
+          description: Modules belonging to the course, each with its lessons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModuleWithLessons"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/courses/{id}/tree:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Courses]
+      summary: Get a course with its module tree
+      operationId: getCourseTree
+      responses:
+        "200":
+          description: The course including nested modules and lessons
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseTree"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/modules:
+    get:
+      tags: [Modules]
+      summary: List all modules
+      operationId: listModules
+      responses:
+        "200":
+          description: A list of modules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Module"
+    post:
+      tags: [Modules]
+      summary: Create a module
+      operationId: createModule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ModuleInput"
+              required: [title]
+      responses:
+        "201":
+          description: Module created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/modules/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Modules]
+      summary: Get a module by id
+      operationId: getModuleById
+      responses:
+        "200":
+          description: The module
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Modules]
+      summary: Update a module
+      operationId: updateModule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleInput"
+      responses:
+        "200":
+          description: The updated module
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Modules]
+      summary: Delete a module (cleans orphan content items)
+      operationId: deleteModule
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/modules/{id}/lessons:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Modules]
+      summary: Get lessons (content items) for a module
+      operationId: getModuleLessons
+      responses:
+        "200":
+          description: The content items ordered in the module
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModuleItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/module-items:
+    get:
+      tags: [Module Items]
+      summary: List all module items
+      operationId: listModuleItems
+      responses:
+        "200":
+          description: A list of module items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModuleItem"
+    post:
+      tags: [Module Items]
+      summary: Create a module item
+      operationId: createModuleItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ModuleItemInput"
+              required: [title, type]
+      responses:
+        "201":
+          description: Module item created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/module-items/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Module Items]
+      summary: Get a module item by id
+      operationId: getModuleItemById
+      responses:
+        "200":
+          description: The module item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Module Items]
+      summary: Update a module item
+      operationId: updateModuleItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleItemInput"
+      responses:
+        "200":
+          description: The updated module item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Module Items]
+      summary: Delete a module item
+      operationId: deleteModuleItem
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/module-lessons:
+    get:
+      tags: [Module Lessons]
+      summary: List all module lessons
+      operationId: listModuleLessons
+      responses:
+        "200":
+          description: A list of module lessons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModuleLesson"
+    post:
+      tags: [Module Lessons]
+      summary: Create a module lesson
+      operationId: createModuleLesson
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ModuleLessonInput"
+              required: [module_id, module_item_id]
+      responses:
+        "201":
+          description: Module lesson created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleLesson"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/module-lessons/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Module Lessons]
+      summary: Get a module lesson by id
+      operationId: getModuleLessonById
+      responses:
+        "200":
+          description: The module lesson
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleLesson"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Module Lessons]
+      summary: Update a module lesson
+      operationId: updateModuleLesson
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleLessonInput"
+      responses:
+        "200":
+          description: The updated module lesson
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleLesson"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Module Lessons]
+      summary: Delete a module lesson
+      operationId: deleteModuleLesson
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/assignments:
+    get:
+      tags: [Assignments]
+      summary: List all assignments
+      operationId: listAssignments
+      responses:
+        "200":
+          description: A list of assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assignment"
+    post:
+      tags: [Assignments]
+      summary: Create an assignment
+      operationId: createAssignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/AssignmentInput"
+              required: [title]
+      responses:
+        "201":
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/assignments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Assignments]
+      summary: Get an assignment by id
+      operationId: getAssignmentById
+      responses:
+        "200":
+          description: The assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Assignments]
+      summary: Update an assignment
+      operationId: updateAssignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentInput"
+      responses:
+        "200":
+          description: The updated assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Assignments]
+      summary: Delete an assignment
+      operationId: deleteAssignment
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/assignment-submissions:
+    get:
+      tags: [Assignment Submissions]
+      summary: List all assignment submissions
+      operationId: listAssignmentSubmissions
+      responses:
+        "200":
+          description: A list of assignment submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssignmentSubmission"
+    post:
+      tags: [Assignment Submissions]
+      summary: Create an assignment submission
+      operationId: createAssignmentSubmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/AssignmentSubmissionInput"
+              required: [assignment_id, user_id]
+      responses:
+        "201":
+          description: Assignment submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentSubmission"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/assignment-submissions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Assignment Submissions]
+      summary: Get an assignment submission by id
+      operationId: getAssignmentSubmissionById
+      responses:
+        "200":
+          description: The assignment submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentSubmission"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Assignment Submissions]
+      summary: Update an assignment submission
+      operationId: updateAssignmentSubmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentSubmissionInput"
+      responses:
+        "200":
+          description: The updated assignment submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentSubmission"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Assignment Submissions]
+      summary: Delete an assignment submission
+      operationId: deleteAssignmentSubmission
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/quizzes:
+    get:
+      tags: [Quizzes]
+      summary: List all quizzes
+      operationId: listQuizzes
+      responses:
+        "200":
+          description: A list of quizzes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quiz"
+    post:
+      tags: [Quizzes]
+      summary: Create a quiz
+      operationId: createQuiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/QuizInput"
+              required: [title]
+      responses:
+        "201":
+          description: Quiz created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/quizzes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Quizzes]
+      summary: Get a quiz by id
+      operationId: getQuizById
+      responses:
+        "200":
+          description: The quiz
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Quizzes]
+      summary: Update a quiz
+      operationId: updateQuiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizInput"
+      responses:
+        "200":
+          description: The updated quiz
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Quizzes]
+      summary: Delete a quiz
+      operationId: deleteQuiz
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/tests:
+    get:
+      tags: [Tests]
+      summary: List all tests
+      operationId: listTests
+      responses:
+        "200":
+          description: A list of tests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Test"
+    post:
+      tags: [Tests]
+      summary: Create a test
+      operationId: createTest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/TestInput"
+              required: [title]
+      responses:
+        "201":
+          description: Test created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Test"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/tests/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Tests]
+      summary: Get a test by id
+      operationId: getTestById
+      responses:
+        "200":
+          description: The test
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Test"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Tests]
+      summary: Update a test
+      operationId: updateTest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestInput"
+      responses:
+        "200":
+          description: The updated test
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Test"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Tests]
+      summary: Delete a test (cascades to its attempts)
+      operationId: deleteTest
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/questions:
+    get:
+      tags: [Questions]
+      summary: List all questions
+      operationId: listQuestions
+      responses:
+        "200":
+          description: A list of questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+    post:
+      tags: [Questions]
+      summary: Create a question
+      operationId: createQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/QuestionInput"
+              required: [quiz_id, question_text, type]
+      responses:
+        "201":
+          description: Question created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/questions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Questions]
+      summary: Get a question by id
+      operationId: getQuestionById
+      responses:
+        "200":
+          description: The question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Questions]
+      summary: Update a question
+      operationId: updateQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "200":
+          description: The updated question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Questions]
+      summary: Delete a question
+      operationId: deleteQuestion
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/test-attempts:
+    get:
+      tags: [Test Attempts]
+      summary: List all test attempts
+      operationId: listTestAttempts
+      responses:
+        "200":
+          description: A list of test attempts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TestAttempt"
+    post:
+      tags: [Test Attempts]
+      summary: Create a test attempt
+      operationId: createTestAttempt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/TestAttemptInput"
+              required: [test_id, user_id]
+      responses:
+        "201":
+          description: Test attempt created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestAttempt"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/test-attempts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Test Attempts]
+      summary: Get a test attempt by id
+      operationId: getTestAttemptById
+      responses:
+        "200":
+          description: The test attempt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestAttempt"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Test Attempts]
+      summary: Update a test attempt
+      operationId: updateTestAttempt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestAttemptInput"
+      responses:
+        "200":
+          description: The updated test attempt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestAttempt"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Test Attempts]
+      summary: Delete a test attempt
+      operationId: deleteTestAttempt
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/carts:
+    get:
+      tags: [Carts]
+      summary: List all carts
+      operationId: listCarts
+      responses:
+        "200":
+          description: A list of carts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Cart"
+    post:
+      tags: [Carts]
+      summary: Create a cart (one per user)
+      operationId: createCart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CartInput"
+              required: [user_id]
+      responses:
+        "201":
+          description: Cart created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/carts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Carts]
+      summary: Get a cart by id
+      operationId: getCartById
+      responses:
+        "200":
+          description: The cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Carts]
+      summary: Update a cart
+      operationId: updateCart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartInput"
+      responses:
+        "200":
+          description: The updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Carts]
+      summary: Delete a cart
+      operationId: deleteCart
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/coupons:
+    get:
+      tags: [Coupons]
+      summary: List all coupons
+      operationId: listCoupons
+      responses:
+        "200":
+          description: A list of coupons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Coupon"
+    post:
+      tags: [Coupons]
+      summary: Create a coupon
+      operationId: createCoupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CouponInput"
+              required: [code, discount_type]
+      responses:
+        "201":
+          description: Coupon created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/coupons/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Coupons]
+      summary: Get a coupon by id
+      operationId: getCouponById
+      responses:
+        "200":
+          description: The coupon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Coupons]
+      summary: Update a coupon
+      operationId: updateCoupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponInput"
+      responses:
+        "200":
+          description: The updated coupon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Coupons]
+      summary: Delete a coupon
+      operationId: deleteCoupon
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/enrollments:
+    get:
+      tags: [Enrollments]
+      summary: List all enrollments
+      operationId: listEnrollments
+      responses:
+        "200":
+          description: A list of enrollments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Enrollment"
+    post:
+      tags: [Enrollments]
+      summary: Create an enrollment (unique per user and course)
+      operationId: createEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/EnrollmentInput"
+              required: [user_id, course_id]
+      responses:
+        "201":
+          description: Enrollment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/enrollments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Enrollments]
+      summary: Get an enrollment by id
+      operationId: getEnrollmentById
+      responses:
+        "200":
+          description: The enrollment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Enrollments]
+      summary: Update an enrollment
+      operationId: updateEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollmentInput"
+      responses:
+        "200":
+          description: The updated enrollment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Enrollments]
+      summary: Delete an enrollment
+      operationId: deleteEnrollment
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/orders:
+    get:
+      tags: [Orders]
+      summary: List all orders
+      operationId: listOrders
+      responses:
+        "200":
+          description: A list of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      tags: [Orders]
+      summary: Create an order
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/OrderInput"
+              required: [user_id]
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/orders/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Orders]
+      summary: Get an order by id
+      operationId: getOrderById
+      responses:
+        "200":
+          description: The order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Orders]
+      summary: Update an order
+      operationId: updateOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "200":
+          description: The updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Orders]
+      summary: Delete an order (cascades to items and payments)
+      operationId: deleteOrder
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/order-items:
+    get:
+      tags: [Order Items]
+      summary: List all order items
+      operationId: listOrderItems
+      responses:
+        "200":
+          description: A list of order items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderItem"
+    post:
+      tags: [Order Items]
+      summary: Create an order item
+      operationId: createOrderItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/OrderItemInput"
+              required: [order_id, course_id]
+      responses:
+        "201":
+          description: Order item created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/order-items/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Order Items]
+      summary: Get an order item by id
+      operationId: getOrderItemById
+      responses:
+        "200":
+          description: The order item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Order Items]
+      summary: Update an order item
+      operationId: updateOrderItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderItemInput"
+      responses:
+        "200":
+          description: The updated order item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Order Items]
+      summary: Delete an order item
+      operationId: deleteOrderItem
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/payments:
+    get:
+      tags: [Payments]
+      summary: List all payments
+      operationId: listPayments
+      responses:
+        "200":
+          description: A list of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      tags: [Payments]
+      summary: Create a payment
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/PaymentInput"
+              required: [order_id]
+      responses:
+        "201":
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/payments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Payments]
+      summary: Get a payment by id
+      operationId: getPaymentById
+      responses:
+        "200":
+          description: The payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Payments]
+      summary: Update a payment
+      operationId: updatePayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "200":
+          description: The updated payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Payments]
+      summary: Delete a payment
+      operationId: deletePayment
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/certificates:
+    get:
+      tags: [Certificates]
+      summary: List all certificates
+      operationId: listCertificates
+      responses:
+        "200":
+          description: A list of certificates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Certificate"
+    post:
+      tags: [Certificates]
+      summary: Create a certificate (unique per user and course)
+      operationId: createCertificate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CertificateInput"
+              required: [user_id, course_id]
+      responses:
+        "201":
+          description: Certificate created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Certificate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/certificates/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Certificates]
+      summary: Get a certificate by id
+      operationId: getCertificateById
+      responses:
+        "200":
+          description: The certificate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Certificate"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Certificates]
+      summary: Update a certificate
+      operationId: updateCertificate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertificateInput"
+      responses:
+        "200":
+          description: The updated certificate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Certificate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Certificates]
+      summary: Delete a certificate
+      operationId: deleteCertificate
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/reviews:
+    get:
+      tags: [Reviews]
+      summary: List all reviews
+      operationId: listReviews
+      responses:
+        "200":
+          description: A list of reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+    post:
+      tags: [Reviews]
+      summary: Create a review (unique per user and course, rating 1-5)
+      operationId: createReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ReviewInput"
+              required: [user_id, course_id, rating]
+      responses:
+        "201":
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/reviews/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Reviews]
+      summary: Get a review by id
+      operationId: getReviewById
+      responses:
+        "200":
+          description: The review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Reviews]
+      summary: Update a review
+      operationId: updateReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "200":
+          description: The updated review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Reviews]
+      summary: Delete a review
+      operationId: deleteReview
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: UUID of the resource
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Missing required field or no valid fields provided
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Missing required field: title"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Not found"
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    User:
+      type: object
+      required: [id, name, email, role, auth_provider, is_verified, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 255 }
+        phone: { type: string, maxLength: 15, nullable: true }
+        password_hash: { type: string, maxLength: 255, nullable: true }
+        role: { $ref: "#/components/schemas/UserRole" }
+        auth_provider: { $ref: "#/components/schemas/AuthProvider" }
+        is_verified: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    UserInput:
+      type: object
+      description: Writable user fields (create requires name and email)
+      properties:
+        name: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 255 }
+        phone: { type: string, maxLength: 15, nullable: true }
+        password_hash: { type: string, maxLength: 255, nullable: true }
+        role: { $ref: "#/components/schemas/UserRole" }
+        auth_provider: { $ref: "#/components/schemas/AuthProvider" }
+        is_verified: { type: boolean }
+
+    Category:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, maxLength: 100 }
+
+    CategoryInput:
+      type: object
+      description: Writable category fields (create requires name)
+      properties:
+        name: { type: string, maxLength: 100 }
+
+    Course:
+      type: object
+      required: [id, title, slug, price, rating_avg, total_enrollments, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        slug: { type: string, maxLength: 220 }
+        category_id: { type: string, format: uuid, nullable: true }
+        price: { type: string, example: "49.99" }
+        rating_avg: { type: string, example: "4.50" }
+        total_enrollments: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CourseInput:
+      type: object
+      description: Writable course fields (create requires title and slug)
+      properties:
+        title: { type: string, maxLength: 200 }
+        slug: { type: string, maxLength: 220 }
+        category_id: { type: string, format: uuid, nullable: true }
+        price: { type: string, example: "49.99" }
+        rating_avg: { type: string, example: "4.50" }
+        total_enrollments: { type: integer }
+
+    Module:
+      type: object
+      required: [id, title, order_index]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        course_id: { type: string, format: uuid, nullable: true }
+        order_index: { type: integer, example: 0 }
+
+    ModuleInput:
+      type: object
+      description: Writable module fields (create requires title)
+      properties:
+        title: { type: string, maxLength: 200 }
+        course_id: { type: string, format: uuid, nullable: true }
+        order_index: { type: integer, example: 0 }
+
+    ModuleWithLessons:
+      type: object
+      required: [id, title, order_index, lessons]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        course_id: { type: string, format: uuid, nullable: true }
+        order_index: { type: integer, example: 0 }
+        lessons:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleItem"
+
+    CourseTree:
+      allOf:
+        - $ref: "#/components/schemas/Course"
+        - type: object
+          required: [modules]
+          properties:
+            modules:
+              type: array
+              items:
+                $ref: "#/components/schemas/ModuleWithLessons"
+
+    ModuleItem:
+      type: object
+      required: [id, title, type, order_index]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        type: { $ref: "#/components/schemas/ItemType" }
+        content_url: { type: string, maxLength: 500, nullable: true }
+        order_index: { type: integer, example: 0 }
+
+    ModuleItemInput:
+      type: object
+      description: Writable module item fields (create requires title and type)
+      properties:
+        title: { type: string, maxLength: 200 }
+        type: { $ref: "#/components/schemas/ItemType" }
+        content_url: { type: string, maxLength: 500, nullable: true }
+        order_index: { type: integer, example: 0 }
+
+    ModuleLesson:
+      type: object
+      required: [id, module_id, module_item_id, order_index]
+      properties:
+        id: { type: string, format: uuid }
+        module_id: { type: string, format: uuid }
+        module_item_id: { type: string, format: uuid }
+        order_index: { type: integer, example: 0 }
+
+    ModuleLessonInput:
+      type: object
+      description: Writable module lesson fields (create requires module_id and module_item_id)
+      properties:
+        module_id: { type: string, format: uuid }
+        module_item_id: { type: string, format: uuid }
+        order_index: { type: integer, example: 0 }
+
+    Assignment:
+      type: object
+      required: [id, title, max_score, allowed_attempts]
+      properties:
+        id: { type: string, format: uuid }
+        lesson_id: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        max_score: { type: integer, example: 100 }
+        due_date: { type: string, format: date-time, nullable: true }
+        allowed_attempts: { type: integer, example: 1 }
+
+    AssignmentInput:
+      type: object
+      description: Writable assignment fields (create requires title)
+      properties:
+        lesson_id: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        max_score: { type: integer, example: 100 }
+        due_date: { type: string, format: date-time, nullable: true }
+        allowed_attempts: { type: integer, example: 1 }
+
+    AssignmentSubmission:
+      type: object
+      required: [id, assignment_id, user_id, submitted_at, status]
+      properties:
+        id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        file_url: { type: string, maxLength: 500, nullable: true }
+        submitted_at: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/SubmissionStatus" }
+        score: { type: string, nullable: true, example: "85.00" }
+
+    AssignmentSubmissionInput:
+      type: object
+      description: Writable submission fields (create requires assignment_id and user_id)
+      properties:
+        assignment_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        file_url: { type: string, maxLength: 500, nullable: true }
+        status: { $ref: "#/components/schemas/SubmissionStatus" }
+        score: { type: string, nullable: true, example: "85.00" }
+
+    Quiz:
+      type: object
+      required: [id, title, duration_min, total_marks, passing_marks, max_attempts]
+      properties:
+        id: { type: string, format: uuid }
+        moduel_item_id: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        duration_min: { type: integer, example: 10 }
+        total_marks: { type: integer, example: 20 }
+        passing_marks: { type: integer, example: 12 }
+        max_attempts: { type: integer, example: 1 }
+
+    QuizInput:
+      type: object
+      description: Writable quiz fields (create requires title)
+      properties:
+        moduel_item_id: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        duration_min: { type: integer, example: 10 }
+        total_marks: { type: integer, example: 20 }
+        passing_marks: { type: integer, example: 12 }
+        max_attempts: { type: integer, example: 1 }
+
+    UserRole:
+      type: string
+      enum: [student, admin]
+      description: User role
+
+    AuthProvider:
+      type: string
+      enum: [local, google, supabase]
+      description: Authentication provider
+
+    ItemType:
+      type: string
+      enum: [video, pdf, article, quiz, assignment]
+      description: Content item type
+
+    SubmissionStatus:
+      type: string
+      enum: [pending, graded]
+      description: Assignment submission status
+
+    Test:
+      type: object
+      required: [id, title, duration_min, total_marks, passing_marks, max_attempts]
+      properties:
+        id: { type: string, format: uuid }
+        module_item_id: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        duration_min: { type: integer, example: 10 }
+        total_marks: { type: integer, example: 20 }
+        passing_marks: { type: integer, example: 12 }
+        max_attempts: { type: integer, example: 1 }
+
+    TestInput:
+      type: object
+      description: Writable test fields (create requires title)
+      properties:
+        module_item_id: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        duration_min: { type: integer, example: 10 }
+        total_marks: { type: integer, example: 20 }
+        passing_marks: { type: integer, example: 12 }
+        max_attempts: { type: integer, example: 1 }
+
+    Question:
+      type: object
+      required: [id, quiz_id, question_text, type, marks]
+      properties:
+        id: { type: string, format: uuid }
+        quiz_id: { type: string, format: uuid }
+        question_text: { type: string }
+        type: { $ref: "#/components/schemas/QuestionType" }
+        options:
+          type: array
+          items: { type: string }
+          nullable: true
+        correct_answer:
+          type: array
+          items: {}
+          nullable: true
+        marks: { type: integer, example: 5 }
+
+    QuestionInput:
+      type: object
+      description: Writable question fields (create requires quiz_id, question_text and type)
+      properties:
+        quiz_id: { type: string, format: uuid }
+        question_text: { type: string }
+        type: { $ref: "#/components/schemas/QuestionType" }
+        options:
+          type: array
+          items: { type: string }
+          nullable: true
+        correct_answer:
+          type: array
+          items: {}
+          nullable: true
+        marks: { type: integer, example: 5 }
+
+    TestAttempt:
+      type: object
+      required: [id, test_id, user_id, status]
+      properties:
+        id: { type: string, format: uuid }
+        test_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/AttemptStatus" }
+        score: { type: string, nullable: true, example: "85.00" }
+        answers:
+          type: array
+          items: {}
+          nullable: true
+
+    TestAttemptInput:
+      type: object
+      description: Writable test attempt fields (create requires test_id and user_id)
+      properties:
+        test_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/AttemptStatus" }
+        score: { type: string, nullable: true, example: "85.00" }
+        answers:
+          type: array
+          items: {}
+          nullable: true
+
+    Cart:
+      type: object
+      required: [id, user_id]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+
+    CartInput:
+      type: object
+      description: Writable cart fields (create requires user_id; unique per user)
+      properties:
+        user_id: { type: string, format: uuid }
+
+    Coupon:
+      type: object
+      required: [id, code, discount_type, value, max_uses, used_count, valid_from, valid_to]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, maxLength: 30 }
+        discount_type: { $ref: "#/components/schemas/DiscountType" }
+        value: { type: string, example: "10.00" }
+        max_uses: { type: integer }
+        used_count: { type: integer }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time }
+
+    CouponInput:
+      type: object
+      description: Writable coupon fields (create requires code and discount_type)
+      properties:
+        code: { type: string, maxLength: 30 }
+        discount_type: { $ref: "#/components/schemas/DiscountType" }
+        value: { type: string, example: "10.00" }
+        max_uses: { type: integer }
+        used_count: { type: integer }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time }
+
+    Enrollment:
+      type: object
+      required: [id, user_id, course_id, enrolled_at, progress_percent, status]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        enrolled_at: { type: string, format: date-time }
+        expiry_at: { type: string, format: date-time, nullable: true }
+        progress_percent: { type: integer, example: 0 }
+        status: { $ref: "#/components/schemas/EnrollmentStatus" }
+
+    EnrollmentInput:
+      type: object
+      description: Writable enrollment fields (create requires user_id and course_id; unique per pair)
+      properties:
+        user_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        expiry_at: { type: string, format: date-time, nullable: true }
+        progress_percent: { type: integer, example: 0 }
+        status: { $ref: "#/components/schemas/EnrollmentStatus" }
+
+    Order:
+      type: object
+      required: [id, user_id, razorpay_order_id, amount, currency, status]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        razorpay_order_id: { type: string, maxLength: 50 }
+        amount: { type: string, example: "49.99" }
+        currency: { type: string, maxLength: 3, example: "INR" }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        coupon_id: { type: string, format: uuid, nullable: true }
+
+    OrderInput:
+      type: object
+      description: Writable order fields (create requires user_id)
+      properties:
+        user_id: { type: string, format: uuid }
+        razorpay_order_id: { type: string, maxLength: 50 }
+        amount: { type: string, example: "49.99" }
+        currency: { type: string, maxLength: 3, example: "INR" }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        coupon_id: { type: string, format: uuid, nullable: true }
+
+    OrderItem:
+      type: object
+      required: [id, order_id, course_id, price_at_purchase]
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        price_at_purchase: { type: string, example: "49.99" }
+
+    OrderItemInput:
+      type: object
+      description: Writable order item fields (create requires order_id and course_id)
+      properties:
+        order_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        price_at_purchase: { type: string, example: "49.99" }
+
+    Payment:
+      type: object
+      required: [id, order_id, razorpay_payment_id, razorpay_signature, status]
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        razorpay_payment_id: { type: string, maxLength: 50 }
+        razorpay_signature: { type: string, maxLength: 255 }
+        method: { type: string, maxLength: 30, nullable: true }
+        status: { $ref: "#/components/schemas/PaymentStatus" }
+
+    PaymentInput:
+      type: object
+      description: Writable payment fields (create requires order_id)
+      properties:
+        order_id: { type: string, format: uuid }
+        razorpay_payment_id: { type: string, maxLength: 50 }
+        razorpay_signature: { type: string, maxLength: 255 }
+        method: { type: string, maxLength: 30, nullable: true }
+        status: { $ref: "#/components/schemas/PaymentStatus" }
+
+    Certificate:
+      type: object
+      required: [id, user_id, course_id, certificate_url]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        certificate_url: { type: string, maxLength: 500 }
+
+    CertificateInput:
+      type: object
+      description: Writable certificate fields (create requires user_id and course_id; unique per pair)
+      properties:
+        user_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        certificate_url: { type: string, maxLength: 500 }
+
+    Review:
+      type: object
+      required: [id, user_id, course_id, rating]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        comment: { type: string, nullable: true }
+
+    ReviewInput:
+      type: object
+      description: Writable review fields (create requires user_id, course_id and rating 1-5; unique per pair)
+      properties:
+        user_id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        comment: { type: string, nullable: true }
+
+    QuestionType:
+      type: string
+      enum: [mcq_single, mcq_multi, true_false, subjective]
+      description: Question type
+
+    AttemptStatus:
+      type: string
+      enum: [in_progress, submitted, evaluated]
+      description: Test attempt status
+
+    DiscountType:
+      type: string
+      enum: [flat, percent]
+      description: Coupon discount type
+
+    EnrollmentStatus:
+      type: string
+      enum: [active, completed, expired]
+      description: Enrollment status
+
+    OrderStatus:
+      type: string
+      enum: [created, paid, failed, refunded]
+      description: Order status
+
+    PaymentStatus:
+      type: string
+      enum: [captured, failed, refunded]
+      description: Payment status

@@ -7,7 +7,7 @@ Basic TypeScript backend for the Unisole LMS schema — an Express + Drizzle (Po
 - **Runtime:** Node.js 22 (Alpine)
 - **Framework:** Express 4
 - **ORM:** Drizzle ORM 0.45 + `pg`
-- **Database:** PostgreSQL 16
+- **Database:** PostgreSQL 18
 - **Language:** TypeScript 5 (strict)
 - **Deployment:** Docker (multi-stage build) + Docker Compose
 
@@ -36,7 +36,7 @@ docker compose up -d --build
 The `api` service runs migrations, then seeds data only when `RUN_SEED=true`, then starts the server. `RUN_SEED` defaults to `false` to avoid wiping data on every restart; run `RUN_SEED=true docker compose up -d api` once (or `docker compose exec api node dist/scripts/seed.js`) to seed.
 
 - API: http://localhost:3000
-- Postgres: `localhost:5433` (mapped to container 5432)
+- Postgres 18: `localhost:5433` (mapped to container 5432; creds `postgres` / `postgres`, database `unisole`)
 
 ## Configuration
 
