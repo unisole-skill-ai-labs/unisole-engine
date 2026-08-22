@@ -2,6 +2,7 @@ import { moduleItemsRepository } from "../repositories/moduleItems.repository";
 import { ModuleItem, NewModuleItem, moduleItems } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { filterColumns } from "../helpers/filterColumns";
+import { generateId } from "../helpers/generateId";
 
 export const moduleItemsManager = {
   async list(): Promise<ModuleItem[]> {
@@ -14,9 +15,7 @@ export const moduleItemsManager = {
   },
   async create(body: Record<string, unknown>): Promise<ModuleItem> {
     const values = filterColumns(body, moduleItems) as NewModuleItem;
-    if (Object.keys(values).length === 0) {
-      throw new ValidationError("No valid fields provided");
-    }
+    values.id = await generateId(moduleItems, "moduleItems", moduleItems.id);
     return moduleItemsRepository.create(values);
   },
   async update(

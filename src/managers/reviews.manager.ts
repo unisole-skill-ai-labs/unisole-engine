@@ -2,6 +2,7 @@ import { reviewsRepository } from "../repositories/reviews.repository";
 import { Review, NewReview, reviews } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { filterColumns } from "../helpers/filterColumns";
+import { generateId } from "../helpers/generateId";
 
 export const reviewsManager = {
   async list(): Promise<Review[]> {
@@ -14,9 +15,7 @@ export const reviewsManager = {
   },
   async create(body: Record<string, unknown>): Promise<Review> {
     const values = filterColumns(body, reviews) as NewReview;
-    if (Object.keys(values).length === 0) {
-      throw new ValidationError("No valid fields provided");
-    }
+    values.id = await generateId(reviews, "reviews", reviews.id);
     return reviewsRepository.create(values);
   },
   async update(id: string, body: Record<string, unknown>): Promise<Review> {

@@ -2,6 +2,7 @@ import { cartsRepository } from "../repositories/carts.repository";
 import { Cart, NewCart, carts } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { filterColumns } from "../helpers/filterColumns";
+import { generateId } from "../helpers/generateId";
 
 export const cartsManager = {
   async list(): Promise<Cart[]> {
@@ -14,9 +15,7 @@ export const cartsManager = {
   },
   async create(body: Record<string, unknown>): Promise<Cart> {
     const values = filterColumns(body, carts) as NewCart;
-    if (Object.keys(values).length === 0) {
-      throw new ValidationError("No valid fields provided");
-    }
+    values.id = await generateId(carts, "carts", carts.id);
     return cartsRepository.create(values);
   },
   async update(id: string, body: Record<string, unknown>): Promise<Cart> {

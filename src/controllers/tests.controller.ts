@@ -3,11 +3,13 @@ import { testsManager } from "../managers/tests.manager";
 import { asyncHandler } from "../middleware/async-handler";
 
 export const testsController = {
-  list: asyncHandler(async (_req: Request, res: Response) => {
-    res.json(await testsManager.list());
+  list: asyncHandler(async (req: Request, res: Response) => {
+    const withDetails = req.query.details === "true" || req.query.withDetails === "true";
+    res.json(await testsManager.list({ withDetails }));
   }),
   getById: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await testsManager.getById(req.params.id));
+    const withDetails = req.query.details === "true" || req.query.withDetails === "true";
+    res.json(await testsManager.getById(req.params.id, { withDetails }));
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
     res.status(201).json(await testsManager.create(req.body));

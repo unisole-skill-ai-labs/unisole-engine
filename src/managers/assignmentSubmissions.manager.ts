@@ -6,6 +6,7 @@ import {
 } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { filterColumns } from "../helpers/filterColumns";
+import { generateId } from "../helpers/generateId";
 
 export const assignmentSubmissionsManager = {
   async list(): Promise<AssignmentSubmission[]> {
@@ -23,9 +24,7 @@ export const assignmentSubmissionsManager = {
       body,
       assignmentSubmissions
     ) as NewAssignmentSubmission;
-    if (Object.keys(values).length === 0) {
-      throw new ValidationError("No valid fields provided");
-    }
+    values.id = await generateId(assignmentSubmissions, "assignmentSubmissions", assignmentSubmissions.id);
     return assignmentSubmissionsRepository.create(values);
   },
   async update(

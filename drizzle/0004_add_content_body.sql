@@ -1,0 +1,1 @@
+ALTER TABLE "module_item" ADD COLUMN "content_body" text;

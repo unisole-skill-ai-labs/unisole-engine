@@ -1,7 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db";
-import { Module, moduleItems, moduleLessons, modules, NewModule } from "../db/schema";
-import { deleteOrphanLessons } from "../helpers/orphans";
+import { Module, modules, NewModule } from "../db/schema";
 
 export const modulesRepository = {
   async list(): Promise<Module[]> {
@@ -29,21 +28,5 @@ export const modulesRepository = {
   async remove(id: string): Promise<Module | undefined> {
     const rows = await db.delete(modules).where(eq(modules.id, id)).returning();
     return rows[0];
-  },
-  getLessonsForModule(moduleId: string) {
-    return db
-      .select()
-      .from(moduleLessons)
-      .innerJoin(moduleItems, eq(moduleLessons.module_item_id, moduleItems.id))
-      .where(eq(moduleLessons.module_id, moduleId))
-      .orderBy(asc(moduleLessons.order_index));
-  },
-  removeWithCleanup(id: string) {
-    return db.transaction(async (tx) => {
-      const deleted = await tx.delete(modules).where(eq(modules.id, id)).returning();
-      if (deleted.length === 0) return null;
-      await deleteOrphanLessons(tx);
-      return deleted[0];
-    });
   },
 };

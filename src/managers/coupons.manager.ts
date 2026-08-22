@@ -2,6 +2,7 @@ import { couponsRepository } from "../repositories/coupons.repository";
 import { Coupon, NewCoupon, coupons } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { filterColumns } from "../helpers/filterColumns";
+import { generateId } from "../helpers/generateId";
 
 export const couponsManager = {
   async list(): Promise<Coupon[]> {
@@ -14,9 +15,7 @@ export const couponsManager = {
   },
   async create(body: Record<string, unknown>): Promise<Coupon> {
     const values = filterColumns(body, coupons) as NewCoupon;
-    if (Object.keys(values).length === 0) {
-      throw new ValidationError("No valid fields provided");
-    }
+    values.id = await generateId(coupons, "coupons", coupons.id);
     return couponsRepository.create(values);
   },
   async update(id: string, body: Record<string, unknown>): Promise<Coupon> {

@@ -1,15 +1,17 @@
 import { Router } from "express";
 import { testAttemptsController } from "../controllers/testAttempts.controller";
+import { optionalAuthMiddleware } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
 export const testAttemptsRouter: Router = Router();
 
-testAttemptsRouter.get("/", testAttemptsController.list);
-testAttemptsRouter.get("/:id", testAttemptsController.getById);
+testAttemptsRouter.get("/", optionalAuthMiddleware, testAttemptsController.list);
+testAttemptsRouter.get("/:id", optionalAuthMiddleware, testAttemptsController.getById);
 testAttemptsRouter.post(
   "/",
-  validateBody({ required: ["test_id", "user_id"] }),
+  optionalAuthMiddleware,
+  validateBody({ required: ["test_id"] }),
   testAttemptsController.create
 );
-testAttemptsRouter.put("/:id", testAttemptsController.update);
-testAttemptsRouter.delete("/:id", testAttemptsController.remove);
+testAttemptsRouter.put("/:id", optionalAuthMiddleware, testAttemptsController.update);
+testAttemptsRouter.delete("/:id", optionalAuthMiddleware, testAttemptsController.remove);

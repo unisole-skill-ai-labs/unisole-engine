@@ -2,6 +2,7 @@ import { orderItemsRepository } from "../repositories/orderItems.repository";
 import { OrderItem, NewOrderItem, orderItems } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { filterColumns } from "../helpers/filterColumns";
+import { generateId } from "../helpers/generateId";
 
 export const orderItemsManager = {
   async list(): Promise<OrderItem[]> {
@@ -14,9 +15,7 @@ export const orderItemsManager = {
   },
   async create(body: Record<string, unknown>): Promise<OrderItem> {
     const values = filterColumns(body, orderItems) as NewOrderItem;
-    if (Object.keys(values).length === 0) {
-      throw new ValidationError("No valid fields provided");
-    }
+    values.id = await generateId(orderItems, "orderItems", orderItems.id);
     return orderItemsRepository.create(values);
   },
   async update(id: string, body: Record<string, unknown>): Promise<OrderItem> {

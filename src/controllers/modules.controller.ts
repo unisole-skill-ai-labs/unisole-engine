@@ -9,9 +9,6 @@ export const modulesController = {
   getById: asyncHandler(async (req: Request, res: Response) => {
     res.json(await modulesManager.getById(req.params.id));
   }),
-  lessons: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await modulesManager.getLessons(req.params.id));
-  }),
   create: asyncHandler(async (req: Request, res: Response) => {
     res.status(201).json(await modulesManager.create(req.body));
   }),

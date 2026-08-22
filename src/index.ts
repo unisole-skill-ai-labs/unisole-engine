@@ -1,17 +1,15 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { authRouter } from "./routes/auth";
 import { usersRouter } from "./routes/users";
 import { categoriesRouter } from "./routes/categories";
 import { coursesRouter } from "./routes/courses";
 import { modulesRouter } from "./routes/modules";
-import { moduleLessonsRouter } from "./routes/moduleLessons";
 import { moduleItemsRouter } from "./routes/moduleItems";
 import { assignmentsRouter } from "./routes/assignments";
 import { assignmentSubmissionsRouter } from "./routes/assignmentSubmissions";
-import { quizzesRouter } from "./routes/quizzes";
 import { testsRouter } from "./routes/tests";
-import { questionsRouter } from "./routes/questions";
 import { testAttemptsRouter } from "./routes/testAttempts";
 import { cartsRouter } from "./routes/carts";
 import { couponsRouter } from "./routes/coupons";
@@ -32,17 +30,15 @@ app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
+app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/courses", coursesRouter);
 app.use("/api/modules", modulesRouter);
-app.use("/api/module-lessons", moduleLessonsRouter);
 app.use("/api/module-items", moduleItemsRouter);
 app.use("/api/assignments", assignmentsRouter);
 app.use("/api/assignment-submissions", assignmentSubmissionsRouter);
-app.use("/api/quizzes", quizzesRouter);
 app.use("/api/tests", testsRouter);
-app.use("/api/questions", questionsRouter);
 app.use("/api/test-attempts", testAttemptsRouter);
 app.use("/api/carts", cartsRouter);
 app.use("/api/coupons", couponsRouter);

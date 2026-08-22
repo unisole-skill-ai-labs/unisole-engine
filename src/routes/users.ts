@@ -12,4 +12,5 @@ usersRouter.post(
   usersController.create
 );
 usersRouter.put("/:id", usersController.update);
+usersRouter.patch("/:id/password", usersController.changePassword);
 usersRouter.delete("/:id", usersController.remove);

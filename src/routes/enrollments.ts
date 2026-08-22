@@ -1,15 +1,17 @@
 import { Router } from "express";
 import { enrollmentsController } from "../controllers/enrollments.controller";
+import { authMiddleware } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
 export const enrollmentsRouter: Router = Router();
 
-enrollmentsRouter.get("/", enrollmentsController.list);
-enrollmentsRouter.get("/:id", enrollmentsController.getById);
+enrollmentsRouter.get("/", authMiddleware, enrollmentsController.list);
+enrollmentsRouter.get("/:id", authMiddleware, enrollmentsController.getById);
 enrollmentsRouter.post(
   "/",
-  validateBody({ required: ["user_id", "course_id"] }),
+  authMiddleware,
+  validateBody({ required: ["course_id"] }),
   enrollmentsController.create
 );
-enrollmentsRouter.put("/:id", enrollmentsController.update);
-enrollmentsRouter.delete("/:id", enrollmentsController.remove);
+enrollmentsRouter.put("/:id", authMiddleware, enrollmentsController.update);
+enrollmentsRouter.delete("/:id", authMiddleware, enrollmentsController.remove);

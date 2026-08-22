@@ -9,13 +9,10 @@ import {
   courses,
   enrollments,
   moduleItems,
-  moduleLessons,
   modules,
   orderItems,
   orders,
   payments,
-  questions,
-  quizzes,
   reviews,
   testAttempts,
   tests,
@@ -31,13 +28,10 @@ import {
   seedCourses,
   seedEnrollments,
   seedModuleItems,
-  seedModuleLessons,
   seedModules,
   seedOrderItems,
   seedOrders,
   seedPayments,
-  seedQuestions,
-  seedQuizzes,
   seedReviews,
   seedTestAttempts,
   seedTests,
@@ -54,15 +48,12 @@ async function seed() {
         orderItems,
         payments,
         testAttempts,
-        questions,
         orders,
         carts,
         coupons,
         tests,
         assignmentSubmissions,
         assignments,
-        quizzes,
-        moduleLessons,
         moduleItems,
         modules,
         courses,
@@ -73,90 +64,79 @@ async function seed() {
       }
 
       const userIds = new Map<string, string>();
-      for (const { key, ...data } of seedUsers) {
-        const [row] = await tx
-          .insert(users)
-          .values(data)
-          .returning({ id: users.id });
-        userIds.set(key, row.id);
+      for (const { key, id, ...data } of seedUsers) {
+        await tx.insert(users).values({ id, ...data });
+        userIds.set(key, id);
       }
 
       const categoryIds = new Map<string, string>();
-      for (const { key, ...data } of seedCategories) {
-        const [row] = await tx
-          .insert(categories)
-          .values(data)
-          .returning({ id: categories.id });
-        categoryIds.set(key, row.id);
+      for (const { key, id, ...data } of seedCategories) {
+        await tx.insert(categories).values({ id, ...data });
+        categoryIds.set(key, id);
       }
 
       const courseIds = new Map<string, string>();
       for (const course of seedCourses) {
-        const [row] = await tx
+        await tx
           .insert(courses)
           .values({
+            id: course.id,
             title: course.title,
             slug: course.slug,
             category_id: categoryIds.get(course.categoryKey),
             price: course.price,
             rating_avg: course.rating_avg,
             total_enrollments: course.total_enrollments,
-          })
-          .returning({ id: courses.id });
-        courseIds.set(course.key, row.id);
+          });
+        courseIds.set(course.key, course.id);
       }
 
       const moduleIds = new Map<string, string>();
       for (const module of seedModules) {
-        const [row] = await tx
+        await tx
           .insert(modules)
           .values({
+            id: module.id,
             title: module.title,
             course_id: courseIds.get(module.courseKey),
             order_index: module.order_index,
-          })
-          .returning({ id: modules.id });
-        moduleIds.set(module.key, row.id);
+          });
+        moduleIds.set(module.key, module.id);
       }
 
       const itemIds = new Map<string, string>();
       for (const item of seedModuleItems) {
-        const [row] = await tx
+        await tx
           .insert(moduleItems)
           .values({
+            id: item.id,
+            module_id: moduleIds.get(item.moduleKey)!,
             title: item.title,
             type: item.type,
             content_url: item.content_url,
+            content_body: item.content_body,
             order_index: item.order_index,
-          })
-          .returning({ id: moduleItems.id });
-        itemIds.set(item.key, row.id);
+          });
+        itemIds.set(item.key, item.id);
       }
-
-      await tx.insert(moduleLessons).values(
-        seedModuleLessons.map((link) => ({
-          module_id: moduleIds.get(link.moduleKey)!,
-          module_item_id: itemIds.get(link.itemKey)!,
-          order_index: link.order_index,
-        }))
-      );
 
       const assignmentIds = new Map<string, string>();
       for (const assignment of seedAssignments) {
-        const [row] = await tx
+        await tx
           .insert(assignments)
           .values({
+            id: assignment.id,
             lesson_id: itemIds.get(assignment.lessonItemKey),
             title: assignment.title,
             max_score: assignment.max_score,
             allowed_attempts: assignment.allowed_attempts,
-          })
-          .returning({ id: assignments.id });
-        assignmentIds.set(assignment.key, row.id);
+          });
+        assignmentIds.set(assignment.key, assignment.id);
       }
 
       await tx.insert(assignmentSubmissions).values(
         seedAssignmentSubmissions.map((submission) => ({
+          id: submission.id,
           assignment_id: assignmentIds.get(submission.assignmentKey)!,
           user_id: userIds.get(submission.userKey)!,
           file_url: submission.file_url,
@@ -164,40 +144,25 @@ async function seed() {
         }))
       );
 
-      const quizIds = new Map<string, string>();
-      for (const quiz of seedQuizzes) {
-        const [row] = await tx
-          .insert(quizzes)
-          .values({
-            moduel_item_id: itemIds.get(quiz.moduleItemKey),
-            title: quiz.title,
-            duration_min: quiz.duration_min,
-            total_marks: quiz.total_marks,
-            passing_marks: quiz.passing_marks,
-            max_attempts: quiz.max_attempts,
-          })
-          .returning({ id: quizzes.id });
-        quizIds.set(quiz.key, row.id);
-      }
-
       const testIds = new Map<string, string>();
       for (const test of seedTests) {
-        const [row] = await tx
+        await tx
           .insert(tests)
           .values({
+            id: test.id,
             module_item_id: itemIds.get(test.moduleItemKey),
             title: test.title,
             duration_min: test.duration_min,
             total_marks: test.total_marks,
             passing_marks: test.passing_marks,
             max_attempts: test.max_attempts,
-          })
-          .returning({ id: tests.id });
-        testIds.set(test.key, row.id);
+          });
+        testIds.set(test.key, test.id);
       }
 
       await tx.insert(testAttempts).values(
         seedTestAttempts.map((attempt) => ({
+          id: attempt.id,
           test_id: testIds.get(attempt.testKey)!,
           user_id: userIds.get(attempt.userKey)!,
           status: attempt.status,
@@ -206,26 +171,16 @@ async function seed() {
         }))
       );
 
-      for (const question of seedQuestions) {
-        await tx.insert(questions).values({
-          quiz_id: quizIds.get(question.quizKey)!,
-          question_text: question.question_text,
-          type: question.type,
-          options: question.options,
-          correct_answer: question.correct_answer,
-          marks: question.marks,
-        });
-      }
-
       await tx.insert(carts).values(
-        seedCarts.map((cart) => ({ user_id: userIds.get(cart.userKey)! }))
+        seedCarts.map((cart) => ({ id: cart.id, user_id: userIds.get(cart.userKey)! }))
       );
 
       const couponIds = new Map<string, string>();
       for (const coupon of seedCoupons) {
-        const [row] = await tx
+        await tx
           .insert(coupons)
           .values({
+            id: coupon.id,
             code: coupon.code,
             discount_type: coupon.discount_type,
             value: coupon.value,
@@ -233,13 +188,13 @@ async function seed() {
             used_count: coupon.used_count,
             valid_from: new Date(coupon.valid_from),
             valid_to: new Date(coupon.valid_to),
-          })
-          .returning({ id: coupons.id });
-        couponIds.set(coupon.key, row.id);
+          });
+        couponIds.set(coupon.key, coupon.id);
       }
 
       await tx.insert(enrollments).values(
         seedEnrollments.map((enrollment) => ({
+          id: enrollment.id,
           user_id: userIds.get(enrollment.userKey)!,
           course_id: courseIds.get(enrollment.courseKey)!,
           expiry_at: enrollment.expiry_at ? new Date(enrollment.expiry_at) : null,
@@ -250,22 +205,23 @@ async function seed() {
 
       const orderIds = new Map<string, string>();
       for (const order of seedOrders) {
-        const [row] = await tx
+        await tx
           .insert(orders)
           .values({
+            id: order.id,
             user_id: userIds.get(order.userKey)!,
             razorpay_order_id: order.razorpay_order_id,
             amount: order.amount,
             currency: order.currency,
             status: order.status,
             coupon_id: order.couponKey ? couponIds.get(order.couponKey) : null,
-          })
-          .returning({ id: orders.id });
-        orderIds.set(order.key, row.id);
+          });
+        orderIds.set(order.key, order.id);
       }
 
       await tx.insert(orderItems).values(
         seedOrderItems.map((item) => ({
+          id: item.id,
           order_id: orderIds.get(item.orderKey)!,
           course_id: courseIds.get(item.courseKey)!,
           price_at_purchase: item.price_at_purchase,
@@ -274,6 +230,7 @@ async function seed() {
 
       for (const payment of seedPayments) {
         await tx.insert(payments).values({
+          id: payment.id,
           order_id: orderIds.get(payment.orderKey)!,
           razorpay_payment_id: payment.razorpay_payment_id,
           razorpay_signature: payment.razorpay_signature,
@@ -284,6 +241,7 @@ async function seed() {
 
       await tx.insert(certificates).values(
         seedCertificates.map((certificate) => ({
+          id: certificate.id,
           user_id: userIds.get(certificate.userKey)!,
           course_id: courseIds.get(certificate.courseKey)!,
           certificate_url: certificate.certificate_url,
@@ -292,6 +250,7 @@ async function seed() {
 
       await tx.insert(reviews).values(
         seedReviews.map((review) => ({
+          id: review.id,
           user_id: userIds.get(review.userKey)!,
           course_id: courseIds.get(review.courseKey)!,
           rating: review.rating,
@@ -302,7 +261,7 @@ async function seed() {
 
     console.log("Seed data inserted successfully.");
     console.log(
-      `Users: ${seedUsers.length}, Categories: ${seedCategories.length}, Courses: ${seedCourses.length}, Modules: ${seedModules.length}, Lessons: ${seedModuleItems.length}, LessonLinks: ${seedModuleLessons.length}, Assignments: ${seedAssignments.length}, Submissions: ${seedAssignmentSubmissions.length}, Quizzes: ${seedQuizzes.length}, Tests: ${seedTests.length}, Questions: ${seedQuestions.length}, TestAttempts: ${seedTestAttempts.length}, Carts: ${seedCarts.length}, Coupons: ${seedCoupons.length}, Enrollments: ${seedEnrollments.length}, Orders: ${seedOrders.length}, OrderItems: ${seedOrderItems.length}, Payments: ${seedPayments.length}, Certificates: ${seedCertificates.length}, Reviews: ${seedReviews.length}`
+      `Users: ${seedUsers.length}, Categories: ${seedCategories.length}, Courses: ${seedCourses.length}, Modules: ${seedModules.length}, Lessons: ${seedModuleItems.length}, Assignments: ${seedAssignments.length}, Submissions: ${seedAssignmentSubmissions.length}, Tests: ${seedTests.length}, TestAttempts: ${seedTestAttempts.length}, Carts: ${seedCarts.length}, Coupons: ${seedCoupons.length}, Enrollments: ${seedEnrollments.length}, Orders: ${seedOrders.length}, OrderItems: ${seedOrderItems.length}, Payments: ${seedPayments.length}, Certificates: ${seedCertificates.length}, Reviews: ${seedReviews.length}`
     );
   } catch (err) {
     console.error("Seed failed:", err);

@@ -15,6 +15,10 @@ export const usersController = {
   update: asyncHandler(async (req: Request, res: Response) => {
     res.json(await usersManager.update(req.params.id, req.body));
   }),
+  changePassword: asyncHandler(async (req: Request, res: Response) => {
+    await usersManager.changePassword(req.params.id, req.body.password);
+    res.json({ ok: true });
+  }),
   remove: asyncHandler(async (req: Request, res: Response) => {
     await usersManager.remove(req.params.id);
     res.status(204).end();

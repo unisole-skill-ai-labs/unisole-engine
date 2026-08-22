@@ -6,7 +6,6 @@ export const modulesRouter: Router = Router();
 
 modulesRouter.get("/", modulesController.list);
 modulesRouter.get("/:id", modulesController.getById);
-modulesRouter.get("/:id/lessons", modulesController.lessons);
 modulesRouter.post(
   "/",
   validateBody({ required: ["title"] }),
