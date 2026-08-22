@@ -1,28 +1,27 @@
-ALTER TABLE "assignment_submissions" DROP CONSTRAINT IF EXISTS "assignment_submissions_assignment_id_assignments_id_fk";--> statement-breakpoint
-ALTER TABLE "assignment_submissions" DROP CONSTRAINT IF EXISTS "assignment_submissions_user_id_users_id_fk";--> statement-breakpoint
-ALTER TABLE "assignments" DROP CONSTRAINT IF EXISTS "assignments_lesson_id_module_item_id_fk";--> statement-breakpoint
-ALTER TABLE "course_modules" DROP CONSTRAINT IF EXISTS "course_modules_course_id_courses_id_fk";--> statement-breakpoint
-ALTER TABLE "course_modules" DROP CONSTRAINT IF EXISTS "course_modules_module_id_modules_id_fk";--> statement-breakpoint
-ALTER TABLE "courses" DROP CONSTRAINT IF EXISTS "courses_category_id_categories_id_fk";--> statement-breakpoint
-ALTER TABLE "module_lessons" DROP CONSTRAINT IF EXISTS "module_lessons_module_id_modules_id_fk";--> statement-breakpoint
-ALTER TABLE "module_lessons" DROP CONSTRAINT IF EXISTS "module_lessons_module_item_id_module_item_id_fk";--> statement-breakpoint
-ALTER TABLE "quiz" DROP CONSTRAINT IF EXISTS "quiz_moduel_item_id_module_item_id_fk";--> statement-breakpoint
-ALTER TABLE "carts" DROP CONSTRAINT IF EXISTS "carts_user_id_users_id_fk";--> statement-breakpoint
-ALTER TABLE "certificates" DROP CONSTRAINT IF EXISTS "certificates_user_id_users_id_fk";--> statement-breakpoint
-ALTER TABLE "certificates" DROP CONSTRAINT IF EXISTS "certificates_course_id_courses_id_fk";--> statement-breakpoint
-ALTER TABLE "enrollments" DROP CONSTRAINT IF EXISTS "enrollments_user_id_users_id_fk";--> statement-breakpoint
-ALTER TABLE "enrollments" DROP CONSTRAINT IF EXISTS "enrollments_course_id_courses_id_fk";--> statement-breakpoint
-ALTER TABLE "order_items" DROP CONSTRAINT IF EXISTS "order_items_order_id_orders_id_fk";--> statement-breakpoint
-ALTER TABLE "order_items" DROP CONSTRAINT IF EXISTS "order_items_course_id_courses_id_fk";--> statement-breakpoint
-ALTER TABLE "orders" DROP CONSTRAINT IF EXISTS "orders_user_id_users_id_fk";--> statement-breakpoint
-ALTER TABLE "orders" DROP CONSTRAINT IF EXISTS "orders_coupon_id_coupons_id_fk";--> statement-breakpoint
-ALTER TABLE "payments" DROP CONSTRAINT IF EXISTS "payments_order_id_orders_id_fk";--> statement-breakpoint
-ALTER TABLE "questions" DROP CONSTRAINT IF EXISTS "questions_quiz_id_quiz_id_fk";--> statement-breakpoint
-ALTER TABLE "reviews" DROP CONSTRAINT IF EXISTS "reviews_user_id_users_id_fk";--> statement-breakpoint
-ALTER TABLE "reviews" DROP CONSTRAINT IF EXISTS "reviews_course_id_courses_id_fk";--> statement-breakpoint
-ALTER TABLE "test_attempts" DROP CONSTRAINT IF EXISTS "test_attempts_test_id_tests_id_fk";--> statement-breakpoint
-ALTER TABLE "test_attempts" DROP CONSTRAINT IF EXISTS "test_attempts_user_id_users_id_fk";--> statement-breakpoint
-ALTER TABLE "tests" DROP CONSTRAINT IF EXISTS "tests_module_item_id_module_item_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "assignment_submissions" DROP CONSTRAINT IF EXISTS "assignment_submissions_assignment_id_assignments_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "assignment_submissions" DROP CONSTRAINT IF EXISTS "assignment_submissions_user_id_users_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "assignments" DROP CONSTRAINT IF EXISTS "assignments_lesson_id_module_item_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "courses" DROP CONSTRAINT IF EXISTS "courses_category_id_categories_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "module_lessons" DROP CONSTRAINT IF EXISTS "module_lessons_module_id_modules_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "module_lessons" DROP CONSTRAINT IF EXISTS "module_lessons_module_item_id_module_item_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "modules" DROP CONSTRAINT IF EXISTS "modules_course_id_courses_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "quiz" DROP CONSTRAINT IF EXISTS "quiz_moduel_item_id_module_item_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "carts" DROP CONSTRAINT IF EXISTS "carts_user_id_users_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "certificates" DROP CONSTRAINT IF EXISTS "certificates_user_id_users_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "certificates" DROP CONSTRAINT IF EXISTS "certificates_course_id_courses_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "enrollments" DROP CONSTRAINT IF EXISTS "enrollments_user_id_users_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "enrollments" DROP CONSTRAINT IF EXISTS "enrollments_course_id_courses_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "order_items" DROP CONSTRAINT IF EXISTS "order_items_order_id_orders_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "order_items" DROP CONSTRAINT IF EXISTS "order_items_course_id_courses_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "orders" DROP CONSTRAINT IF EXISTS "orders_user_id_users_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "orders" DROP CONSTRAINT IF EXISTS "orders_coupon_id_coupons_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "payments" DROP CONSTRAINT IF EXISTS "payments_order_id_orders_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "questions" DROP CONSTRAINT IF EXISTS "questions_quiz_id_quiz_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "reviews" DROP CONSTRAINT IF EXISTS "reviews_user_id_users_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "reviews" DROP CONSTRAINT IF EXISTS "reviews_course_id_courses_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "test_attempts" DROP CONSTRAINT IF EXISTS "test_attempts_test_id_tests_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "test_attempts" DROP CONSTRAINT IF EXISTS "test_attempts_user_id_users_id_fk";--> statement-breakpoint
+ALTER TABLE IF EXISTS "tests" DROP CONSTRAINT IF EXISTS "tests_module_item_id_module_item_id_fk";--> statement-breakpoint
 ALTER TABLE "assignment_submissions" ALTER COLUMN "id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "assignment_submissions" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "assignment_submissions" ALTER COLUMN "assignment_id" SET DATA TYPE text;--> statement-breakpoint
@@ -90,11 +89,10 @@ ALTER TABLE "users" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "assignment_submissions" ADD CONSTRAINT "assignment_submissions_assignment_id_assignments_id_fk" FOREIGN KEY ("assignment_id") REFERENCES "public"."assignments"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "assignment_submissions" ADD CONSTRAINT "assignment_submissions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_lesson_id_module_item_id_fk" FOREIGN KEY ("lesson_id") REFERENCES "public"."module_item"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "course_modules" ADD CONSTRAINT "course_modules_course_id_courses_id_fk" FOREIGN KEY ("course_id") REFERENCES "public"."courses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "course_modules" ADD CONSTRAINT "course_modules_module_id_modules_id_fk" FOREIGN KEY ("module_id") REFERENCES "public"."modules"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "courses" ADD CONSTRAINT "courses_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "module_lessons" ADD CONSTRAINT "module_lessons_module_id_modules_id_fk" FOREIGN KEY ("module_id") REFERENCES "public"."modules"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "module_lessons" ADD CONSTRAINT "module_lessons_module_item_id_module_item_id_fk" FOREIGN KEY ("module_item_id") REFERENCES "public"."module_item"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "modules" ADD CONSTRAINT "modules_course_id_courses_id_fk" FOREIGN KEY ("course_id") REFERENCES "public"."courses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "quiz" ADD CONSTRAINT "quiz_moduel_item_id_module_item_id_fk" FOREIGN KEY ("moduel_item_id") REFERENCES "public"."module_item"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "carts" ADD CONSTRAINT "carts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "certificates" ADD CONSTRAINT "certificates_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
