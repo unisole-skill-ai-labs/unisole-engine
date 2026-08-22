@@ -28,6 +28,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "Unisole Engine API",
+    version: "1.0.0",
+    health: "/health",
+  });
+});
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 app.use("/api/auth", authRouter);
