@@ -21,6 +21,7 @@ import { certificatesRouter } from "./routes/certificates";
 import { reviewsRouter } from "./routes/reviews";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
+import { ensureDefaultAdmin } from "./helpers/ensureAdmin";
 
 dotenv.config();
 
@@ -61,6 +62,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = Number(process.env.PORT ?? 3000);
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server listening on http://localhost:${PORT}`);
+  await ensureDefaultAdmin();
 });
