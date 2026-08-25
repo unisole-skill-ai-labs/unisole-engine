@@ -26,6 +26,7 @@ import { liveQuizzesRouter } from "./routes/liveQuizzes";
 import { liveQuestionsRouter } from "./routes/liveQuestions";
 import { liveSessionsRouter } from "./routes/liveSessions";
 import { liveParticipantsRouter } from "./routes/liveParticipants";
+import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { ensureDefaultAdmin } from "./helpers/ensureAdmin";
@@ -49,7 +50,13 @@ const io = new SocketIOServer(server, {
 initLiveSocket(io);
 
 app.use(cors());
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 app.get("/", (_req, res) => {
   res.json({
@@ -77,6 +84,7 @@ app.use("/api/enrollments", enrollmentsRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/order-items", orderItemsRouter);
 app.use("/api/payments", paymentsRouter);
+app.use("/api/webhooks", webhooksRouter);
 app.use("/api/certificates", certificatesRouter);
 app.use("/api/reviews", reviewsRouter);
 app.use("/api/live", liveRouter);

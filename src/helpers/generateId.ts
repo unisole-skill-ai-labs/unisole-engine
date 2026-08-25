@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { AnyPgTable, PgColumn } from "drizzle-orm/pg-core";
 import { db } from "../db";
+import crypto from "crypto";
 
 const TABLE_PREFIXES: Record<string, string> = {
   users: "usr_",
@@ -27,20 +28,30 @@ const TABLE_PREFIXES: Record<string, string> = {
 };
 
 export async function generateId(table: AnyPgTable, tableName: string, idColumn: PgColumn): Promise<string> {
-  const prefix = TABLE_PREFIXES[tableName];
-  if (!prefix) throw new Error(`No prefix defined for table: ${tableName}`);
+  const prefix = TABLE_PREFIXES[tableName] || "id_";
 
-  const pattern = `${prefix}%`;
-  const rows = await db
-    .select({ id: idColumn })
-    .from(table)
-    .where(sql`${idColumn} LIKE ${pattern}`)
-    .orderBy(sql`CAST(regexp_replace(CAST(${idColumn} AS text), '^[a-z_]+', '') AS int) DESC`)
-    .limit(1);
+  try {
+    const rows = await db
+      .select({ id: idColumn })
+      .from(table)
+      .where(sql`${idColumn} ~ ${`^${prefix}[0-9]+$`}`)
+      .orderBy(sql`CAST(substring(CAST(${idColumn} AS text) from ${`^${prefix}([0-9]+)$`}) AS bigint) DESC`)
+      .limit(1);
 
-  if (rows.length === 0) return `${prefix}1`;
+    if (rows.length > 0 && rows[0].id) {
+      const currentId = String(rows[0].id);
+      const match = currentId.match(new RegExp(`^${prefix}(\\d+)$`));
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        return `${prefix}${num + 1}`;
+      }
+    } else {
+      return `${prefix}1`;
+    }
+  } catch (err) {
+    console.warn(`[generateId] Fallback for ${tableName}:`, err);
+  }
 
-  const currentId = rows[0].id as string;
-  const num = parseInt(currentId.replace(/^[a-z_]+/, ""), 10);
-  return `${prefix}${num + 1}`;
+  const rand = crypto.randomBytes(3).toString("hex");
+  return `${prefix}${Date.now().toString(36)}_${rand}`;
 }

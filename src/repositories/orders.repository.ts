@@ -6,6 +6,9 @@ export const ordersRepository = {
   async list(): Promise<Order[]> {
     return await db.select().from(orders);
   },
+  async listByUser(userId: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.user_id, userId));
+  },
   async getById(id: string): Promise<Order | undefined> {
     const rows = await db.select().from(orders).where(eq(orders.id, id));
     return rows[0];

@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { ordersController } from "../controllers/orders.controller";
 import { validateBody } from "../middleware/validate";
+import { optionalAuthMiddleware } from "../middleware/auth";
 
 export const ordersRouter: Router = Router();
+
+ordersRouter.use(optionalAuthMiddleware);
 
 ordersRouter.get("/", ordersController.list);
 ordersRouter.get("/:id", ordersController.getById);
