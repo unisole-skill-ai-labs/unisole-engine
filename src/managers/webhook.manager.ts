@@ -3,6 +3,7 @@ import { eq, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { users, orders, payments, orderItems, enrollments, courses } from "../db/schema";
 import { generateId } from "../helpers/generateId";
+import { toTitleCase, normalizeEmail, normalizePhone } from "../helpers/formatters";
 
 export const webhookManager = {
   async handleRazorpayWebhook(rawBody: Buffer | string | undefined, signature: string | undefined, body: any) {
@@ -42,7 +43,9 @@ export const webhookManager = {
     // 2. Extract transaction metadata
     const paymentId = paymentEntity?.id || `pay_${crypto.randomBytes(4).toString("hex")}`;
     const rawContact = paymentEntity?.contact || paymentLinkEntity?.customer?.contact || "";
-    const email = paymentEntity?.email || paymentLinkEntity?.customer?.email || "";
+    const rawEmail = paymentEntity?.email || paymentLinkEntity?.customer?.email || "";
+    const email = normalizeEmail(rawEmail);
+    const cleanPhone = normalizePhone(rawContact);
     const rawAmount = paymentEntity?.amount ?? paymentLinkEntity?.amount ?? 0;
     const amount = (Number(rawAmount) / 100).toFixed(2);
     const currency = paymentEntity?.currency || paymentLinkEntity?.currency || "INR";
@@ -56,8 +59,6 @@ export const webhookManager = {
       paymentEntity?.order_id ||
       paymentLinkEntity?.id ||
       paymentId;
-
-    const cleanPhone = rawContact.replace(/\D/g, "").slice(-10);
 
     console.log(`[Razorpay Webhook] Payment Received: ID=${paymentId}, Phone=${cleanPhone}, Email=${email}, Amount=${amount} ${currency}, Desc=${description}`);
 
@@ -74,7 +75,8 @@ export const webhookManager = {
 
     if (!user) {
       const userId = await generateId(users, "users", users.id);
-      const userName = (paymentEntity?.notes?.name || paymentLinkEntity?.customer?.name || (cleanPhone ? `+91 ${cleanPhone}` : "Student"));
+      const rawName = (paymentEntity?.notes?.name || paymentLinkEntity?.customer?.name || (cleanPhone ? `+91 ${cleanPhone}` : "Student"));
+      const userName = toTitleCase(rawName);
       const newUsers = await db
         .insert(users)
         .values({

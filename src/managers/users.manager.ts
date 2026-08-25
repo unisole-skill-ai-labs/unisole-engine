@@ -4,6 +4,7 @@ import { NewUser, User, users } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { filterColumns } from "../helpers/filterColumns";
 import { generateId } from "../helpers/generateId";
+import { toTitleCase, normalizeEmail, normalizePhone } from "../helpers/formatters";
 
 export function sanitizeUser(user: User | undefined): Omit<User, "password_hash"> | undefined {
   if (!user) return undefined;
@@ -28,6 +29,16 @@ export const usersManager = {
     const now = new Date();
     values.created_at = now;
     values.updated_at = now;
+
+    if (values.name) {
+      values.name = toTitleCase(String(values.name));
+    }
+    if (values.email) {
+      values.email = normalizeEmail(String(values.email)) || undefined;
+    }
+    if (values.phone) {
+      values.phone = normalizePhone(String(values.phone)) || undefined;
+    }
 
     // Validate and normalize role
     const validRoles = ["student", "admin"];
@@ -72,6 +83,16 @@ export const usersManager = {
     const values = filterColumns(body, users) as NewUser;
     if (Object.keys(values).length === 0) {
       throw new ValidationError("No valid fields provided");
+    }
+
+    if (values.name) {
+      values.name = toTitleCase(String(values.name));
+    }
+    if (values.email) {
+      values.email = normalizeEmail(String(values.email)) || undefined;
+    }
+    if (values.phone) {
+      values.phone = normalizePhone(String(values.phone)) || undefined;
     }
 
     const validRoles = ["student", "admin"];

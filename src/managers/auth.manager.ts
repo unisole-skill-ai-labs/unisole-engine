@@ -8,6 +8,7 @@ import { usersRepository } from "../repositories/users.repository";
 import { generateId } from "../helpers/generateId";
 import { JWT_SECRET, JWT_REFRESH_SECRET } from "../middleware/auth";
 import { otpService } from "../services/otp.service";
+import { toTitleCase, normalizeEmail, normalizePhone } from "../helpers/formatters";
 
 export function sanitizeUser<T extends Record<string, any>>(
   user: T | undefined | null
@@ -56,8 +57,13 @@ export const authManager = {
       throw new ValidationError("Name, email, and password are required");
     }
 
+    const cleanEmail = normalizeEmail(email);
+    if (!cleanEmail) {
+      throw new ValidationError("Invalid email address format");
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(cleanEmail)) {
       throw new ValidationError("Invalid email address format");
     }
 
@@ -66,13 +72,12 @@ export const authManager = {
     }
 
     const validRoles = ["student", "admin"];
-    // If role is instructor and schema enum doesn't have it yet, map to student or admin safely
     const assignedRole = validRoles.includes(role) ? (role as "student" | "admin") : "student";
 
     const existing = await db
       .select()
       .from(users)
-      .where(eq(users.email, email.toLowerCase().trim()))
+      .where(eq(users.email, cleanEmail))
       .limit(1);
 
     if (existing.length > 0) {
@@ -82,14 +87,16 @@ export const authManager = {
     const id = await generateId(users, "users", users.id);
     const now = new Date();
     const password_hash = hashSync(password, 10);
+    const formattedName = toTitleCase(name);
+    const cleanPhone = normalizePhone(phone);
 
     const rows = await db
       .insert(users)
       .values({
         id,
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        phone: phone || null,
+        name: formattedName,
+        email: cleanEmail,
+        phone: cleanPhone || null,
         password_hash,
         role: assignedRole,
         auth_provider: "local",
@@ -111,10 +118,15 @@ export const authManager = {
       throw new ValidationError("Email and password are required");
     }
 
+    const cleanEmail = normalizeEmail(email);
+    if (!cleanEmail) {
+      throw new ValidationError("Invalid email address format");
+    }
+
     const rows = await db
       .select()
       .from(users)
-      .where(eq(users.email, email.toLowerCase().trim()))
+      .where(eq(users.email, cleanEmail))
       .limit(1);
 
     const user = rows[0];
@@ -207,7 +219,7 @@ export const authManager = {
       // User doesn't exist -> Create new user with role 'student' and provider 'phone'
       const id = await generateId(users, "users", users.id);
       const now = new Date();
-      const userName = name && name.trim() ? name.trim() : `Learner ${normalizedPhone.slice(-4)}`;
+      const userName = name && name.trim() ? toTitleCase(name) : `Learner ${normalizedPhone.slice(-4)}`;
 
       const inserted = await db
         .insert(users)
@@ -218,7 +230,7 @@ export const authManager = {
           email: null,
           role: "student",
           auth_provider: "phone",
-          is_verified: false,
+          is_verified: true,
           created_at: now,
           updated_at: now,
         })
@@ -227,13 +239,16 @@ export const authManager = {
 
     } else {
       // If existing user was provided a new name and had a generic or blank name, update it
-      if (name && name.trim() && (user.name.startsWith("Learner ") || !user.name)) {
-        const updated = await db
-          .update(users)
-          .set({ name: name.trim(), updated_at: new Date() })
-          .where(eq(users.id, user.id))
-          .returning();
-        user = updated[0];
+      if (name && name.trim()) {
+        const formattedName = toTitleCase(name);
+        if (user.name.startsWith("Learner ") || !user.name || user.name !== formattedName) {
+          const updated = await db
+            .update(users)
+            .set({ name: formattedName, updated_at: new Date() })
+            .where(eq(users.id, user.id))
+            .returning();
+          user = updated[0];
+        }
       }
     }
 
