@@ -48,11 +48,11 @@ export const usersManager = {
     }
 
     // Validate and normalize auth_provider
-    const validProviders = ["local", "google", "supabase"];
+    const validProviders = ["local", "google", "supabase", "phone"];
     if (values.auth_provider) {
       const normalizedProvider = String(values.auth_provider).trim().toLowerCase();
       if (validProviders.includes(normalizedProvider)) {
-        values.auth_provider = normalizedProvider as "local" | "google" | "supabase";
+        values.auth_provider = normalizedProvider as "local" | "google" | "supabase" | "phone";
       } else {
         throw new ValidationError(
           `Invalid auth_provider '${values.auth_provider}'. Allowed: ${validProviders.join(", ")}`
@@ -88,11 +88,11 @@ export const usersManager = {
       }
     }
 
-    const validProviders = ["local", "google", "supabase"];
+    const validProviders = ["local", "google", "supabase", "phone"];
     if (values.auth_provider) {
       const normalizedProvider = String(values.auth_provider).trim().toLowerCase();
       if (validProviders.includes(normalizedProvider)) {
-        values.auth_provider = normalizedProvider as "local" | "google" | "supabase";
+        values.auth_provider = normalizedProvider as "local" | "google" | "supabase" | "phone";
       } else {
         throw new ValidationError(
           `Invalid auth_provider '${values.auth_provider}'. Allowed: ${validProviders.join(", ")}`

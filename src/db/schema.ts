@@ -16,7 +16,7 @@ import {
 import { InferInsertModel, InferSelectModel, sql } from "drizzle-orm";
 
 export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
-export const authProviderEnum = pgEnum("auth_provider", ["local", "google", "supabase"]);
+export const authProviderEnum = pgEnum("auth_provider", ["local", "google", "supabase", "phone"]);
 export const itemTypeEnum = pgEnum("item_type", ["video", "pdf", "article", "quiz", "assignment"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["pending", "graded"]);
 export const attemptStatusEnum = pgEnum("attempt_status", [
@@ -41,12 +41,21 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "failed",
   "refunded",
 ]);
+export const liveSessionStatusEnum = pgEnum("live_session_status", [
+  "lobby",
+  "locked_active",
+  "finished",
+]);
+export const liveQuestionTypeEnum = pgEnum("live_question_type", [
+  "mcq",
+  "true_false",
+]);
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  phone: varchar("phone", { length: 15 }).unique(),
+  email: varchar("email", { length: 255 }).unique(),
+  phone: varchar("phone", { length: 20 }).unique(),
   password_hash: varchar("password_hash", { length: 255 }),
   role: userRoleEnum("role").notNull().default("student"),
   auth_provider: authProviderEnum("auth_provider").notNull().default("local"),
@@ -246,6 +255,63 @@ export const reviews = pgTable(
   ]
 );
 
+export const liveQuizzes = pgTable("live_quizzes", {
+  id: text("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  created_by: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const liveQuestions = pgTable("live_questions", {
+  id: text("id").primaryKey(),
+  quiz_id: text("quiz_id")
+    .notNull()
+    .references(() => liveQuizzes.id, { onDelete: "cascade" }),
+  question_order: integer("question_order").notNull(),
+  question_text: text("question_text").notNull(),
+  image_url: text("image_url"),
+  type: liveQuestionTypeEnum("type").notNull().default("mcq"),
+  time_limit_sec: integer("time_limit_sec").notNull().default(30),
+  options: jsonb("options").notNull(), // Array of { id: string, text: string, is_correct: boolean }
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const liveSessions = pgTable("live_sessions", {
+  id: text("id").primaryKey(),
+  room_code: varchar("room_code", { length: 10 }).notNull().unique(),
+  quiz_id: text("quiz_id")
+    .notNull()
+    .references(() => liveQuizzes.id, { onDelete: "cascade" }),
+  host_id: text("host_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  session_name: varchar("session_name", { length: 255 }).notNull(),
+  institute_name: varchar("institute_name", { length: 255 }).notNull(),
+  status: liveSessionStatusEnum("status").notNull().default("lobby"),
+  total_participants: integer("total_participants").notNull().default(0),
+  started_at: timestamp("started_at", { withTimezone: true }),
+  ended_at: timestamp("ended_at", { withTimezone: true }),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const liveParticipants = pgTable("live_participants", {
+  id: text("id").primaryKey(),
+  session_id: text("session_id")
+    .notNull()
+    .references(() => liveSessions.id, { onDelete: "cascade" }),
+  user_id: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  total_score: integer("total_score").notNull().default(0),
+  correct_count: integer("correct_count").notNull().default(0),
+  final_rank: integer("final_rank"),
+  joined_at: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type User = InferSelectModel<typeof users>;
 export type Course = InferSelectModel<typeof courses>;
 export type Category = InferSelectModel<typeof categories>;
@@ -263,6 +329,10 @@ export type OrderItem = InferSelectModel<typeof orderItems>;
 export type Payment = InferSelectModel<typeof payments>;
 export type Certificate = InferSelectModel<typeof certificates>;
 export type Review = InferSelectModel<typeof reviews>;
+export type LiveQuiz = InferSelectModel<typeof liveQuizzes>;
+export type LiveQuestion = InferSelectModel<typeof liveQuestions>;
+export type LiveSession = InferSelectModel<typeof liveSessions>;
+export type LiveParticipant = InferSelectModel<typeof liveParticipants>;
 
 export type NewUser = InferInsertModel<typeof users>;
 export type NewCourse = InferInsertModel<typeof courses>;
@@ -281,3 +351,8 @@ export type NewOrderItem = InferInsertModel<typeof orderItems>;
 export type NewPayment = InferInsertModel<typeof payments>;
 export type NewCertificate = InferInsertModel<typeof certificates>;
 export type NewReview = InferInsertModel<typeof reviews>;
+export type NewLiveQuiz = InferInsertModel<typeof liveQuizzes>;
+export type NewLiveQuestion = InferInsertModel<typeof liveQuestions>;
+export type NewLiveSession = InferInsertModel<typeof liveSessions>;
+export type NewLiveParticipant = InferInsertModel<typeof liveParticipants>;
+

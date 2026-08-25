@@ -7,6 +7,7 @@ import { ValidationError, NotFoundError, UnauthorizedError } from "../errors";
 import { usersRepository } from "../repositories/users.repository";
 import { generateId } from "../helpers/generateId";
 import { JWT_SECRET, JWT_REFRESH_SECRET } from "../middleware/auth";
+import { otpService } from "../services/otp.service";
 
 export function sanitizeUser<T extends Record<string, any>>(
   user: T | undefined | null
@@ -16,10 +17,17 @@ export function sanitizeUser<T extends Record<string, any>>(
   return rest as Omit<T, "password_hash">;
 }
 
-function generateTokens(user: { id: string; email: string; role: string; name?: string }) {
+function generateTokens(user: {
+  id: string;
+  email?: string | null;
+  phone?: string | null;
+  role: string;
+  name?: string;
+}) {
   const payload = {
     id: user.id,
-    email: user.email,
+    email: user.email || undefined,
+    phone: user.phone || undefined,
     role: user.role,
     name: user.name,
   };
@@ -145,69 +153,88 @@ export const authManager = {
     }
   },
 
-  async forgotPassword(body: { email?: string }) {
-    const { email } = body;
-    if (!email) {
-      throw new ValidationError("Email is required");
-    }
-
-    return {
-      message:
-        "If your email is registered in our platform, you will receive password reset instructions shortly.",
-    };
-  },
-
   async me(id: string) {
     const user = await usersRepository.getById(id);
     if (!user) throw new NotFoundError("User not found");
     return sanitizeUser(user);
   },
 
-  async googleAuth(body: {
-    googleId?: string;
-    email?: string;
-    name?: string;
-    role?: string;
-    avatar_url?: string;
-    credential?: string;
-  }) {
-    let { googleId, email, name, role = "student", avatar_url } = body;
 
-    if (!email || !name) {
-      throw new ValidationError("googleId, email, and name are required");
+  async sendOtp(body: { phone?: string; name?: string }) {
+    const { phone } = body;
+    if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
+      throw new ValidationError("Mobile number is required");
+    }
+    const normalizedPhone = otpService.normalizePhone(phone);
+    if (!normalizedPhone || normalizedPhone.length < 10) {
+      throw new ValidationError("Please provide a valid 10-digit mobile number");
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-    const rows = await db
+    const result = await otpService.sendOtp(normalizedPhone);
+    return result;
+  },
+
+  async verifyOtp(body: { phone?: string; otp?: string; name?: string }) {
+    const { phone, otp, name } = body;
+    if (!phone) {
+      throw new ValidationError("Mobile number is required");
+    }
+    if (!otp) {
+      throw new ValidationError("OTP is required");
+    }
+
+    const normalizedPhone = otpService.normalizePhone(phone);
+    if (!normalizedPhone || normalizedPhone.length < 10) {
+      throw new ValidationError("Please provide a valid 10-digit mobile number");
+    }
+
+    const isValid = await otpService.verifyOtp(normalizedPhone, String(otp));
+    if (!isValid) {
+      throw new ValidationError("Invalid or expired verification code");
+    }
+
+
+    // Look up user by phone number
+    const existing = await db
       .select()
       .from(users)
-      .where(eq(users.email, cleanEmail))
+      .where(eq(users.phone, normalizedPhone))
       .limit(1);
 
-    let user = rows[0];
+    let user = existing[0];
 
     if (!user) {
+      // User doesn't exist -> Create new user with role 'student' and provider 'phone'
       const id = await generateId(users, "users", users.id);
       const now = new Date();
-      const validRoles = ["student", "admin"];
-      const assignedRole = validRoles.includes(role)
-        ? (role as "student" | "admin")
-        : "student";
+      const userName = name && name.trim() ? name.trim() : `Learner ${normalizedPhone.slice(-4)}`;
 
       const inserted = await db
         .insert(users)
         .values({
           id,
-          name: name.trim(),
-          email: cleanEmail,
-          role: assignedRole,
-          auth_provider: "google",
-          is_verified: true,
+          name: userName,
+          phone: normalizedPhone,
+          email: null,
+          role: "student",
+          auth_provider: "phone",
+          is_verified: false,
           created_at: now,
           updated_at: now,
         })
         .returning();
       user = inserted[0];
+
+    } else {
+      // If existing user was provided a new name and had a generic or blank name, update it
+      if (name && name.trim() && (user.name.startsWith("Learner ") || !user.name)) {
+        const updated = await db
+          .update(users)
+          .set({ name: name.trim(), updated_at: new Date() })
+          .where(eq(users.id, user.id))
+          .returning();
+        user = updated[0];
+      }
     }
 
     const tokens = generateTokens(user);

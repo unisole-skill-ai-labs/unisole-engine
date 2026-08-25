@@ -6,20 +6,14 @@ import { createRateLimiter } from "../middleware/rate-limiter";
 
 export const authRouter: Router = Router();
 
-// Rate limiter for sensitive auth routes (login, register, forgot-password)
+// Rate limiter for sensitive auth routes
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   maxRequests: 50,
   message: "Too many authentication requests, please try again in 15 minutes",
 });
 
-authRouter.post(
-  "/register",
-  authLimiter,
-  validateBody({ required: ["name", "email", "password"] }),
-  authController.register
-);
-
+// Admin email/password login (used by Unisole Admin Portal)
 authRouter.post(
   "/login",
   authLimiter,
@@ -33,17 +27,20 @@ authRouter.post(
   authController.refresh
 );
 
-authRouter.post(
-  "/forgot-password",
-  authLimiter,
-  validateBody({ required: ["email"] }),
-  authController.forgotPassword
-);
-
 authRouter.get("/me", authMiddleware, authController.me);
 
+// Mobile OTP Authentication
 authRouter.post(
-  "/google",
-  validateBody({ required: ["email", "name"] }),
-  authController.googleAuth
+  "/send-otp",
+  authLimiter,
+  validateBody({ required: ["phone"] }),
+  authController.sendOtp
 );
+
+authRouter.post(
+  "/verify-otp",
+  authLimiter,
+  validateBody({ required: ["phone", "otp"] }),
+  authController.verifyOtp
+);
+

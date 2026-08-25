@@ -20,6 +20,10 @@ const TABLE_PREFIXES: Record<string, string> = {
   payments: "pay_",
   certificates: "cert_",
   reviews: "rev_",
+  liveQuizzes: "lquiz_",
+  liveQuestions: "lq_",
+  liveSessions: "lsess_",
+  liveParticipants: "lpart_",
 };
 
 export async function generateId(table: AnyPgTable, tableName: string, idColumn: PgColumn): Promise<string> {

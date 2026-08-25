@@ -8,7 +8,7 @@ export interface SeedUser {
   phone: string | null;
   password_hash: string;
   role: "student" | "admin";
-  auth_provider: "local" | "google" | "supabase";
+  auth_provider: "local" | "google" | "supabase" | "phone";
   is_verified: boolean;
 }
 
