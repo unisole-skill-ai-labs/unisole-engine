@@ -30,6 +30,7 @@ import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { ensureDefaultAdmin } from "./helpers/ensureAdmin";
+import { ensureDefaultCourses } from "./helpers/ensureCourses";
 import { initLiveSocket } from "./sockets/live.socket";
 
 dotenv.config();
@@ -100,4 +101,5 @@ const PORT = Number(process.env.PORT ?? 3000);
 server.listen(PORT, async () => {
   console.log(`Server listening on http://localhost:${PORT}`);
   await ensureDefaultAdmin();
+  await ensureDefaultCourses();
 });

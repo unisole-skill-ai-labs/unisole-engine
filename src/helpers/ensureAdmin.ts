@@ -6,7 +6,7 @@ import { users } from "../db/schema";
 export async function ensureDefaultAdmin() {
   try {
     const adminEmail = (process.env.ADMIN_EMAIL || "admin@unisole.test").toLowerCase().trim();
-    const adminPassword = process.env.ADMIN_PASSWORD || "password123";
+    const adminPassword = process.env.ADMIN_PASSWORD || "Admin@Pop#2000";
 
     const existingAdmin = await db
       .select()
@@ -31,15 +31,17 @@ export async function ensureDefaultAdmin() {
         updated_at: now,
       });
       console.log(`[Auth] Default admin ensured: ${adminEmail}`);
-    } else if (existingAdmin[0].role !== "admin") {
+    } else {
       await db
         .update(users)
         .set({
           role: "admin",
+          password_hash: passwordHash,
+          is_verified: true,
           updated_at: now,
         })
         .where(eq(users.email, adminEmail));
-      console.log(`[Auth] Promoted ${adminEmail} to admin role`);
+      console.log(`[Auth] Default admin ensured/updated: ${adminEmail}`);
     }
   } catch (err) {
     console.error("[Auth] Error ensuring default admin user:", err);

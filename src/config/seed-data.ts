@@ -163,7 +163,7 @@ export const seedUsers: SeedUser[] = [
     name: "Admin User",
     email: "admin@unisole.test",
     phone: "0000000000",
-    password_hash: hashSync("password123", 10),
+    password_hash: hashSync("Admin@Pop#2000", 10),
     role: "admin",
     auth_provider: "local",
     is_verified: true,

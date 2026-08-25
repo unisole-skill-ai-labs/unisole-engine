@@ -5,7 +5,7 @@ import { users } from "../db/schema";
 
 async function createAdmin() {
   const email = (process.argv[2] || process.env.ADMIN_EMAIL || "admin@unisole.test").toLowerCase().trim();
-  const password = process.argv[3] || process.env.ADMIN_PASSWORD || "password123";
+  const password = process.argv[3] || process.env.ADMIN_PASSWORD || "Admin@Pop#2000";
   const name = process.argv[4] || "Admin User";
 
   try {

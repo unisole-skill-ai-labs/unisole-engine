@@ -33,7 +33,7 @@ export const enrollmentsRepository = {
         },
       })
       .from(enrollments)
-      .innerJoin(courses, eq(enrollments.course_id, courses.id))
+      .leftJoin(courses, eq(enrollments.course_id, courses.id))
       .where(eq(enrollments.user_id, userId));
     return rows;
   },
