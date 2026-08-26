@@ -1,22 +1,30 @@
 import { Request, Response } from "express";
-import { modulesManager } from "../managers/modules.manager";
+import { modulesService } from "../services/modules.service";
 import { asyncHandler } from "../middleware/async-handler";
 
 export const modulesController = {
   list: asyncHandler(async (_req: Request, res: Response) => {
-    res.json(await modulesManager.list());
+    res.json(await modulesService.list());
   }),
   getById: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await modulesManager.getById(req.params.id));
+    res.json(await modulesService.getById(req.params.id));
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
-    res.status(201).json(await modulesManager.create(req.body));
+    const created = await modulesService.create(req.body);
+    res.status(201).json(created);
   }),
   update: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await modulesManager.update(req.params.id, req.body));
+    res.json(await modulesService.update(req.params.id, req.body));
   }),
-  remove: asyncHandler(async (req: Request, res: Response) => {
-    await modulesManager.remove(req.params.id);
-    res.status(204).end();
+  attachLesson: asyncHandler(async (req: Request, res: Response) => {
+    await modulesService.attachLesson(req.params.id, req.body.lessonId, req.body.position);
+    res.json({ ok: true });
+  }),
+  detachLesson: asyncHandler(async (req: Request, res: Response) => {
+    await modulesService.detachLesson(req.params.id, req.params.lessonId);
+    res.json({ ok: true });
+  }),
+  getLessons: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await modulesService.getLessons(req.params.id));
   }),
 };

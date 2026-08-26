@@ -1,26 +1,21 @@
-import type { Response } from "express";
-import { enrollmentsManager } from "../managers/enrollments.manager";
+import { Response } from "express";
+import { enrollmentsService } from "../services/enrollments.service";
 import { asyncHandler } from "../middleware/async-handler";
-import type { CustomRequest } from "../middleware/auth";
+import { CustomRequest } from "../middleware/auth";
 
 export const enrollmentsController = {
   list: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const user = req.user;
-    const queryUserId = req.query.user_id as string | undefined;
-    const includeCourse = req.query.include === "course" || req.query.includeCourse === "true";
-    res.json(await enrollmentsManager.list(user, { userId: queryUserId, includeCourse }));
+    const userId = req.query.userId as string | undefined;
+    res.json(await enrollmentsService.list(req.user, { userId }));
   }),
   getById: asyncHandler(async (req: CustomRequest, res: Response) => {
-    res.json(await enrollmentsManager.getById(req.params.id, req.user));
+    res.json(await enrollmentsService.getById(req.params.id, req.user));
   }),
   create: asyncHandler(async (req: CustomRequest, res: Response) => {
-    res.status(201).json(await enrollmentsManager.create(req.body, req.user));
+    const created = await enrollmentsService.create(req.body, req.user);
+    res.status(201).json(created);
   }),
   update: asyncHandler(async (req: CustomRequest, res: Response) => {
-    res.json(await enrollmentsManager.update(req.params.id, req.body, req.user));
-  }),
-  remove: asyncHandler(async (req: CustomRequest, res: Response) => {
-    await enrollmentsManager.remove(req.params.id, req.user);
-    res.status(204).end();
+    res.json(await enrollmentsService.update(req.params.id, req.body, req.user));
   }),
 };

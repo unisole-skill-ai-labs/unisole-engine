@@ -1,32 +1,38 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { Category, NewCategory, categories } from "../db/schema";
+import { categories, Category, NewCategory } from "../db/schema";
 
 export const categoriesRepository = {
   async list(): Promise<Category[]> {
-    return await db.select().from(categories);
+    return db.select().from(categories);
   },
-  async getById(id: string): Promise<Category | undefined> {
-    const rows = await db.select().from(categories).where(eq(categories.id, id));
+
+  async getById(id: string): Promise<Category | null> {
+    const rows = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
+    return rows[0] ?? null;
+  },
+
+  async getBySlug(slug: string): Promise<Category | null> {
+    const rows = await db.select().from(categories).where(eq(categories.slug, slug)).limit(1);
+    return rows[0] ?? null;
+  },
+
+  async create(data: NewCategory): Promise<Category> {
+    const rows = await db.insert(categories).values(data).returning();
     return rows[0];
   },
-  async create(values: NewCategory): Promise<Category> {
-    const rows = await db.insert(categories).values(values).returning();
-    return rows[0];
-  },
-  async update(
-    id: string,
-    values: Partial<NewCategory>
-  ): Promise<Category | undefined> {
+
+  async update(id: string, data: Partial<Omit<NewCategory, "id">>): Promise<Category | null> {
     const rows = await db
       .update(categories)
-      .set(values)
+      .set({ ...data, updatedAt: new Date().toISOString() })
       .where(eq(categories.id, id))
       .returning();
-    return rows[0];
+    return rows[0] ?? null;
   },
-  async remove(id: string): Promise<Category | undefined> {
+
+  async remove(id: string): Promise<Category | null> {
     const rows = await db.delete(categories).where(eq(categories.id, id)).returning();
-    return rows[0];
+    return rows[0] ?? null;
   },
 };

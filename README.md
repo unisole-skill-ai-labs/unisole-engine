@@ -1,6 +1,6 @@
 # Unisole Engine
 
-Basic TypeScript backend for the Unisole LMS schema — an Express + Drizzle (PostgreSQL) REST API.
+Production TypeScript backend engine for the Unisole EdTech Platform — an Express + Drizzle (PostgreSQL) REST API.
 
 ## Tech Stack
 
@@ -8,6 +8,7 @@ Basic TypeScript backend for the Unisole LMS schema — an Express + Drizzle (Po
 - **Framework:** Express 4
 - **ORM:** Drizzle ORM 0.45 + `pg`
 - **Database:** PostgreSQL 18
+- **Authentication:** Phone OTP with DB-backed verification (`otp_verifications`), bcrypt hashing & JWT
 - **Language:** TypeScript 5 (strict)
 - **Deployment:** Docker (multi-stage build) + Docker Compose
 
@@ -17,13 +18,12 @@ Basic TypeScript backend for the Unisole LMS schema — an Express + Drizzle (Po
 
 - Node 20+ and PostgreSQL (local dev), or Docker + Docker Compose
 
-### Local development
+### Local Development
 
 ```bash
 npm install
-cp .env.example .env        # set DATABASE_URL for your local Postgres
-npm run db:migrate          # apply drizzle migrations
-npm run db:seed             # optional: insert sample data
+cp .env.example .env        # set DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET
+npm run db:seed             # execute SQL schema & initial seed
 npm run dev                 # tsx watch, http://localhost:3000
 ```
 
@@ -33,18 +33,8 @@ npm run dev                 # tsx watch, http://localhost:3000
 docker compose up -d --build
 ```
 
-The `api` service runs migrations, then seeds data only when `RUN_SEED=true`, then starts the server. `RUN_SEED` defaults to `false` to avoid wiping data on every restart; run `RUN_SEED=true docker compose up -d api` once (or `docker compose exec api node dist/scripts/seed.js`) to seed.
-
-- API: http://localhost:3000
+- API: `http://localhost:3000`
 - Postgres 18: `localhost:5433` (mapped to container 5432; creds `postgres` / `postgres`, database `unisole`)
-
-## Configuration
-
-| Variable       | Default                                   | Description              |
-| -------------- | ----------------------------------------- | ------------------------ |
-| `PORT`         | `3000`                                    | API listen port          |
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/unisole` | Postgres connection string |
-| `RUN_SEED`     | —                                         | `true` to seed on startup |
 
 ## Scripts
 
@@ -57,67 +47,78 @@ The `api` service runs migrations, then seeds data only when `RUN_SEED=true`, th
 | `npm run db:generate`  | Generate drizzle migrations      |
 | `npm run db:push`      | Push schema to database          |
 | `npm run db:migrate`   | Apply migrations                 |
-| `npm run db:seed`      | Seed sample data                 |
+| `npm run db:seed`      | Seed sample schema and data      |
 
 ## Architecture
 
-Layered architecture — each request flows through one direction:
+Layered architecture — each request flows in one direction:
 
 ```
-route → middleware → controller → manager (service) → repository → db
+Route Group → Middleware → Controller → Service → Repository → PostgreSQL
 ```
 
-| Layer        | Responsibility                                  | Location                |
-| ------------ | ----------------------------------------------- | ----------------------- |
-| Router       | Path mapping, middleware wiring                 | `src/routes/`           |
-| Middleware   | Cross-cutting: errors, validation, 404, async   | `src/middleware/`       |
-| Controller   | HTTP concerns: parse request, shape response    | `src/controllers/`      |
-| Manager      | Business logic: validation, defaults, 404s      | `src/managers/`         |
-| Repository   | Data access only (SQL via Drizzle)              | `src/repositories/`     |
+| Layer        | Responsibility                                      | Location                |
+| ------------ | --------------------------------------------------- | ----------------------- |
+| Route        | Path mapping, rate limiting, auth middleware wiring | `src/routes/`           |
+| Middleware   | Cross-cutting: JWT auth, role check, error handler  | `src/middleware/`       |
+| Controller   | HTTP request parsing, response formatting           | `src/controllers/`      |
+| Service      | Business logic, validation, hierarchy access check  | `src/services/`         |
+| Repository   | Data access layer (Drizzle ORM & SQL)               | `src/repositories/`     |
+| DB Schema    | Drizzle tables, sequences, enums, relations         | `src/db/`               |
 
-Each resource has its own repository, manager, and controller implementing full CRUD. Courses and modules add custom endpoints and transactional deletes with orphan cleanup. Seed/dummy data lives in `src/config/seed-data.ts`.
-
-## API Endpoints
+## API Route Groups
 
 Base path: `http://localhost:3000`
 
-| Resource                | Routes                                                        |
-| ----------------------- | ------------------------------------------------------------- |
-| `GET /health`           | Health check                                                  |
-| `/api/users`            | CRUD (`hasUpdatedAt`)                                         |
-| `/api/categories`       | CRUD                                                          |
-| `/api/courses`          | CRUD (delete cleans up orphan modules/items) + `GET /:id/modules`, `GET /:id/tree` |
-| `/api/modules`          | CRUD (delete cleans up orphan items) + `GET /:id/lessons` |
-| `/api/module-items`     | CRUD                                                          |
-| `/api/module-lessons`   | CRUD                                                          |
-| `/api/assignments`      | CRUD                                                          |
-| `/api/assignment-submissions` | CRUD                                                   |
-| `/api/quizzes`          | CRUD                                                          |
+### 1. Authentication (`/api/auth`)
+- `POST /api/auth/send-otp` — Send 4-digit verification code to mobile number
+- `POST /api/auth/verify-otp` — Verify OTP & issue access/refresh JWT tokens
+- `POST /api/auth/refresh` — Refresh access token
+- `GET /api/auth/me` — Authenticated user profile
 
-Every CRUD resource supports:
+### 2. Admin Operations (`/api/admin/*`) — Requires `ADMIN` role
+- `/api/admin/students` — Learner management & deactivation
+- `/api/admin/colleges` — Partner college management
+- `/api/admin/categories` — Domain categories management
+- `/api/admin/pathways` — Pathway CRUD, Category/College links, Course sequencing
+- `/api/admin/courses` — Course CRUD & Module sequencing
+- `/api/admin/modules` — Module CRUD & Lesson sequencing
+- `/api/admin/lessons` — Lesson content, duration, video URLs
+- `/api/admin/enrollments` — Pathway enrollment management & access granting
+- `/api/admin/payments` — Transaction history & audit log
 
-- `GET /` — list all
-- `GET /:id` — get one
-- `POST /` — create (validates required fields)
-- `PUT /:id` — update (partial)
-- `DELETE /:id` — delete
+### 3. Student LMS (`/api/lms/*`) — Requires Authentication
+- `GET /api/lms/me` — Learner profile
+- `GET /api/lms/pathways` — Pathways the student is actively enrolled in
+- `GET /api/lms/pathways/:id` — Full curriculum tree (Courses → Modules → Lessons)
+- `GET /api/lms/lessons/:id` — Lesson content (protected by enrollment access check)
+- `GET /api/lms/enrollments` — Student's active and past enrollments
+- `POST /api/lms/payments/create-order` — Initiate payment order for a pathway
+- `POST /api/lms/payments/verify` — Verify signature and activate enrollment
 
-Responses: success returns JSON (or `204` on delete); errors return `{ "error": "<message>" }` with 400/404/500.
+### 4. Public Catalog (`/api/public/*`) — Unauthenticated
+- `GET /api/public/pathways` — Published pathways list
+- `GET /api/public/pathways/:slug` — Single pathway detail
+- `GET /api/public/categories` — Active domain categories
+- `GET /api/public/colleges` — Active partner colleges
 
-## Database Schema
+### 5. Webhooks (`/api/webhooks`)
+- `POST /api/webhooks/razorpay` — Razorpay payment webhook handler
 
-9 tables in the `unisole` database:
+## Database Schema (15 Tables)
 
-```
-assignment_submissions  assignments  categories  courses  module_item
-module_lessons  modules  quiz  users
-```
-
-Modules link to a course via `modules.course_id`.
-
-Migrations live in `drizzle/`; schema definition in `src/db/schema.ts`.
-
-## Documentation
-
-- `decisions.md` — architecture decision records (ADR)
-- `logs.md` — activity / change log
+- `users`
+- `otp_verifications`
+- `colleges`
+- `categories`
+- `pathways`
+- `pathway_categories`
+- `pathway_colleges`
+- `courses`
+- `pathway_courses`
+- `modules`
+- `course_modules`
+- `lessons`
+- `module_lessons`
+- `enrollments`
+- `payments`

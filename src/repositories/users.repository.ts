@@ -1,32 +1,45 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { NewUser, User, users } from "../db/schema";
+import { users, User, NewUser } from "../db/schema";
 
 export const usersRepository = {
   async list(): Promise<User[]> {
-    return await db.select().from(users);
+    return db.select().from(users);
   },
-  async getById(id: string): Promise<User | undefined> {
-    const rows = await db.select().from(users).where(eq(users.id, id));
+
+  async getById(id: string): Promise<User | null> {
+    const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return rows[0] ?? null;
+  },
+
+  async getByPhone(phone: string): Promise<User | null> {
+    const rows = await db
+      .select()
+      .from(users)
+      .where(eq(users.phone, phone))
+      .limit(1);
+    return rows[0] ?? null;
+  },
+
+  async create(data: NewUser): Promise<User> {
+    const rows = await db.insert(users).values(data).returning();
     return rows[0];
   },
-  async create(values: NewUser): Promise<User> {
-    const rows = await db.insert(users).values(values).returning();
-    return rows[0];
-  },
+
   async update(
     id: string,
-    values: Partial<NewUser>
-  ): Promise<User | undefined> {
+    data: Partial<Omit<NewUser, "id">>
+  ): Promise<User | null> {
     const rows = await db
       .update(users)
-      .set(values)
+      .set({ ...data, updatedAt: new Date().toISOString() })
       .where(eq(users.id, id))
       .returning();
-    return rows[0];
+    return rows[0] ?? null;
   },
-  async remove(id: string): Promise<User | undefined> {
+
+  async remove(id: string): Promise<User | null> {
     const rows = await db.delete(users).where(eq(users.id, id)).returning();
-    return rows[0];
+    return rows[0] ?? null;
   },
 };

@@ -1,22 +1,22 @@
 import { Request, Response } from "express";
-import { categoriesManager } from "../managers/categories.manager";
+import { categoriesService } from "../services/categories.service";
 import { asyncHandler } from "../middleware/async-handler";
 
 export const categoriesController = {
   list: asyncHandler(async (_req: Request, res: Response) => {
-    res.json(await categoriesManager.list());
+    res.json(await categoriesService.list());
+  }),
+  listActive: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await categoriesService.listActive());
   }),
   getById: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await categoriesManager.getById(req.params.id));
+    res.json(await categoriesService.getById(req.params.id));
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
-    res.status(201).json(await categoriesManager.create(req.body));
+    const created = await categoriesService.create(req.body);
+    res.status(201).json(created);
   }),
   update: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await categoriesManager.update(req.params.id, req.body));
-  }),
-  remove: asyncHandler(async (req: Request, res: Response) => {
-    await categoriesManager.remove(req.params.id);
-    res.status(204).end();
+    res.json(await categoriesService.update(req.params.id, req.body));
   }),
 };

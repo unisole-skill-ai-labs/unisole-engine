@@ -1,358 +1,710 @@
 import {
-  boolean,
-  char,
-  check,
-  decimal,
-  integer,
-  jsonb,
-  pgEnum,
   pgTable,
-  smallint,
-  text,
+  index,
+  check,
+  varchar,
+  integer,
   timestamp,
   unique,
-  varchar,
+  text,
+  bigint,
+  boolean,
+  uniqueIndex,
+  foreignKey,
+  primaryKey,
+  pgSequence,
+  pgEnum,
 } from "drizzle-orm/pg-core";
-import { InferInsertModel, InferSelectModel, sql } from "drizzle-orm";
+import { sql, InferSelectModel, InferInsertModel } from "drizzle-orm";
 
-export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
-export const authProviderEnum = pgEnum("auth_provider", ["local", "google", "supabase", "phone"]);
-export const itemTypeEnum = pgEnum("item_type", ["video", "pdf", "article", "quiz", "assignment"]);
-export const submissionStatusEnum = pgEnum("submission_status", ["pending", "graded"]);
-export const attemptStatusEnum = pgEnum("attempt_status", [
-  "in_progress",
-  "submitted",
-  "evaluated",
+// ============================================================
+// ENUMS
+// ============================================================
+
+export const userRole = pgEnum("user_role", ["STUDENT", "ADMIN"]);
+export const pathwayStatus = pgEnum("pathway_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
+export const contentStatus = pgEnum("content_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
+export const enrollmentStatus = pgEnum("enrollment_status", [
+  "PENDING",
+  "ACTIVE",
+  "CANCELLED",
+  "EXPIRED",
 ]);
-export const discountTypeEnum = pgEnum("discount_type", ["flat", "percent"]);
-export const enrollmentStatusEnum = pgEnum("enrollment_status", [
-  "active",
-  "completed",
-  "expired",
+export const paymentStatus = pgEnum("payment_status", [
+  "CREATED",
+  "PENDING",
+  "SUCCESS",
+  "FAILED",
+  "REFUNDED",
 ]);
-export const orderStatusEnum = pgEnum("order_status", [
-  "created",
-  "paid",
-  "failed",
-  "refunded",
-]);
-export const paymentStatusEnum = pgEnum("payment_status", [
-  "captured",
-  "failed",
-  "refunded",
-]);
-export const liveSessionStatusEnum = pgEnum("live_session_status", [
-  "lobby",
-  "locked_active",
-  "finished",
-]);
-export const liveQuestionTypeEnum = pgEnum("live_question_type", [
-  "mcq",
-  "true_false",
-]);
+export const otpChannel = pgEnum("otp_channel", ["SMS", "WHATSAPP"]);
+export const otpStatus = pgEnum("otp_status", ["PENDING", "VERIFIED", "EXPIRED", "FAILED"]);
 
-export const users = pgTable("users", {
-  id: text("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),
-  email: varchar("email", { length: 255 }).unique(),
-  phone: varchar("phone", { length: 20 }).unique(),
-  password_hash: varchar("password_hash", { length: 255 }),
-  role: userRoleEnum("role").notNull().default("student"),
-  auth_provider: authProviderEnum("auth_provider").notNull().default("local"),
-  is_verified: boolean("is_verified").notNull().default(false),
-  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+// ============================================================
+// SEQUENCES
+// ============================================================
+
+export const usersIdSeq = pgSequence("users_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const otpVerificationsIdSeq = pgSequence("otp_verifications_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const collegesIdSeq = pgSequence("colleges_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const categoriesIdSeq = pgSequence("categories_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const pathwaysIdSeq = pgSequence("pathways_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const coursesIdSeq = pgSequence("courses_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const modulesIdSeq = pgSequence("modules_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const lessonsIdSeq = pgSequence("lessons_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const enrollmentsIdSeq = pgSequence("enrollments_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const paymentsIdSeq = pgSequence("payments_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
 });
 
-export const categories = pgTable("categories", {
-  id: text("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),
-});
+// ============================================================
+// 1. USERS
+// ============================================================
 
-export const courses = pgTable("courses", {
-  id: text("id").primaryKey(),
-  title: varchar("title", { length: 200 }).notNull(),
-  slug: varchar("slug", { length: 220 }).notNull().unique(),
-  category_id: text("category_id").references(() => categories.id, { onDelete: "set null" }),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull().default("0"),
-  rating_avg: decimal("rating_avg", { precision: 3, scale: 2 }).notNull().default("0"),
-  total_enrollments: integer("total_enrollments").notNull().default(0),
-  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('usr_'::text || nextval('users_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    phone: varchar({ length: 20 }).notNull(),
+    name: varchar({ length: 150 }),
+    role: userRole().default("STUDENT").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_users_is_active").using("btree", table.isActive.asc().nullsLast()),
+    index("idx_users_role").using("btree", table.role.asc().nullsLast()),
+    unique("uq_users_phone").on(table.phone),
+  ]
+);
 
-export const modules = pgTable("modules", {
-  id: text("id").primaryKey(),
-  title: varchar("title", { length: 200 }).notNull(),
-  course_id: text("course_id").references(() => courses.id, { onDelete: "cascade" }),
-  order_index: smallint("order_index").notNull().default(0),
-});
+// ============================================================
+// 2. OTP VERIFICATIONS
+// ============================================================
 
-export const moduleItems = pgTable("module_item", {
-  id: text("id").primaryKey(),
-  module_id: text("module_id")
-    .notNull()
-    .references(() => modules.id, { onDelete: "cascade" }),
-  title: varchar("title", { length: 200 }).notNull(),
-  type: itemTypeEnum("type").notNull(),
-  content_url: varchar("content_url", { length: 500 }),
-  content_body: text("content_body"),
-  order_index: smallint("order_index").notNull().default(0),
-});
+export const otpVerifications = pgTable(
+  "otp_verifications",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('otp_'::text || nextval('otp_verifications_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    phone: varchar({ length: 20 }).notNull(),
+    otpHash: varchar("otp_hash", { length: 255 }).notNull(),
+    channel: otpChannel().notNull(),
+    status: otpStatus().default("PENDING").notNull(),
+    attempts: integer().default(0).notNull(),
+    maxAttempts: integer("max_attempts").default(5).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_otp_expires_at").using("btree", table.expiresAt.asc().nullsLast()),
+    index("idx_otp_phone").using("btree", table.phone.asc().nullsLast()),
+    index("idx_otp_status").using("btree", table.status.asc().nullsLast()),
+    check("chk_otp_attempts", sql`attempts >= 0`),
+    check("chk_otp_max_attempts", sql`max_attempts > 0`),
+  ]
+);
 
-export const assignments = pgTable("assignments", {
-  id: text("id").primaryKey(),
-  lesson_id: text("lesson_id").references(() => moduleItems.id, { onDelete: "cascade" }),
-  title: varchar("title", { length: 200 }).notNull(),
-  max_score: smallint("max_score").notNull().default(100),
-  due_date: timestamp("due_date", { withTimezone: true }),
-  allowed_attempts: smallint("allowed_attempts").notNull().default(1),
-});
+// ============================================================
+// 3. COLLEGES
+// ============================================================
 
-export const assignmentSubmissions = pgTable("assignment_submissions", {
-  id: text("id").primaryKey(),
-  assignment_id: text("assignment_id")
-    .notNull()
-    .references(() => assignments.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  file_url: varchar("file_url", { length: 500 }),
-  submitted_at: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
-  status: submissionStatusEnum("status").notNull().default("pending"),
-  score: decimal("score", { precision: 5, scale: 2 }),
-});
+export const colleges = pgTable(
+  "colleges",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('clg_'::text || nextval('colleges_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    name: varchar({ length: 200 }).notNull(),
+    slug: varchar({ length: 220 }).notNull(),
+    shortName: varchar("short_name", { length: 100 }),
+    description: text(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_colleges_is_active").using("btree", table.isActive.asc().nullsLast()),
+    unique("uq_colleges_slug").on(table.slug),
+  ]
+);
 
-export const tests = pgTable("tests", {
-  id: text("id").primaryKey(),
-  module_item_id: text("module_item_id").references(() => moduleItems.id, {
-    onDelete: "cascade",
-  }),
-  title: varchar("title", { length: 200 }).notNull(),
-  duration_min: smallint("duration_min").notNull().default(0),
-  total_marks: smallint("total_marks").notNull().default(0),
-  passing_marks: smallint("passing_marks").notNull().default(0),
-  max_attempts: smallint("max_attempts").notNull().default(1),
-});
+// ============================================================
+// 4. CATEGORIES
+// ============================================================
 
-export const testAttempts = pgTable("test_attempts", {
-  id: text("id").primaryKey(),
-  test_id: text("test_id")
-    .notNull()
-    .references(() => tests.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  status: attemptStatusEnum("status").notNull().default("in_progress"),
-  score: decimal("score", { precision: 6, scale: 2 }),
-  answers: jsonb("answers"),
-});
+export const categories = pgTable(
+  "categories",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('cat_'::text || nextval('categories_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    name: varchar({ length: 150 }).notNull(),
+    slug: varchar({ length: 180 }).notNull(),
+    description: text(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_categories_is_active").using("btree", table.isActive.asc().nullsLast()),
+    unique("uq_categories_name").on(table.name),
+    unique("uq_categories_slug").on(table.slug),
+  ]
+);
 
-export const carts = pgTable("carts", {
-  id: text("id").primaryKey(),
-  user_id: text("user_id")
-    .notNull()
-    .unique()
-    .references(() => users.id, { onDelete: "cascade" }),
-});
+// ============================================================
+// 5. PATHWAYS
+// ============================================================
 
-export const coupons = pgTable("coupons", {
-  id: text("id").primaryKey(),
-  code: varchar("code", { length: 30 }).notNull().unique(),
-  discount_type: discountTypeEnum("discount_type").notNull(),
-  value: decimal("value", { precision: 10, scale: 2 }).notNull().default("0"),
-  max_uses: integer("max_uses").notNull().default(0),
-  used_count: integer("used_count").notNull().default(0),
-  valid_from: timestamp("valid_from", { withTimezone: true }).notNull(),
-  valid_to: timestamp("valid_to", { withTimezone: true }).notNull(),
-});
+export const pathways = pgTable(
+  "pathways",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('pwy_'::text || nextval('pathways_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    title: varchar({ length: 250 }).notNull(),
+    slug: varchar({ length: 280 }).notNull(),
+    shortDescription: varchar("short_description", { length: 500 }),
+    description: text(),
+    pricePaise: bigint("price_paise", { mode: "number" }).default(0).notNull(),
+    status: pathwayStatus().default("DRAFT").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_pathways_is_active").using("btree", table.isActive.asc().nullsLast()),
+    index("idx_pathways_status").using("btree", table.status.asc().nullsLast()),
+    unique("uq_pathways_slug").on(table.slug),
+    check("chk_pathways_price", sql`price_paise >= 0`),
+  ]
+);
+
+// ============================================================
+// 6. PATHWAY ↔ CATEGORY
+// ============================================================
+
+export const pathwayCategories = pgTable(
+  "pathway_categories",
+  {
+    pathwayId: varchar("pathway_id", { length: 50 }).notNull(),
+    categoryId: varchar("category_id", { length: 50 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_pathway_categories_category").using(
+      "btree",
+      table.categoryId.asc().nullsLast()
+    ),
+    foreignKey({
+      columns: [table.pathwayId],
+      foreignColumns: [pathways.id],
+      name: "fk_pathway_categories_pathway",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.categoryId],
+      foreignColumns: [categories.id],
+      name: "fk_pathway_categories_category",
+    }).onDelete("restrict"),
+    primaryKey({
+      columns: [table.pathwayId, table.categoryId],
+      name: "pathway_categories_pkey",
+    }),
+  ]
+);
+
+// ============================================================
+// 7. PATHWAY ↔ COLLEGE
+// ============================================================
+
+export const pathwayColleges = pgTable(
+  "pathway_colleges",
+  {
+    pathwayId: varchar("pathway_id", { length: 50 }).notNull(),
+    collegeId: varchar("college_id", { length: 50 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_pathway_colleges_college").using(
+      "btree",
+      table.collegeId.asc().nullsLast()
+    ),
+    foreignKey({
+      columns: [table.pathwayId],
+      foreignColumns: [pathways.id],
+      name: "fk_pathway_colleges_pathway",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.collegeId],
+      foreignColumns: [colleges.id],
+      name: "fk_pathway_colleges_college",
+    }).onDelete("restrict"),
+    primaryKey({
+      columns: [table.pathwayId, table.collegeId],
+      name: "pathway_colleges_pkey",
+    }),
+  ]
+);
+
+// ============================================================
+// 8. COURSES
+// ============================================================
+
+export const courses = pgTable(
+  "courses",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('crs_'::text || nextval('courses_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    title: varchar({ length: 250 }).notNull(),
+    slug: varchar({ length: 280 }).notNull(),
+    shortDescription: varchar("short_description", { length: 500 }),
+    description: text(),
+    status: contentStatus().default("DRAFT").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_courses_is_active").using("btree", table.isActive.asc().nullsLast()),
+    index("idx_courses_status").using("btree", table.status.asc().nullsLast()),
+    unique("uq_courses_slug").on(table.slug),
+  ]
+);
+
+// ============================================================
+// 9. PATHWAY ↔ COURSE
+// ============================================================
+
+export const pathwayCourses = pgTable(
+  "pathway_courses",
+  {
+    pathwayId: varchar("pathway_id", { length: 50 }).notNull(),
+    courseId: varchar("course_id", { length: 50 }).notNull(),
+    position: integer().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_pathway_courses_course").using("btree", table.courseId.asc().nullsLast()),
+    foreignKey({
+      columns: [table.pathwayId],
+      foreignColumns: [pathways.id],
+      name: "fk_pathway_courses_pathway",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.courseId],
+      foreignColumns: [courses.id],
+      name: "fk_pathway_courses_course",
+    }).onDelete("restrict"),
+    primaryKey({
+      columns: [table.pathwayId, table.courseId],
+      name: "pathway_courses_pkey",
+    }),
+    unique("uq_pathway_courses_position").on(table.pathwayId, table.position),
+    check("chk_pathway_courses_position", sql`"position" > 0`),
+  ]
+);
+
+// ============================================================
+// 10. MODULES
+// ============================================================
+
+export const modules = pgTable(
+  "modules",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('mod_'::text || nextval('modules_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    title: varchar({ length: 250 }).notNull(),
+    slug: varchar({ length: 280 }).notNull(),
+    description: text(),
+    status: contentStatus().default("DRAFT").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_modules_is_active").using("btree", table.isActive.asc().nullsLast()),
+    index("idx_modules_status").using("btree", table.status.asc().nullsLast()),
+    unique("uq_modules_slug").on(table.slug),
+  ]
+);
+
+// ============================================================
+// 11. COURSE ↔ MODULE
+// ============================================================
+
+export const courseModules = pgTable(
+  "course_modules",
+  {
+    courseId: varchar("course_id", { length: 50 }).notNull(),
+    moduleId: varchar("module_id", { length: 50 }).notNull(),
+    position: integer().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_course_modules_module").using("btree", table.moduleId.asc().nullsLast()),
+    foreignKey({
+      columns: [table.courseId],
+      foreignColumns: [courses.id],
+      name: "fk_course_modules_course",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.moduleId],
+      foreignColumns: [modules.id],
+      name: "fk_course_modules_module",
+    }).onDelete("restrict"),
+    primaryKey({
+      columns: [table.courseId, table.moduleId],
+      name: "course_modules_pkey",
+    }),
+    unique("uq_course_modules_position").on(table.courseId, table.position),
+    check("chk_course_modules_position", sql`"position" > 0`),
+  ]
+);
+
+// ============================================================
+// 12. LESSONS
+// ============================================================
+
+export const lessons = pgTable(
+  "lessons",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('les_'::text || nextval('lessons_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    title: varchar({ length: 250 }).notNull(),
+    slug: varchar({ length: 280 }).notNull(),
+    description: text(),
+    content: text(),
+    videoUrl: text("video_url"),
+    durationMinutes: integer("duration_minutes"),
+    status: contentStatus().default("DRAFT").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_lessons_is_active").using("btree", table.isActive.asc().nullsLast()),
+    index("idx_lessons_status").using("btree", table.status.asc().nullsLast()),
+    unique("uq_lessons_slug").on(table.slug),
+    check("chk_lessons_duration", sql`(duration_minutes IS NULL) OR (duration_minutes >= 0)`),
+  ]
+);
+
+// ============================================================
+// 13. MODULE ↔ LESSON
+// ============================================================
+
+export const moduleLessons = pgTable(
+  "module_lessons",
+  {
+    moduleId: varchar("module_id", { length: 50 }).notNull(),
+    lessonId: varchar("lesson_id", { length: 50 }).notNull(),
+    position: integer().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_module_lessons_lesson").using("btree", table.lessonId.asc().nullsLast()),
+    foreignKey({
+      columns: [table.moduleId],
+      foreignColumns: [modules.id],
+      name: "fk_module_lessons_module",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.lessonId],
+      foreignColumns: [lessons.id],
+      name: "fk_module_lessons_lesson",
+    }).onDelete("restrict"),
+    primaryKey({
+      columns: [table.moduleId, table.lessonId],
+      name: "module_lessons_pkey",
+    }),
+    unique("uq_module_lessons_position").on(table.moduleId, table.position),
+    check("chk_module_lessons_position", sql`"position" > 0`),
+  ]
+);
+
+// ============================================================
+// 14. ENROLLMENTS
+// ============================================================
 
 export const enrollments = pgTable(
   "enrollments",
   {
-    id: text("id").primaryKey(),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    course_id: text("course_id")
-      .notNull()
-      .references(() => courses.id, { onDelete: "cascade" }),
-    enrolled_at: timestamp("enrolled_at", { withTimezone: true }).defaultNow().notNull(),
-    expiry_at: timestamp("expiry_at", { withTimezone: true }),
-    progress_percent: smallint("progress_percent").notNull().default(0),
-    status: enrollmentStatusEnum("status").notNull().default("active"),
-  },
-  (table) => [unique().on(table.user_id, table.course_id)]
-);
-
-export const orders = pgTable("orders", {
-  id: text("id").primaryKey(),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  razorpay_order_id: varchar("razorpay_order_id", { length: 50 }).notNull().unique(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull().default("0"),
-  currency: char("currency", { length: 3 }).notNull().default("INR"),
-  status: orderStatusEnum("status").notNull().default("created"),
-  coupon_id: text("coupon_id").references(() => coupons.id, { onDelete: "set null" }),
-});
-
-export const orderItems = pgTable("order_items", {
-  id: text("id").primaryKey(),
-  order_id: text("order_id")
-    .notNull()
-    .references(() => orders.id, { onDelete: "cascade" }),
-  course_id: text("course_id")
-    .notNull()
-    .references(() => courses.id, { onDelete: "cascade" }),
-  price_at_purchase: decimal("price_at_purchase", { precision: 10, scale: 2 })
-    .notNull()
-    .default("0"),
-});
-
-export const payments = pgTable("payments", {
-  id: text("id").primaryKey(),
-  order_id: text("order_id")
-    .notNull()
-    .references(() => orders.id, { onDelete: "cascade" }),
-  razorpay_payment_id: varchar("razorpay_payment_id", { length: 50 }).notNull().unique(),
-  razorpay_signature: varchar("razorpay_signature", { length: 255 }).notNull(),
-  method: varchar("method", { length: 30 }),
-  status: paymentStatusEnum("status").notNull().default("captured"),
-});
-
-export const certificates = pgTable(
-  "certificates",
-  {
-    id: text("id").primaryKey(),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    course_id: text("course_id")
-      .notNull()
-      .references(() => courses.id, { onDelete: "cascade" }),
-    certificate_url: varchar("certificate_url", { length: 500 }).notNull(),
-  },
-  (table) => [unique().on(table.user_id, table.course_id)]
-);
-
-export const reviews = pgTable(
-  "reviews",
-  {
-    id: text("id").primaryKey(),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    course_id: text("course_id")
-      .notNull()
-      .references(() => courses.id, { onDelete: "cascade" }),
-    rating: smallint("rating").notNull(),
-    comment: text("comment"),
+    id: varchar({ length: 50 })
+      .default(sql`('enr_'::text || nextval('enrollments_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }).notNull(),
+    status: enrollmentStatus().default("PENDING").notNull(),
+    enrolledAt: timestamp("enrolled_at", { withTimezone: true, mode: "string" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
-    unique().on(table.user_id, table.course_id),
-    check("rating_range", sql`rating between 1 and 5`),
+    index("idx_enrollments_pathway").using("btree", table.pathwayId.asc().nullsLast()),
+    index("idx_enrollments_pathway_status").using(
+      "btree",
+      table.pathwayId.asc().nullsLast(),
+      table.status.asc().nullsLast()
+    ),
+    index("idx_enrollments_user").using("btree", table.userId.asc().nullsLast()),
+    index("idx_enrollments_user_status").using(
+      "btree",
+      table.userId.asc().nullsLast(),
+      table.status.asc().nullsLast()
+    ),
+    uniqueIndex("uq_active_user_pathway_enrollment")
+      .using("btree", table.userId.asc().nullsLast(), table.pathwayId.asc().nullsLast())
+      .where(sql`(status = 'ACTIVE'::enrollment_status)`),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_enrollments_user",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.pathwayId],
+      foreignColumns: [pathways.id],
+      name: "fk_enrollments_pathway",
+    }).onDelete("restrict"),
   ]
 );
 
-export const liveQuizzes = pgTable("live_quizzes", {
-  id: text("id").primaryKey(),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
-  created_by: text("created_by").references(() => users.id, { onDelete: "set null" }),
-  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+// ============================================================
+// 15. PAYMENTS
+// ============================================================
 
-export const liveQuestions = pgTable("live_questions", {
-  id: text("id").primaryKey(),
-  quiz_id: text("quiz_id")
-    .notNull()
-    .references(() => liveQuizzes.id, { onDelete: "cascade" }),
-  question_order: integer("question_order").notNull(),
-  question_text: text("question_text").notNull(),
-  image_url: text("image_url"),
-  type: liveQuestionTypeEnum("type").notNull().default("mcq"),
-  time_limit_sec: integer("time_limit_sec").notNull().default(30),
-  options: jsonb("options").notNull(), // Array of { id: string, text: string, is_correct: boolean }
-  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const payments = pgTable(
+  "payments",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('pay_'::text || nextval('payments_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    enrollmentId: varchar("enrollment_id", { length: 50 }),
+    pathwayId: varchar("pathway_id", { length: 50 }).notNull(),
+    amountPaise: bigint("amount_paise", { mode: "number" }).notNull(),
+    currency: varchar({ length: 3 }).default("INR").notNull(),
+    status: paymentStatus().default("CREATED").notNull(),
+    provider: varchar({ length: 50 }).default("RAZORPAY").notNull(),
+    providerOrderId: varchar("provider_order_id", { length: 150 }),
+    providerPaymentId: varchar("provider_payment_id", { length: 150 }),
+    providerSignature: varchar("provider_signature", { length: 500 }),
+    failureReason: text("failure_reason"),
+    paidAt: timestamp("paid_at", { withTimezone: true, mode: "string" }),
+    refundedAt: timestamp("refunded_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_payments_enrollment").using("btree", table.enrollmentId.asc().nullsLast()),
+    index("idx_payments_pathway").using("btree", table.pathwayId.asc().nullsLast()),
+    index("idx_payments_provider_order").using(
+      "btree",
+      table.providerOrderId.asc().nullsLast()
+    ),
+    index("idx_payments_provider_payment").using(
+      "btree",
+      table.providerPaymentId.asc().nullsLast()
+    ),
+    index("idx_payments_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_payments_user").using("btree", table.userId.asc().nullsLast()),
+    uniqueIndex("uq_payments_provider_order")
+      .using("btree", table.providerOrderId.asc().nullsLast())
+      .where(sql`(provider_order_id IS NOT NULL)`),
+    uniqueIndex("uq_payments_provider_payment")
+      .using("btree", table.providerPaymentId.asc().nullsLast())
+      .where(sql`(provider_payment_id IS NOT NULL)`),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_payments_user",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.enrollmentId],
+      foreignColumns: [enrollments.id],
+      name: "fk_payments_enrollment",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.pathwayId],
+      foreignColumns: [pathways.id],
+      name: "fk_payments_pathway",
+    }).onDelete("restrict"),
+    check("chk_payments_amount", sql`amount_paise >= 0`),
+    check("chk_payments_currency", sql`(currency)::text = 'INR'::text`),
+  ]
+);
 
-export const liveSessions = pgTable("live_sessions", {
-  id: text("id").primaryKey(),
-  room_code: varchar("room_code", { length: 10 }).notNull().unique(),
-  quiz_id: text("quiz_id")
-    .notNull()
-    .references(() => liveQuizzes.id, { onDelete: "cascade" }),
-  host_id: text("host_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  session_name: varchar("session_name", { length: 255 }).notNull(),
-  institute_name: varchar("institute_name", { length: 255 }).notNull(),
-  status: liveSessionStatusEnum("status").notNull().default("lobby"),
-  total_participants: integer("total_participants").notNull().default(0),
-  started_at: timestamp("started_at", { withTimezone: true }),
-  ended_at: timestamp("ended_at", { withTimezone: true }),
-  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export const liveParticipants = pgTable("live_participants", {
-  id: text("id").primaryKey(),
-  session_id: text("session_id")
-    .notNull()
-    .references(() => liveSessions.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }).notNull(),
-  phone: varchar("phone", { length: 20 }).notNull(),
-  total_score: integer("total_score").notNull().default(0),
-  correct_count: integer("correct_count").notNull().default(0),
-  final_rank: integer("final_rank"),
-  joined_at: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
-});
+// ============================================================
+// SELECT TYPES (read from DB)
+// ============================================================
 
 export type User = InferSelectModel<typeof users>;
-export type Course = InferSelectModel<typeof courses>;
+export type OtpVerification = InferSelectModel<typeof otpVerifications>;
+export type College = InferSelectModel<typeof colleges>;
 export type Category = InferSelectModel<typeof categories>;
+export type Pathway = InferSelectModel<typeof pathways>;
+export type PathwayCategory = InferSelectModel<typeof pathwayCategories>;
+export type PathwayCollege = InferSelectModel<typeof pathwayColleges>;
+export type Course = InferSelectModel<typeof courses>;
+export type PathwayCourse = InferSelectModel<typeof pathwayCourses>;
 export type Module = InferSelectModel<typeof modules>;
-export type ModuleItem = InferSelectModel<typeof moduleItems>;
-export type Assignment = InferSelectModel<typeof assignments>;
-export type AssignmentSubmission = InferSelectModel<typeof assignmentSubmissions>;
-export type Test = InferSelectModel<typeof tests>;
-export type TestAttempt = InferSelectModel<typeof testAttempts>;
-export type Cart = InferSelectModel<typeof carts>;
-export type Coupon = InferSelectModel<typeof coupons>;
+export type CourseModule = InferSelectModel<typeof courseModules>;
+export type Lesson = InferSelectModel<typeof lessons>;
+export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Enrollment = InferSelectModel<typeof enrollments>;
-export type Order = InferSelectModel<typeof orders>;
-export type OrderItem = InferSelectModel<typeof orderItems>;
 export type Payment = InferSelectModel<typeof payments>;
-export type Certificate = InferSelectModel<typeof certificates>;
-export type Review = InferSelectModel<typeof reviews>;
-export type LiveQuiz = InferSelectModel<typeof liveQuizzes>;
-export type LiveQuestion = InferSelectModel<typeof liveQuestions>;
-export type LiveSession = InferSelectModel<typeof liveSessions>;
-export type LiveParticipant = InferSelectModel<typeof liveParticipants>;
+
+// ============================================================
+// INSERT TYPES (write to DB)
+// ============================================================
 
 export type NewUser = InferInsertModel<typeof users>;
-export type NewCourse = InferInsertModel<typeof courses>;
+export type NewOtpVerification = InferInsertModel<typeof otpVerifications>;
+export type NewCollege = InferInsertModel<typeof colleges>;
 export type NewCategory = InferInsertModel<typeof categories>;
+export type NewPathway = InferInsertModel<typeof pathways>;
+export type NewPathwayCategory = InferInsertModel<typeof pathwayCategories>;
+export type NewPathwayCollege = InferInsertModel<typeof pathwayColleges>;
+export type NewCourse = InferInsertModel<typeof courses>;
+export type NewPathwayCourse = InferInsertModel<typeof pathwayCourses>;
 export type NewModule = InferInsertModel<typeof modules>;
-export type NewModuleItem = InferInsertModel<typeof moduleItems>;
-export type NewAssignment = InferInsertModel<typeof assignments>;
-export type NewAssignmentSubmission = InferInsertModel<typeof assignmentSubmissions>;
-export type NewTest = InferInsertModel<typeof tests>;
-export type NewTestAttempt = InferInsertModel<typeof testAttempts>;
-export type NewCart = InferInsertModel<typeof carts>;
-export type NewCoupon = InferInsertModel<typeof coupons>;
+export type NewCourseModule = InferInsertModel<typeof courseModules>;
+export type NewLesson = InferInsertModel<typeof lessons>;
+export type NewModuleLesson = InferInsertModel<typeof moduleLessons>;
 export type NewEnrollment = InferInsertModel<typeof enrollments>;
-export type NewOrder = InferInsertModel<typeof orders>;
-export type NewOrderItem = InferInsertModel<typeof orderItems>;
 export type NewPayment = InferInsertModel<typeof payments>;
-export type NewCertificate = InferInsertModel<typeof certificates>;
-export type NewReview = InferInsertModel<typeof reviews>;
-export type NewLiveQuiz = InferInsertModel<typeof liveQuizzes>;
-export type NewLiveQuestion = InferInsertModel<typeof liveQuestions>;
-export type NewLiveSession = InferInsertModel<typeof liveSessions>;
-export type NewLiveParticipant = InferInsertModel<typeof liveParticipants>;
-

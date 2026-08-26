@@ -1,7 +1,6 @@
 import { Router } from "express";
-import { webhookController } from "../controllers/webhook.controller";
+import { paymentsController } from "../controllers/payments.controller";
 
-export const webhooksRouter = Router();
+export const webhooksRouter: Router = Router();
 
-// Route: POST /api/webhooks/razorpay
-webhooksRouter.post("/razorpay", webhookController.handleRazorpay);
+webhooksRouter.post("/razorpay", paymentsController.webhook);

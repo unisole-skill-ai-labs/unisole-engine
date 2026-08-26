@@ -13,22 +13,6 @@ const authLimiter = createRateLimiter({
   message: "Too many authentication requests, please try again in 15 minutes",
 });
 
-// Admin email/password login (used by Unisole Admin Portal)
-authRouter.post(
-  "/login",
-  authLimiter,
-  validateBody({ required: ["email", "password"] }),
-  authController.login
-);
-
-authRouter.post(
-  "/refresh",
-  validateBody({ required: ["refreshToken"] }),
-  authController.refresh
-);
-
-authRouter.get("/me", authMiddleware, authController.me);
-
 // Mobile OTP Authentication
 authRouter.post(
   "/send-otp",
@@ -44,3 +28,10 @@ authRouter.post(
   authController.verifyOtp
 );
 
+authRouter.post(
+  "/refresh",
+  validateBody({ required: ["refreshToken"] }),
+  authController.refresh
+);
+
+authRouter.get("/me", authMiddleware, authController.me);

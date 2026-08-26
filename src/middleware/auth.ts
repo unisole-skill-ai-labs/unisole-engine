@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 export interface CustomRequest extends Request {
   user?: {
     id: string;
-    email: string;
+    phone: string;
     role: string;
     name?: string;
   };
@@ -29,28 +29,15 @@ export function authMiddleware(
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as {
       id: string;
-      email: string;
+      phone: string;
       role: string;
       name?: string;
     };
     req.user = decoded;
     next();
   } catch {
-    // Graceful fallback for mock or client-generated session tokens
-    if (token && (token.startsWith("token_") || token.startsWith("mock_"))) {
-      const parts = token.split("_");
-      const identifier = parts[parts.length - 1] || "student";
-      req.user = {
-        id: `usr_${identifier}`,
-        email: `${identifier}@unisole.test`,
-        role: "student",
-        name: `Learner ${identifier.slice(-4)}`,
-      };
-      return next();
-    }
     res.status(401).json({ error: "Unauthorized: Token expired or invalid" });
   }
-
 }
 
 export function optionalAuthMiddleware(
@@ -64,7 +51,7 @@ export function optionalAuthMiddleware(
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as {
         id: string;
-        email: string;
+        phone: string;
         role: string;
         name?: string;
       };
@@ -91,4 +78,3 @@ export function requireRole(roles: string[]) {
 }
 
 export { JWT_SECRET, JWT_REFRESH_SECRET };
-

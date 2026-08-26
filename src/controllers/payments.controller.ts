@@ -1,22 +1,29 @@
 import { Request, Response } from "express";
-import { paymentsManager } from "../managers/payments.manager";
+import { paymentsService } from "../services/payments.service";
 import { asyncHandler } from "../middleware/async-handler";
+import { CustomRequest } from "../middleware/auth";
 
 export const paymentsController = {
-  list: asyncHandler(async (_req: Request, res: Response) => {
-    res.json(await paymentsManager.list());
+  list: asyncHandler(async (req: CustomRequest, res: Response) => {
+    res.json(await paymentsService.list(req.user));
   }),
   getById: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await paymentsManager.getById(req.params.id));
+    res.json(await paymentsService.getById(req.params.id));
   }),
-  create: asyncHandler(async (req: Request, res: Response) => {
-    res.status(201).json(await paymentsManager.create(req.body));
+  createOrder: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { pathwayId } = req.body;
+    const order = await paymentsService.createOrder(userId, pathwayId);
+    res.status(201).json(order);
   }),
-  update: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await paymentsManager.update(req.params.id, req.body));
+  verifyPayment: asyncHandler(async (req: Request, res: Response) => {
+    const result = await paymentsService.verifyPayment(req.body);
+    res.json(result);
   }),
-  remove: asyncHandler(async (req: Request, res: Response) => {
-    await paymentsManager.remove(req.params.id);
-    res.status(204).end();
+  webhook: asyncHandler(async (req: Request, res: Response) => {
+    const signature = req.headers["x-razorpay-signature"] as string | undefined;
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const result = await paymentsService.handleWebhook(rawBody, signature, req.body);
+    res.json(result);
   }),
 };

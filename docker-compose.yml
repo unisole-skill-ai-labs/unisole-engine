@@ -8,6 +8,7 @@ services:
       POSTGRES_DB: unisole
     volumes:
       - pgdata:/var/lib/postgresql
+      - ./edtech_schema_and_seed.sql:/docker-entrypoint-initdb.d/01_schema_and_seed.sql:ro
     ports:
       - "5433:5432"
     healthcheck:
@@ -22,17 +23,15 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgres://postgres:postgres@db:5432/unisole
-      # Set to "true" to wipe & re-insert seed data on startup. Keep "false" to preserve data.
-      RUN_SEED: "false"
+      JWT_SECRET: unisole-secret-key
+      JWT_REFRESH_SECRET: unisole-refresh-secret-key
+      RAZORPAY_KEY_SECRET: rzp_test_secret
+      RAZORPAY_WEBHOOK_SECRET: unisole_webhook_secret_2026
     ports:
       - "3000:3000"
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      sh -c "node dist/scripts/migrate.js &&
-             if [ \"$$RUN_SEED\" = \"true\" ]; then node dist/scripts/seed.js; fi &&
-             node dist/index.js"
 
 volumes:
   pgdata:

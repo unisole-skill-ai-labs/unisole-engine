@@ -1,1 +1,0 @@
-ALTER TABLE "module_item" ADD COLUMN IF NOT EXISTS "content_body" text;

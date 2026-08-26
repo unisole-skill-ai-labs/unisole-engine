@@ -10,20 +10,20 @@ export function toTitleCase(str: string | null | undefined): string {
 }
 
 /**
- * Normalizes email by trimming and converting to lowercase
- */
-export function normalizeEmail(email: string | null | undefined): string | null {
-  if (!email || typeof email !== "string") return null;
-  const trimmed = email.trim().toLowerCase();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-/**
- * Normalizes phone number to 10 clean digits
+ * Normalizes phone number to E.164 format: +91XXXXXXXXXX
+ * Accepts: "9876543210", "+919876543210", "919876543210", "09876543210"
+ * Returns: "+919876543210" or null if invalid
  */
 export function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone || typeof phone !== "string") return null;
-  const cleaned = phone.replace(/\D/g, "");
-  const tenDigit = cleaned.slice(-10);
-  return tenDigit.length === 10 ? tenDigit : null;
+  const digits = phone.replace(/\D/g, "");
+  let tenDigit: string;
+  if (digits.length > 10 && digits.startsWith("91")) {
+    tenDigit = digits.slice(-10);
+  } else if (digits.length === 10) {
+    tenDigit = digits;
+  } else {
+    return null;
+  }
+  return `+91${tenDigit}`;
 }
