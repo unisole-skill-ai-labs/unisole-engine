@@ -42,11 +42,12 @@ newgrp docker
 echo "📚 Installing Git..."
 sudo apt-get install -y git
 
-# Install Nginx (for reverse proxy)
-echo "🌐 Installing Nginx..."
-sudo apt-get install -y nginx
-sudo systemctl enable nginx
-sudo systemctl start nginx
+# Ensure host nginx does not conflict with Docker nginx on port 80
+if systemctl is-active --quiet nginx; then
+  echo "Stopping host Nginx so Docker Nginx can bind to port 80..."
+  sudo systemctl stop nginx
+  sudo systemctl disable nginx
+fi
 
 # Create application directory
 echo "📁 Creating application directory..."

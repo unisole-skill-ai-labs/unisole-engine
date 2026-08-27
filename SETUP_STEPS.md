@@ -1,10 +1,43 @@
-# Complete CI/CD Setup Steps for Unisole on AWS EC2
+# Complete CI/CD & Deployment Setup: AWS EC2 (Backend) + Vercel (Frontends)
 
-Follow these steps in order. Each section should take 5-15 minutes.
+This guide documents the setup for Unisole's production architecture:
+* **AWS EC2:** Hosts PostgreSQL Database, Backend Engine API, and Nginx Reverse Proxy via Docker.
+* **Vercel:** Hosts all 3 client-side Frontends (`unisole-app`, `unisole-admin`, `unisole-seo-website`) with automated CI/CD on Git push.
 
 ---
 
-## **PHASE 1: Prepare GitHub (15 minutes)**
+## 🏛️ Architecture Overview
+
+```
+┌────────────────────────────────────────────────────────┐
+│                        VERCEL                          │
+│  • unisole-app         (LMS Frontend)                  │
+│  • unisole-admin       (Admin Dashboard)               │
+│  • unisole-seo-website (Landing & SEO Site)            │
+│  Auto-deployed on git push to GitHub                   │
+└─────────────────────────┬──────────────────────────────┘
+                          │ (API Requests: VITE_API_BASE_URL)
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│                    AWS EC2 SERVER                      │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │ Nginx Container (Ports 80 / 443)                 │  │
+│  │   └── Reverse proxies requests to API Backend    │  │
+│  └──────────────────────┬───────────────────────────┘  │
+│                         ▼                              │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │ Backend API: unisole-engine (Port 3000)          │  │
+│  └──────────────────────┬───────────────────────────┘  │
+│                         ▼                              │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │ Database: PostgreSQL 16 (Port 5433:5432)         │  │
+│  └──────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **PHASE 1: Prepare GitHub Secrets for Backend (10 minutes)**
 
 ### Step 1: Generate SSH Key for EC2
 
@@ -14,456 +47,247 @@ On your **local machine**:
 # Generate SSH key pair
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/ec2-unisole-key -N ""
 
-# View your private key (you'll need this)
+# View your private key (you'll paste this into GitHub Secrets)
 cat ~/.ssh/ec2-unisole-key
 
-# View your public key
+# View your public key (you'll add this to EC2 ~/.ssh/authorized_keys)
 cat ~/.ssh/ec2-unisole-key.pub
 ```
 
-**Keep the private key safe** - you'll need it for GitHub/EC2 access.
-
 ---
 
-### Step 2: Add GitHub Secrets
+### Step 2: Add GitHub Secrets to `unisole-engine`
 
-1. Go to GitHub: **Your Repo → Settings → Secrets and variables → Actions**
+1. Go to GitHub: **unisole-engine → Settings → Secrets and variables → Actions**
 2. Click **"New repository secret"**
-3. Add these secrets one by one:
+3. Add these 5 secrets:
 
-| Secret Name | Value | Where to Get |
-|-------------|-------|--------------|
-| `DOCKER_USERNAME` | Your Docker Hub username | [docker.com](https://docker.com) login |
-| `DOCKER_PASSWORD` | Your Docker Hub password/token | Settings → Security → New token |
-| `AWS_EC2_HOST` | Your EC2 IP address | AWS Console (after launching EC2) |
-| `AWS_EC2_USER` | `ec2-user` or `ubuntu` | Depends on AMI (use `ubuntu` for Ubuntu 24.04) |
-| `AWS_EC2_KEY` | **Your entire private SSH key** | From Step 1 above (`~/.ssh/ec2-unisole-key` contents) |
-
-**How to add a secret:**
-- Secret name: `DOCKER_USERNAME`
-- Secret value: `your-docker-hub-username`
-- Click "Add secret"
-
-Repeat for all 5 secrets.
+| Secret Name | Value | Description |
+|-------------|-------|-------------|
+| `DOCKER_USERNAME` | `divyank380` | Your Docker Hub username |
+| `DOCKER_PASSWORD` | Docker Hub Access Token | Generated in Docker Hub → Account Settings → Security → New Access Token |
+| `AWS_EC2_HOST` | `54.xx.xx.xx` | **Public IPv4 address** (or Elastic IP) of your EC2 instance |
+| `AWS_EC2_USER` | `ubuntu` | SSH user for Ubuntu EC2 |
+| `AWS_EC2_KEY` | `-----BEGIN OPENSSH PRIVATE KEY...` | Full private key generated in Step 1 (`~/.ssh/ec2-unisole-key`) |
 
 ---
 
-### Step 3: Prepare Docker Hub Token
+## **PHASE 2: Launch AWS EC2 Instance (15 minutes)**
 
-1. Go to [Docker Hub](https://hub.docker.com)
-2. Login to your account
-3. Account settings → Security → New Access Token
-4. Name: `Unisole CI/CD`
-5. Permissions: Read & Write
-6. Copy the token
-7. Use this as `DOCKER_PASSWORD` in GitHub secrets
+### Step 3: Create EC2 Instance
 
----
+1. Go to [AWS Console](https://console.aws.amazon.com) → **EC2 Dashboard** → **Launch Instances**.
 
-## **PHASE 2: Launch AWS EC2 Instance (20 minutes)**
-
-### Step 4: Create EC2 Instance
-
-1. Go to [AWS Console](https://console.aws.amazon.com)
-2. Navigate to **EC2 Dashboard**
-3. Click **"Launch Instances"**
-
-| Setting | Value |
-|---------|-------|
-| **Name** | `unisole-production` or `unisole-app` |
-| **AMI** | Ubuntu Server 24.04 LTS (free tier eligible) |
-| **Instance Type** | `t3.small` (or `t2.small` free tier) |
-| **Key pair** | Create new or use existing |
-| **VPC** | Default |
-| **Subnet** | Default |
-| **Auto-assign public IP** | Enable |
+| Setting | Recommended Value |
+|---------|-------------------|
+| **Name** | `unisole-backend-prod` |
+| **AMI** | Ubuntu Server 24.04 LTS (or 22.04 LTS) |
+| **Instance Type** | `t3.small` (2 vCPU, 2GB RAM) or `t2.small` |
+| **Key Pair** | Select existing or create new `.pem` |
 | **Storage** | 20 GB (gp3) |
-| **Security Group** | Create new |
+| **Auto-assign Public IP** | **Enable** (or allocate an Elastic IP) |
 
 ---
 
-### Step 5: Configure Security Group
+### Step 4: Configure Security Group Inbound Rules
 
-In security group settings, add **Inbound Rules**:
+Add the following **Inbound Rules**:
 
-| Type | Protocol | Port | Source |
-|------|----------|------|--------|
-| SSH | TCP | 22 | 0.0.0.0/0 (or your IP) |
-| HTTP | TCP | 80 | 0.0.0.0/0 |
-| HTTPS | TCP | 443 | 0.0.0.0/0 |
-| Custom TCP | TCP | 3000 | 0.0.0.0/0 (API) |
-| Custom TCP | TCP | 5173 | 0.0.0.0/0 (Admin) |
-| Custom TCP | TCP | 5174 | 0.0.0.0/0 (LMS) |
-| Custom TCP | TCP | 5175 | 0.0.0.0/0 (SEO) |
-| Custom TCP | TCP | 5433 | 0.0.0.0/0 (Database) |
+| Type | Protocol | Port | Source | Purpose |
+|------|----------|------|--------|---------|
+| **SSH** | TCP | `22` | `0.0.0.0/0` | SSH Access & GitHub Actions deploy |
+| **HTTP** | TCP | `80` | `0.0.0.0/0` | Nginx Public Traffic |
+| **HTTPS** | TCP | `443` | `0.0.0.0/0` | SSL Encrypted Traffic |
+| **Custom TCP** | TCP | `3000` | `0.0.0.0/0` | Direct API Testing |
+| **Custom TCP** | TCP | `5433` | Your IP only | Remote DB Access (Optional) |
 
 ---
 
-### Step 6: Launch & Get IP
+### Step 5: Add GitHub Actions Public Key to EC2
 
-1. Click **"Launch Instance"**
-2. Wait for instance to start (2-3 minutes)
-3. Go to EC2 Dashboard → Instances
-4. Copy your **Public IPv4 address** (e.g., `52.123.45.67`)
-5. Update GitHub secret `AWS_EC2_HOST` with this IP
-
----
-
-### Step 7: Add Your SSH Key to EC2
-
-Download your key pair `.pem` file from AWS and set permissions:
-
+1. Download your AWS `.pem` key pair and connect to EC2 from your local terminal:
 ```bash
-# On your local machine
-chmod 600 ~/Downloads/unisole-key.pem
+chmod 600 ~/Downloads/your-key.pem
+ssh -i ~/Downloads/your-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
+```
 
-# Test SSH connection
-ssh -i ~/Downloads/unisole-key.pem ubuntu@YOUR_EC2_IP
-
-# You should see: ubuntu@ip-xxx:/home/ubuntu$
-# If yes, SSH works! Type 'exit' to quit
+2. On the **EC2 instance**, append your GitHub Actions public key to `~/.ssh/authorized_keys`:
+```bash
+# Replace with the output from cat ~/.ssh/ec2-unisole-key.pub on your local PC
+echo "ssh-rsa AAAAB3NzaC1yc2EAAA... ec2-unisole-key" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
 ```
 
 ---
 
-## **PHASE 3: Setup EC2 Machine (15 minutes)**
+## **PHASE 3: Setup EC2 Machine (10 minutes)**
 
-### Step 8: SSH into EC2
+### Step 6: Clone Repository & Run Initial Setup
 
-```bash
-ssh -i ~/Downloads/unisole-key.pem ubuntu@YOUR_EC2_IP
-```
-
----
-
-### Step 9: Clone Repository & Run Setup
+While SSH'd into EC2:
 
 ```bash
-# Create app directory
+# 1. Create app directory with proper ownership
 sudo mkdir -p /opt/unisole
 sudo chown -R ubuntu:ubuntu /opt/unisole
 
-# Clone repository
+# 2. Clone the backend repository
 cd /opt/unisole
 git clone https://github.com/unisole-skill-ai-labs/unisole-engine.git .
 
-# Run setup script (this will take 5-10 minutes)
+# 3. Run setup script (Installs Docker, Docker Compose, Git, sets up .env)
 bash scripts/setup-ec2.sh
 ```
 
-This installs:
-- Docker & Docker Compose
-- PostgreSQL Database (`db` container with migrations)
-- Unisole Backend Engine (`api` container)
-- Nginx Reverse Proxy (`nginx` container on port 80/443)
-- Frontends (`unisole-app`, `unisole-admin`, `unisole-seo-website`) deployed directly via Git pushes on **Vercel**
-
 ---
 
-### Step 10: Configure Environment
+### Step 7: Configure Production Environment Variables
+
+Edit the generated `.env` file:
 
 ```bash
-# Edit the .env file
-nano .env
+nano /opt/unisole/.env
 ```
 
-Update these values:
+Ensure the following variables are configured:
 
 ```env
 NODE_ENV=production
 API_PORT=3000
-API_BASE_URL=https://yourdomain.com  # Use EC2 IP if no domain yet
+API_BASE_URL=https://api.unisole.org  # Or http://YOUR_EC2_PUBLIC_IP
 
 DB_USER=postgres
-DB_PASSWORD=______  # Already generated (random 32 chars)
+DB_PASSWORD=YOUR_STRONG_PASSWORD_HERE
 DB_NAME=unisole
 
-JWT_SECRET=______  # Already generated
-JWT_REFRESH_SECRET=______  # Already generated
+JWT_SECRET=YOUR_RANDOM_32_CHAR_SECRET
+JWT_REFRESH_SECRET=YOUR_RANDOM_32_CHAR_REFRESH_SECRET
 
 RAZORPAY_KEY_SECRET=YOUR_ACTUAL_RAZORPAY_KEY
 RAZORPAY_WEBHOOK_SECRET=YOUR_ACTUAL_WEBHOOK_SECRET
 
-DOCKER_USERNAME=your-docker-username
+DOCKER_USERNAME=divyank380
 ```
 
-> To generate a secure secret if needed:
-> ```bash
-> openssl rand -base64 32
-> ```
-
-**Save file:** Press `Ctrl+X` → `Y` → `Enter`
+*(Press `Ctrl+O` → `Enter` to save, `Ctrl+X` to exit)*
 
 ---
 
-### Step 11: Initial Deployment
+### Step 8: Deploy Backend on EC2
 
 ```bash
-# Make scripts executable
-chmod +x scripts/*.sh
-
-# Deploy all services
+cd /opt/unisole
 bash scripts/deploy.sh
 ```
 
-This will:
-- Login to Docker Hub
-- Pull Docker images (may take 5-10 min first time)
-- Start all containers
-- Initialize database
-
-**Wait for it to complete** - you should see:
-```
-✅ Deployment completed successfully!
-```
+This pulls `postgres:16-alpine`, `divyank380/unisole-engine:latest`, and `nginx:1.27-alpine`, automatically runs database schema migrations (`edtech_schema_and_seed.sql`), and starts the backend!
 
 ---
 
-### Step 12: Verify Services Running
+### Step 9: Verify Running Backend Services
 
 ```bash
-# Check all containers
-docker-compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
+```
 
-# Should show: (all containers with status "Up")
-# - unisole-engine-db-1 (PostgreSQL)
-# - unisole-engine-api-1 (Backend API)
-# - unisole-engine-admin-1 (Admin Dashboard)
-# - unisole-engine-lms-1 (LMS App)
-# - unisole-engine-seo-1 (SEO Website)
-# - unisole-engine-nginx-1 (Reverse Proxy)
+You should see 3 running containers:
+* `unisole-db-1` (healthy)
+* `unisole-api-1` (healthy)
+* `unisole-nginx-1` (Up)
+
+**Test from browser or curl:**
+```bash
+curl http://localhost/health
+# Returns: healthy
+
+curl http://localhost:3000/
+# Returns: {"status":"ok","service":"Unisole Engine API","version":"2.0.0","health":"/health"}
 ```
 
 ---
 
-### Step 13: Test Services
+## **PHASE 4: Deploy Frontends to Vercel (10 minutes)**
 
-```bash
-# Test API health
-curl http://localhost:3000/api/health
+All 3 frontends run independently on Vercel with automatic deployments on git pushes.
 
-# Should return: successful response
-
-# Test other services
-curl http://localhost/health  # Nginx health check
-```
-
----
-
-### Step 14: Access Services from Browser
-
-Open your browser and go to:
-
-| Service | URL |
-|---------|-----|
-| **API** | `http://YOUR_EC2_IP:3000` |
-| **Admin** | `http://YOUR_EC2_IP:5173` |
-| **LMS** | `http://YOUR_EC2_IP:5174` |
-| **SEO** | `http://YOUR_EC2_IP:5175` |
-
-All should load successfully! ✅
+### Step 10: Deploy `unisole-app` (LMS Frontend)
+1. Go to [Vercel Dashboard](https://vercel.com) → **Add New** → **Project**.
+2. Select your `unisole-app` repository.
+3. In **Environment Variables**:
+   * Key: `VITE_API_BASE_URL`
+   * Value: `http://YOUR_EC2_PUBLIC_IP` (or `https://api.unisole.org`)
+4. Click **Deploy**.
 
 ---
 
-### Step 15: Exit SSH
-
-```bash
-exit
-```
+### Step 11: Deploy `unisole-admin` (Admin Dashboard)
+1. In Vercel, import the `unisole-admin` repository.
+2. In **Environment Variables**:
+   * Key: `VITE_API_BASE_URL`
+   * Value: `http://YOUR_EC2_PUBLIC_IP` (or `https://api.unisole.org`)
+3. Click **Deploy**.
 
 ---
 
-## **PHASE 4: First Automated Deployment (5 minutes)**
+### Step 12: Deploy `unisole-seo-website` (Landing Page & SEO)
+1. In Vercel, import the `unisole-seo-website` repository.
+2. In **Environment Variables**:
+   * Key: `VITE_API_BASE_URL`
+   * Value: `http://YOUR_EC2_PUBLIC_IP` (or `https://api.unisole.org`)
+3. Click **Deploy**.
 
-### Step 16: Push to Production Branch
+---
 
-On your **local machine**:
+## **PHASE 5: Automated GitHub Actions CI/CD Workflow**
 
+### How Auto-Deployment Works:
+
+1. Whenever you push code to the `production` branch of `unisole-engine`:
 ```bash
-# Navigate to repo
-cd /Users/girish/Desktop/Unisole-Codebase/unisole-engine
-
-# Make a small change (e.g., update README or add comment)
-echo "# Updated $(date)" >> README.md
-
-# Commit and push to production
+cd unisole-engine
 git add .
-git commit -m "ci: trigger first automated deployment"
+git commit -m "feat: updated api endpoint"
 git push origin production
 ```
 
----
+2. **GitHub Actions automatically:**
+   * Builds the `unisole-engine` Docker image
+   * Pushes the image to Docker Hub (`divyank380/unisole-engine:latest`)
+   * Connects via SSH to your EC2 instance
+   * Executes zero-downtime rolling restart of the backend container
 
-### Step 17: Monitor GitHub Actions
-
-1. Go to GitHub → Your Repo
-2. Click **"Actions"** tab
-3. Watch the workflow run in real-time
-4. You should see:
-   - ✅ Build-and-push job running
-   - ✅ Deploy-to-ec2 job running
-   - ✅ Both jobs completing successfully
-
-**Total time:** 10-15 minutes
+3. For Frontends (`unisole-app`, `unisole-admin`, `unisole-seo-website`):
+   * Simply push to `main`/`master` in GitHub. Vercel detects the push and instantly builds & deploys to its global edge network.
 
 ---
 
-### Step 18: Verify Deployment
+## **PHASE 6: Setup Daily Database Backups (5 minutes)**
+
+On your **EC2 instance**:
 
 ```bash
-# SSH back into EC2
-ssh -i ~/Downloads/unisole-key.pem ubuntu@YOUR_EC2_IP
-
-# Check containers restarted
-docker-compose -f docker-compose.prod.yml ps
-
-# View recent logs
-docker-compose -f docker-compose.prod.yml logs --tail=20
-```
-
-Should see containers with recent restart times. ✅
-
----
-
-## **PHASE 5: Setup Database Backups (5 minutes)**
-
-### Step 19: Enable Daily Backups
-
-```bash
-# SSH into EC2
-ssh -i ~/Downloads/unisole-key.pem ubuntu@YOUR_EC2_IP
-
-# Connect to EC2
 cd /opt/unisole
 
-# Setup cron job for daily backups at 2 AM
+# Setup cron job for daily backups at 2:00 AM UTC
 crontab -e
 
-# Add this line at the bottom:
-0 2 * * * bash /opt/unisole/scripts/backup-db.sh
-
-# Save: Ctrl+X → Y → Enter
+# Paste at the bottom:
+0 2 * * * bash /opt/unisole/scripts/backup-db.sh >> /var/log/unisole-backup.log 2>&1
 ```
 
----
-
-### Step 20: Test Backup
-
+**Test backup manually:**
 ```bash
-# Run backup manually
 bash scripts/backup-db.sh
-
-# Should output:
-# ✅ Backup completed: /opt/unisole/backups/unisole_backup_YYYY-MM-DD_HH-MM-SS.sql.gz
-
-# List backups
-ls -lh backups/
+ls -lh /opt/unisole/backups/
 ```
 
 ---
 
-## **PHASE 6: Optional - Setup SSL/HTTPS (15 minutes)**
+## 🛠️ Quick Troubleshooting Guide
 
-### Step 21: Get Domain Name
-
-If you have a domain:
-1. Update DNS A record to point to EC2 IP
-2. Update `API_BASE_URL` in `.env` to your domain
-
----
-
-### Step 22: Install SSL Certificate
-
-```bash
-# SSH into EC2
-ssh -i ~/Downloads/unisole-key.pem ubuntu@YOUR_EC2_IP
-
-# Install Certbot
-sudo apt-get install certbot python3-certbot-nginx -y
-
-# Get certificate (replace with your domain)
-sudo certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com
-
-# Copy to app directory
-sudo cp -r /etc/letsencrypt/live/yourdomain.com /opt/unisole/ssl/
-sudo chown -R ubuntu:ubuntu /opt/unisole/ssl/
-```
-
----
-
-### Step 23: Update Nginx Config
-
-```bash
-cd /opt/unisole
-
-# Edit nginx config
-nano nginx-prod.conf
-
-# Update these lines:
-# server_name yourdomain.com www.yourdomain.com;
-# ssl_certificate /etc/nginx/ssl/yourdomain.com/fullchain.pem;
-# ssl_certificate_key /etc/nginx/ssl/yourdomain.com/privkey.pem;
-
-# Restart Nginx
-docker-compose -f docker-compose.prod.yml restart nginx
-```
-
----
-
-## **SUMMARY: Done! ✅**
-
-You now have:
-
-✅ **Automated CI/CD** - Push code → Auto deploy  
-✅ **Multiple Services** - API, Admin, LMS, SEO running  
-✅ **Production Database** - PostgreSQL on EC2  
-✅ **Daily Backups** - Automatic database backups  
-✅ **Health Checks** - Services auto-restart if down  
-✅ **Logging** - All logs preserved  
-✅ **Cost Efficient** - ~$10-15/month  
-
----
-
-## **After This: Regular Workflow**
-
-```bash
-# Work normally on your machine
-nano file.js          # Make changes
-git add .
-git commit -m "Feature: xyz"
-git push origin production
-
-# 🚀 Everything auto-deploys!
-# Monitor: GitHub → Actions tab
-# Check services: http://YOUR_EC2_IP
-```
-
----
-
-## **Troubleshooting Reference**
-
-| Problem | Solution |
-|---------|----------|
-| Can't SSH to EC2 | Check key permissions: `chmod 600 key.pem` |
-| GitHub Actions fails | Check: Actions tab → Failed job → See error logs |
-| Services not starting | SSH to EC2: `docker-compose -f docker-compose.prod.yml logs` |
-| Database won't connect | Check `.env` DB credentials match |
-| Port already in use | Change port in `docker-compose.prod.yml` |
-
----
-
-## **Time Breakdown**
-
-| Phase | Time | Status |
-|-------|------|--------|
-| 1. GitHub Setup | 15 min | ⏳ |
-| 2. Launch EC2 | 20 min | ⏳ |
-| 3. EC2 Setup | 15 min | ⏳ |
-| 4. First Deploy | 5 min | ⏳ |
-| 5. Backups | 5 min | ⏳ |
-| 6. SSL (Optional) | 15 min | ⏳ |
-| **TOTAL** | **~75 min** | 🎯 |
-
----
-
-**You're ready to deploy! Start with Phase 1.** 🚀
+| Issue | Solution |
+|---|---|
+| **Port 80/443 already in use** | Run `sudo systemctl stop nginx && sudo systemctl disable nginx` on host so Docker Nginx can bind to port 80. |
+| **Postgres container unhealthy** | Run `docker compose -f docker-compose.prod.yml down -v` to reset corrupted volume, then rerun `bash scripts/deploy.sh`. |
+| **CORS errors in frontend console** | Backend Express API has `cors()` enabled in `src/index.ts`. Verify your frontend's `VITE_API_BASE_URL` matches the EC2 IP/domain. |
+| **GitHub Actions SSH Timeout** | Check that EC2 Security Group allows Port 22 from `0.0.0.0/0`, and `AWS_EC2_HOST` secret uses the **Public IPv4 address** (not private IP). |

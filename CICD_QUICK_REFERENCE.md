@@ -1,280 +1,91 @@
-# CI/CD Quick Reference
+# CI/CD Quick Reference: EC2 (Backend) + Vercel (Frontends)
 
-## Flow Diagram
+## 🔄 Architecture & Flow
 
 ```
-Local Development (Your Machine)
-    ↓ git push origin production
-    ↓
-GitHub Repository
-    ↓ Triggers GitHub Actions
-    ↓
-GitHub Actions Workflow (.github/workflows/deploy.yml)
-    ├─ Step 1: Build Docker images for all services
-    ├─ Step 2: Push to Docker Hub
-    └─ Step 3: SSH to EC2 and deploy
-    ↓
-AWS EC2 Instance
-    ├─ Pull latest code
-    ├─ Pull latest Docker images
-    ├─ Stop old containers
-    ├─ Start new containers
-    └─ Database persists (volumes)
-    ↓
-Live Services
-    ├─ API: yourdomain.com/api
-    ├─ Admin: yourdomain.com/admin
-    ├─ LMS: yourdomain.com/lms
-    └─ SEO: yourdomain.com
+┌────────────────────────────────────────────────────────┐
+│                   VERCEL (Frontends)                   │
+│  unisole-app | unisole-admin | unisole-seo-website     │
+│  Trigger: git push origin main                         │
+│  Deploy: Automated Edge CDN Deployment via Vercel      │
+└─────────────────────────┬──────────────────────────────┘
+                          │ API Calls: VITE_API_BASE_URL
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│                 AWS EC2 (Backend Stack)                │
+│  Trigger: git push origin production in unisole-engine │
+│  Deploy: GitHub Actions (.github/workflows/deploy.yml) │
+│                                                        │
+│  Containers:                                           │
+│   • nginx:1.27-alpine    (Reverse proxy: 80/443)       │
+│   • unisole-engine:latest (Express REST API: 3000)     │
+│   • postgres:16-alpine    (Database: 5433:5432)        │
+└────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Setup Timeline
+## 🔑 GitHub Secrets Checklist (`unisole-engine`)
 
-### Day 1: Initial Setup
-
-1. **GitHub Secrets** (5 min)
-   ```
-   Settings → Secrets and variables → Actions
-   Add: DOCKER_USERNAME, DOCKER_PASSWORD, AWS_EC2_*, etc.
-   ```
-
-2. **Launch EC2** (5 min)
-   ```
-   AWS Console → EC2 → Launch Instance
-   Ubuntu 24.04 LTS, t3.small, 20GB storage
-   Security group: Allow ports 22, 80, 443, 3000, 5173+
-   ```
-
-3. **Run Setup Script** (10 min)
-   ```bash
-   ssh -i key.pem ec2-user@ip
-   bash scripts/setup-ec2.sh
-   nano .env  # Fill in values
-   ```
-
-4. **Initial Deploy** (5 min)
-   ```bash
-   bash scripts/deploy.sh
-   ```
-
-5. **Test Services** (5 min)
-   ```
-   http://your-ec2-ip:3000
-   http://your-ec2-ip:5173
-   http://your-ec2-ip:5174
-   http://your-ec2-ip:5175
-   ```
-
-### Total Setup Time: ~30 minutes
+| Secret Name | Value | Purpose |
+|-------------|-------|---------|
+| `DOCKER_USERNAME` | `divyank380` | Docker Hub username |
+| `DOCKER_PASSWORD` | Access Token | Docker Hub PAT with read/write access |
+| `AWS_EC2_HOST` | Public IPv4 / Elastic IP | Public address of your EC2 instance |
+| `AWS_EC2_USER` | `ubuntu` | SSH user |
+| `AWS_EC2_KEY` | Private SSH Key (`~/.ssh/ec2-unisole-key`) | Key for GitHub Actions runner to SSH into EC2 |
 
 ---
 
-## Files Created for CI/CD
+## 🚀 Deployment Commands Quick Reference
 
-| File | Purpose |
-|------|---------|
-| `.github/workflows/deploy.yml` | GitHub Actions workflow (auto build & deploy) |
-| `docker-compose.prod.yml` | Production Docker Compose (with logging, health checks) |
-| `.env.production` | Environment template (secrets) |
-| `scripts/setup-ec2.sh` | EC2 initial setup (Docker, Docker Compose, etc.) |
-| `scripts/deploy.sh` | Deploy script (run on EC2 to update services) |
-| `scripts/backup-db.sh` | Database backup script (run daily via cron) |
-| `nginx-prod.conf` | Production Nginx config (reverse proxy, SSL) |
-| `CI_CD_GUIDE.md` | Complete setup guide |
-
----
-
-## Workflow Steps
-
-### 1️⃣ Code Push
+### Deploying Backend on EC2:
 ```bash
+# On your local machine:
 git add .
-git commit -m "Feature: new feature"
+git commit -m "feat: backend update"
 git push origin production
+# GitHub Actions will automatically build, push image, and deploy to EC2!
 ```
 
-### 2️⃣ GitHub Actions (Automatic)
-- ✅ Builds Docker images
-- ✅ Pushes to Docker Hub
-- ✅ Runs deploy script on EC2
-
-### 3️⃣ EC2 Update (Automatic)
-- ✅ Pulls latest code
-- ✅ Pulls latest images
-- ✅ Restarts containers
-- ✅ Services live
-
-### 4️⃣ Monitor Deployment
+### Manual Deploy on EC2 (SSH):
 ```bash
-# Check GitHub Actions
-GitHub → Your Repo → Actions → Latest workflow
+ssh -i key.pem ubuntu@YOUR_EC2_IP
+cd /opt/unisole
+git pull origin main
+bash scripts/deploy.sh
+```
 
-# SSH to EC2 and check logs
-ssh -i key.pem ec2-user@ip
-docker-compose -f docker-compose.prod.yml logs -f
+### Deploying Frontends on Vercel:
+```bash
+# In unisole-app / unisole-admin / unisole-seo-website:
+git add .
+git commit -m "feat: frontend update"
+git push origin main
+# Vercel deploys immediately!
 ```
 
 ---
 
-## Essential Commands
-
-### On Your Local Machine
+## 🛠️ Essential EC2 Maintenance Commands
 
 ```bash
-# View deployment status
-git log --oneline production -5
+# View running containers
+docker compose -f docker-compose.prod.yml ps
 
-# Force push if needed (avoid in production)
-git push origin production --force-with-lease
-```
+# View backend logs in real-time
+docker compose -f docker-compose.prod.yml logs -f api
 
-### On EC2 via SSH
+# View database logs
+docker compose -f docker-compose.prod.yml logs -f db
 
-```bash
-# SSH into EC2
-ssh -i your-key.pem ec2-user@your-ec2-ip
+# Restart all services
+docker compose -f docker-compose.prod.yml restart
 
-# Navigate to app
-cd /opt/unisole
-
-# Pull latest and deploy
+# Full clean restart with fresh database volume (CAUTION: wipes DB)
+docker compose -f docker-compose.prod.yml down -v
 bash scripts/deploy.sh
 
-# View service status
-docker-compose -f docker-compose.prod.yml ps
-
-# View logs (all services)
-docker-compose -f docker-compose.prod.yml logs -f
-
-# View specific service logs
-docker-compose -f docker-compose.prod.yml logs -f api
-
-# Restart specific service
-docker-compose -f docker-compose.prod.yml restart api
-
-# Stop all services
-docker-compose -f docker-compose.prod.yml down
-
-# Database operations
-docker-compose -f docker-compose.prod.yml exec db psql -U postgres -d unisole
-
-# Backup database
+# Run database manual backup
 bash scripts/backup-db.sh
-
-# View backups
-ls -lh backups/
 ```
-
----
-
-## Troubleshooting
-
-### Deployment failed in GitHub Actions
-```
-1. GitHub → Actions → Failed workflow
-2. Click job to see error logs
-3. Fix issue and push again
-```
-
-### Services not starting on EC2
-```bash
-# Check logs
-docker-compose -f docker-compose.prod.yml logs
-
-# Check disk space
-df -h
-
-# Check memory
-free -h
-
-# Restart Docker
-sudo systemctl restart docker
-```
-
-### Database connection failed
-```bash
-# Connect to database
-docker exec -it unisole-engine-db-1 psql -U postgres -d unisole
-
-# Reset database (WARNING: Deletes data!)
-docker-compose -f docker-compose.prod.yml down -v
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-### Images not updating after push
-```bash
-# Clear old images
-docker system prune -a
-
-# Redeploy
-cd /opt/unisole
-bash scripts/deploy.sh
-```
-
----
-
-## Monitoring Setup (Optional)
-
-### View logs from local machine
-```bash
-# Watch EC2 logs in real-time
-ssh -i key.pem ec2-user@ip "cd /opt/unisole && docker-compose -f docker-compose.prod.yml logs -f"
-```
-
-### Set up daily backups (on EC2)
-```bash
-crontab -e
-
-# Add line (runs at 2 AM daily):
-0 2 * * * bash /opt/unisole/scripts/backup-db.sh
-
-# Verify cron is set
-crontab -l
-```
-
----
-
-## Security Checklist
-
-- ✅ GitHub secrets configured
-- ✅ SSH key secured (private key never committed)
-- ✅ .env file in .gitignore
-- ✅ Database password strong (32+ chars random)
-- ✅ JWT secrets strong (use `openssl rand -base64 32`)
-- ✅ EC2 security group restricts ports
-- ✅ SSL/HTTPS configured
-- ✅ Regular database backups
-- ✅ Monitor logs for errors
-- ✅ Update Docker regularly
-
----
-
-## Cost Breakdown (AWS)
-
-| Service | Cost/Month |
-|---------|-----------|
-| EC2 t3.small | ~$7 |
-| Data transfer | ~$1-5 |
-| Storage (20GB) | ~$1 |
-| **Total** | **~$10-15** |
-
----
-
-## Next Steps
-
-1. ✅ Follow CI_CD_GUIDE.md step by step
-2. ✅ Set up GitHub secrets
-3. ✅ Launch EC2 instance
-4. ✅ Run setup-ec2.sh
-5. ✅ Verify services running
-6. ✅ Set up SSL certificates
-7. ✅ Configure domain DNS
-8. ✅ Set up monitoring/backups
-9. ✅ Update GitHub Actions secrets when needed
-10. ✅ Monitor and optimize
-
----
-
-**You now have a production-ready CI/CD pipeline!** 🚀
