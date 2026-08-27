@@ -1,0 +1,146 @@
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:18-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-unisole}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./edtech_schema_and_seed.sql:/docker-entrypoint-initdb.d/01_schema_and_seed.sql:ro
+      - ./backups:/backups
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-unisole}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - unisole-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend API
+  api:
+    image: ${DOCKER_USERNAME:-unisole}/unisole-engine:latest
+    restart: always
+    environment:
+      PORT: ${API_PORT:-3000}
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/${DB_NAME:-unisole}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - unisole-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Admin Dashboard
+  admin:
+    image: ${DOCKER_USERNAME:-unisole}/unisole-admin:latest
+    restart: always
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_BASE_URL=${API_BASE_URL:-http://localhost:3000}
+    depends_on:
+      - api
+    networks:
+      - unisole-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Main LMS Application
+  lms:
+    image: ${DOCKER_USERNAME:-unisole}/unisole-lms:latest
+    restart: always
+    ports:
+      - "5174:80"
+    environment:
+      - VITE_API_BASE_URL=${API_BASE_URL:-http://localhost:3000}
+    depends_on:
+      - api
+    networks:
+      - unisole-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # SEO Website
+  seo:
+    image: ${DOCKER_USERNAME:-unisole}/unisole-seo:latest
+    restart: always
+    ports:
+      - "5175:80"
+    environment:
+      - VITE_API_BASE_URL=${API_BASE_URL:-http://localhost:3000}
+    networks:
+      - unisole-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+      - admin
+      - lms
+      - seo
+    networks:
+      - unisole-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  unisole-network:
+    driver: bridge
