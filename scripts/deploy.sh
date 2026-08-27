@@ -62,10 +62,9 @@ $COMPOSE_CMD -f docker-compose.prod.yml ps
 echo "📋 Recent logs:"
 $COMPOSE_CMD -f docker-compose.prod.yml logs --tail=50
 
-echo "✅ Deployment completed successfully!"
+echo "✅ Backend deployment completed successfully!"
 echo ""
-echo "🌍 Services running at:"
-echo "   API: http://your-ec2-ip:3000"
-echo "   Admin: http://your-ec2-ip:5173"
-echo "   LMS: http://your-ec2-ip:5174"
-echo "   SEO: http://your-ec2-ip:5175"
+echo "🌍 Backend API running at:"
+echo "   API (Direct): http://your-ec2-ip:3000"
+echo "   API (Nginx):  http://your-ec2-ip/"
+

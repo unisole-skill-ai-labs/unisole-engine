@@ -152,11 +152,11 @@ bash scripts/setup-ec2.sh
 ```
 
 This installs:
-- Docker
-- Docker Compose
-- Nginx
-- Git
-- Creates `.env` file with secure database password
+- Docker & Docker Compose
+- PostgreSQL Database (`db` container with migrations)
+- Unisole Backend Engine (`api` container)
+- Nginx Reverse Proxy (`nginx` container on port 80/443)
+- Frontends (`unisole-app`, `unisole-admin`, `unisole-seo-website`) deployed directly via Git pushes on **Vercel**
 
 ---
 
