@@ -1,6 +1,5 @@
 node_modules
 dist
 .env
-edtech_schema_and_seed.sql
 edtech_platform_prd.md
 o
