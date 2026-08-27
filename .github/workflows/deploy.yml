@@ -1,4 +1,4 @@
-name: Build & Deploy to EC2
+name: Build & Deploy Backend to EC2
 
 on:
     push:
@@ -31,7 +31,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - name: Build and Push Docker image
+            - name: Build and Push Docker image (Backend Only)
               uses: docker/build-push-action@v5
               with:
                   context: .
@@ -67,11 +67,11 @@ jobs:
                     cd /opt/unisole
                     git pull origin production
                     echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-                    docker-compose down
-                    docker-compose pull
-                    docker-compose up -d
-                    docker-compose logs --tail=50
+                    docker-compose -f docker-compose.prod.yml down
+                    docker-compose -f docker-compose.prod.yml pull
+                    docker-compose -f docker-compose.prod.yml up -d
+                    docker-compose -f docker-compose.prod.yml logs --tail=50
                   EOF
 
             - name: Notify Deployment Success
-              run: echo "✅ Deployment to EC2 completed successfully"
+              run: echo "✅ Backend API deployment to EC2 completed successfully"
