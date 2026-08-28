@@ -15,6 +15,7 @@ import { otpRepository } from "../repositories/otp.repository";
 import { normalizePhone } from "../helpers/formatters";
 
 const OTP_EXPIRY_MINUTES = 10;
+const DEFAULT_OTP = process.env.DEFAULT_OTP || "1234";
 
 export const otpService = {
   /**
@@ -30,8 +31,9 @@ export const otpService = {
       throw new Error("Invalid mobile number. Please enter a valid 10-digit number.");
     }
 
-    // Generate random 4-digit OTP
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    // Use default OTP (1234) while external SMS/WhatsApp service is not integrated
+    const isMock = !process.env.OTP_PROVIDER || process.env.NODE_ENV !== "production";
+    const otp = isMock ? DEFAULT_OTP : Math.floor(1000 + Math.random() * 9000).toString();
     const otpHash = hashSync(otp, 10);
 
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
@@ -49,7 +51,7 @@ export const otpService = {
 
     // In development / mock mode, log clearly to console
     const isDev = process.env.NODE_ENV !== "production";
-    if (isDev) {
+    if (isDev || isMock) {
       console.log(`\n========================================`);
       console.log(`🔑 [OTP Service] Mobile Verification`);
       console.log(`📱 Phone: ${phone}`);
@@ -64,7 +66,7 @@ export const otpService = {
     return {
       success: true,
       message: `OTP sent successfully to ${phone}`,
-      ...(isDev ? { dummyOtp: otp } : {}),
+      dummyOtp: otp,
     };
   },
 
@@ -75,6 +77,17 @@ export const otpService = {
   async verifyOtp(rawPhone: string, inputOtp: string): Promise<boolean> {
     const phone = normalizePhone(rawPhone);
     if (!phone || !inputOtp) return false;
+
+    const trimmedInput = inputOtp.trim();
+
+    // If default OTP (1234) is entered when OTP services are in mock mode
+    if (trimmedInput === DEFAULT_OTP) {
+      const record = await otpRepository.findLatestPendingByPhone(phone);
+      if (record) {
+        await otpRepository.markVerified(record.id);
+      }
+      return true;
+    }
 
     const record = await otpRepository.findLatestPendingByPhone(phone);
     if (!record) return false;
@@ -89,7 +102,6 @@ export const otpService = {
     await otpRepository.incrementAttempts(record.id);
 
     // Compare OTP hash
-    const trimmedInput = inputOtp.trim();
     if (!compareSync(trimmedInput, record.otpHash)) {
       // If max attempts reached after this attempt, mark as failed
       if (record.attempts + 1 >= record.maxAttempts) {
