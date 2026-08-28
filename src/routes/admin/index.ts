@@ -9,6 +9,7 @@ import { adminModulesRouter } from "./modules";
 import { adminLessonsRouter } from "./lessons";
 import { adminEnrollmentsRouter } from "./enrollments";
 import { adminPaymentsRouter } from "./payments";
+import { adminPresentationsRouter } from "./presentations";
 
 export const adminRouter: Router = Router();
 
@@ -24,3 +25,4 @@ adminRouter.use("/modules", adminModulesRouter);
 adminRouter.use("/lessons", adminLessonsRouter);
 adminRouter.use("/enrollments", adminEnrollmentsRouter);
 adminRouter.use("/payments", adminPaymentsRouter);
+adminRouter.use("/presentations", adminPresentationsRouter);

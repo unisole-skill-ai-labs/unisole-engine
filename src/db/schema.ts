@@ -14,6 +14,7 @@ import {
   primaryKey,
   pgSequence,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql, InferSelectModel, InferInsertModel } from "drizzle-orm";
 
@@ -39,6 +40,12 @@ export const paymentStatus = pgEnum("payment_status", [
 ]);
 export const otpChannel = pgEnum("otp_channel", ["SMS", "WHATSAPP"]);
 export const otpStatus = pgEnum("otp_status", ["PENDING", "VERIFIED", "EXPIRED", "FAILED"]);
+export const sessionStatus = pgEnum("session_status", [
+  "DRAFT",
+  "LIVE",
+  "PAUSED",
+  "ENDED",
+]);
 
 // ============================================================
 // SEQUENCES
@@ -124,6 +131,36 @@ export const paymentsIdSeq = pgSequence("payments_id_seq", {
   cache: "1",
   cycle: false,
 });
+export const presentationsIdSeq = pgSequence("presentations_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const presentationSessionsIdSeq = pgSequence(
+  "presentation_sessions_id_seq",
+  {
+    startWith: "1",
+    increment: "1",
+    minValue: "1",
+    maxValue: "9223372036854775807",
+    cache: "1",
+    cycle: false,
+  }
+);
+export const presentationLeadsIdSeq = pgSequence(
+  "presentation_leads_id_seq",
+  {
+    startWith: "1",
+    increment: "1",
+    minValue: "1",
+    maxValue: "9223372036854775807",
+    cache: "1",
+    cycle: false,
+  }
+);
 
 // ============================================================
 // 1. USERS
@@ -670,6 +707,170 @@ export const payments = pgTable(
 );
 
 // ============================================================
+// 16. PRESENTATIONS
+// ============================================================
+
+export const presentations = pgTable(
+  "presentations",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('pres_'::text || nextval('presentations_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    title: varchar({ length: 255 }).notNull(),
+    description: text(),
+    theme: varchar({ length: 50 }).default("dark").notNull(),
+    slides: jsonb().default(sql`'[]'::jsonb`).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdById: varchar("created_by_id", { length: 50 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_presentations_is_active").using(
+      "btree",
+      table.isActive.asc().nullsLast()
+    ),
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [users.id],
+      name: "fk_presentations_created_by",
+    }).onDelete("set null"),
+  ]
+);
+
+// ============================================================
+// 17. PRESENTATION SESSIONS
+// ============================================================
+
+export const presentationSessions = pgTable(
+  "presentation_sessions",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('sess_'::text || nextval('presentation_sessions_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    presentationId: varchar("presentation_id", { length: 50 }).notNull(),
+    collegeId: varchar("college_id", { length: 50 }),
+    collegeName: varchar("college_name", { length: 200 }),
+    sessionCode: varchar("session_code", { length: 20 }).notNull(),
+    status: sessionStatus().default("DRAFT").notNull(),
+    currentSlideIndex: integer("current_slide_index").default(0).notNull(),
+    isQuizActive: boolean("is_quiz_active").default(false).notNull(),
+    isAnswerRevealed: boolean("is_answer_revealed").default(false).notNull(),
+    isLeaderboardActive: boolean("is_leaderboard_active")
+      .default(false)
+      .notNull(),
+    quizStartedAt: timestamp("quiz_started_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    quizTimeLimit: integer("quiz_time_limit").default(30).notNull(),
+    activeAttendeesCount: integer("active_attendees_count")
+      .default(0)
+      .notNull(),
+    startedAt: timestamp("started_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_presentation_sessions_code").using(
+      "btree",
+      table.sessionCode.asc().nullsLast()
+    ),
+    index("idx_presentation_sessions_status").using(
+      "btree",
+      table.status.asc().nullsLast()
+    ),
+    unique("uq_presentation_sessions_code").on(table.sessionCode),
+    foreignKey({
+      columns: [table.presentationId],
+      foreignColumns: [presentations.id],
+      name: "fk_sessions_presentation",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.collegeId],
+      foreignColumns: [colleges.id],
+      name: "fk_sessions_college",
+    }).onDelete("set null"),
+  ]
+);
+
+// ============================================================
+// 18. PRESENTATION LEADS
+// ============================================================
+
+export const presentationLeads = pgTable(
+  "presentation_leads",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('lead_'::text || nextval('presentation_leads_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    sessionId: varchar("session_id", { length: 50 }).notNull(),
+    collegeId: varchar("college_id", { length: 50 }),
+    userId: varchar("user_id", { length: 50 }),
+    name: varchar({ length: 150 }).notNull(),
+    phone: varchar({ length: 20 }).notNull(),
+    email: varchar({ length: 255 }),
+    branch: varchar({ length: 100 }),
+    yearOfStudy: varchar("year_of_study", { length: 50 }),
+    totalScore: integer("total_score").default(0).notNull(),
+    rank: integer(),
+    streak: integer().default(0).notNull(),
+    responses: jsonb().default(sql`'{}'::jsonb`).notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_presentation_leads_session").using(
+      "btree",
+      table.sessionId.asc().nullsLast()
+    ),
+    index("idx_presentation_leads_phone").using(
+      "btree",
+      table.phone.asc().nullsLast()
+    ),
+    index("idx_presentation_leads_score").using(
+      "btree",
+      table.totalScore.desc().nullsLast()
+    ),
+    foreignKey({
+      columns: [table.sessionId],
+      foreignColumns: [presentationSessions.id],
+      name: "fk_leads_session",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.collegeId],
+      foreignColumns: [colleges.id],
+      name: "fk_leads_college",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_leads_user",
+    }).onDelete("set null"),
+  ]
+);
+
+// ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
@@ -688,6 +889,9 @@ export type Lesson = InferSelectModel<typeof lessons>;
 export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Enrollment = InferSelectModel<typeof enrollments>;
 export type Payment = InferSelectModel<typeof payments>;
+export type Presentation = InferSelectModel<typeof presentations>;
+export type PresentationSession = InferSelectModel<typeof presentationSessions>;
+export type PresentationLead = InferSelectModel<typeof presentationLeads>;
 
 // ============================================================
 // INSERT TYPES (write to DB)
@@ -708,3 +912,6 @@ export type NewLesson = InferInsertModel<typeof lessons>;
 export type NewModuleLesson = InferInsertModel<typeof moduleLessons>;
 export type NewEnrollment = InferInsertModel<typeof enrollments>;
 export type NewPayment = InferInsertModel<typeof payments>;
+export type NewPresentation = InferInsertModel<typeof presentations>;
+export type NewPresentationSession = InferInsertModel<typeof presentationSessions>;
+export type NewPresentationLead = InferInsertModel<typeof presentationLeads>;

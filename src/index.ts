@@ -2,6 +2,7 @@ import http from "http";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { Server as SocketIOServer } from "socket.io";
 import { authRouter } from "./routes/auth";
 import { adminRouter } from "./routes/admin";
 import { lmsRouter } from "./routes/lms";
@@ -9,11 +10,21 @@ import { publicRouter } from "./routes/public";
 import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
+import { setupPresentationSocket } from "./socket/presentation.socket";
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Initialize Real-time Socket.io Engine
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+  },
+});
+setupPresentationSocket(io);
 
 app.use(cors());
 app.use(

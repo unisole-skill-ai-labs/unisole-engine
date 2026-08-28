@@ -14,6 +14,9 @@ import {
   modules,
   moduleLessons,
   lessons,
+  presentations,
+  presentationSessions,
+  presentationLeads,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -131,4 +134,39 @@ export const moduleLessonsRelations = relations(moduleLessons, ({ one }) => ({
 
 export const lessonsRelations = relations(lessons, ({ many }) => ({
   moduleLessons: many(moduleLessons),
+}));
+
+export const presentationsRelations = relations(presentations, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [presentations.createdById],
+    references: [users.id],
+  }),
+  sessions: many(presentationSessions),
+}));
+
+export const presentationSessionsRelations = relations(presentationSessions, ({ one, many }) => ({
+  presentation: one(presentations, {
+    fields: [presentationSessions.presentationId],
+    references: [presentations.id],
+  }),
+  college: one(colleges, {
+    fields: [presentationSessions.collegeId],
+    references: [colleges.id],
+  }),
+  leads: many(presentationLeads),
+}));
+
+export const presentationLeadsRelations = relations(presentationLeads, ({ one }) => ({
+  session: one(presentationSessions, {
+    fields: [presentationLeads.sessionId],
+    references: [presentationSessions.id],
+  }),
+  college: one(colleges, {
+    fields: [presentationLeads.collegeId],
+    references: [colleges.id],
+  }),
+  user: one(users, {
+    fields: [presentationLeads.userId],
+    references: [users.id],
+  }),
 }));
