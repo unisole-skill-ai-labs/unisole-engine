@@ -73,6 +73,7 @@ services:
       - "443:443" # HTTPS for api.yourdomain.com
     volumes:
       - ./nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - api
     networks:
