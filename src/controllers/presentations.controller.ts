@@ -75,7 +75,9 @@ export const presentationsController = {
   async launchSession(req: Request, res: Response, next: NextFunction) {
     try {
       const clientBaseUrl =
-        (req.headers.origin as string) || (process.env.CLIENT_URL as string);
+        process.env.SEO_URL ||
+        process.env.CLIENT_URL ||
+        "https://unisole.org";
       const data = await presentationsService.launchSession(
         req.params.id,
         {

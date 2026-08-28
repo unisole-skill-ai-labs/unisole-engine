@@ -232,8 +232,12 @@ export const presentationsService = {
       startedAt: new Date().toISOString(),
     });
 
-    const baseUrl = data.clientBaseUrl ?? process.env.CLIENT_URL ?? "https://unisole.in";
-    const joinUrl = `${baseUrl.replace(/\/$/, "")}/live/${code}`;
+    const seoBaseUrl =
+      data.clientBaseUrl ||
+      process.env.SEO_URL ||
+      process.env.CLIENT_URL ||
+      "https://unisole.org";
+    const joinUrl = `${seoBaseUrl.replace(/\/+$/, "")}/login?redirect=/live/${code}`;
     const qrCodeDataUrl = await QRCode.toDataURL(joinUrl, {
       width: 400,
       margin: 2,
