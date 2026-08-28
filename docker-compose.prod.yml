@@ -1,12 +1,10 @@
-version: "3.9"
-
 # Production Compose: Backend API + Database + Nginx only
 # Frontends (Admin, LMS, SEO) are deployed on Vercel separately
 
 services:
   # PostgreSQL Database (Internal only)
   db:
-    image: postgres:18-alpine
+    image: postgres:16-alpine
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}

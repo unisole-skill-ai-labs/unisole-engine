@@ -1,16 +1,14 @@
-version: "3.9"
-
 services:
   # PostgreSQL Database
   db:
-    image: postgres:18-alpine
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: unisole
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
       - ./edtech_schema_and_seed.sql:/docker-entrypoint-initdb.d/01_schema_and_seed.sql:ro
     ports:
       - "5433:5432"
