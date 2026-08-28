@@ -9,6 +9,10 @@ export const usersController = {
   getById: asyncHandler(async (req: Request, res: Response) => {
     res.json(await usersService.getById(req.params.id));
   }),
+  create: asyncHandler(async (req: Request, res: Response) => {
+    const created = await usersService.create(req.body);
+    res.status(201).json(created);
+  }),
   update: asyncHandler(async (req: Request, res: Response) => {
     res.json(await usersService.update(req.params.id, req.body));
   }),

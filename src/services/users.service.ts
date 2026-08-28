@@ -1,6 +1,6 @@
 import { usersRepository } from "../repositories/users.repository";
 import { User, NewUser } from "../db/schema";
-import { NotFoundError, ValidationError } from "../errors";
+import { NotFoundError, ValidationError, ConflictError } from "../errors";
 import { normalizePhone, toTitleCase } from "../helpers/formatters";
 
 export const usersService = {
@@ -12,6 +12,37 @@ export const usersService = {
     const user = await usersRepository.getById(id);
     if (!user) throw new NotFoundError("User not found");
     return user;
+  },
+
+  async create(body: Record<string, unknown>): Promise<User> {
+    if (!body.phone) {
+      throw new ValidationError("Mobile phone number is required");
+    }
+
+    const phone = normalizePhone(body.phone as string);
+    if (!phone) {
+      throw new ValidationError("Invalid phone number format");
+    }
+
+    const existing = await usersRepository.getByPhone(phone);
+    if (existing) {
+      throw new ConflictError("A user with this phone number already exists");
+    }
+
+    const role = (body.role as string) || "STUDENT";
+    if (!["STUDENT", "ADMIN"].includes(role)) {
+      throw new ValidationError("Invalid role. Must be STUDENT or ADMIN");
+    }
+
+    const name = body.name ? toTitleCase(body.name as string) : undefined;
+    const isActive = body.isActive !== undefined ? Boolean(body.isActive) : true;
+
+    return usersRepository.create({
+      phone,
+      name,
+      role: role as "STUDENT" | "ADMIN",
+      isActive,
+    });
   },
 
   async update(id: string, body: Record<string, unknown>): Promise<User> {

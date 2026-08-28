@@ -72,8 +72,7 @@ services:
       - "80:80" # HTTP redirect to HTTPS
       - "443:443" # HTTPS for api.yourdomain.com
     volumes:
-      - ./nginx-api.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      - ./nginx-prod.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - api
     networks:
