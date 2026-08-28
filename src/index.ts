@@ -11,8 +11,12 @@ import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
+import { ensureDatabaseSchema } from "./db/init";
 
 dotenv.config();
+
+// Ensure DB tables exist on startup
+ensureDatabaseSchema();
 
 const app = express();
 const server = http.createServer(app);

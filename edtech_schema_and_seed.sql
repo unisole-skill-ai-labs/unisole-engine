@@ -60,6 +60,11 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+DO $$ BEGIN
+    CREATE TYPE session_status AS ENUM ('DRAFT', 'LIVE', 'PAUSED', 'ENDED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 
 -- ============================================================
 -- ID SEQUENCES
@@ -75,6 +80,9 @@ CREATE SEQUENCE IF NOT EXISTS modules_id_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS lessons_id_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS enrollments_id_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS payments_id_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS presentations_id_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS presentation_sessions_id_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS presentation_leads_id_seq START 1;
 
 
 -- ============================================================
@@ -698,6 +706,97 @@ DROP TRIGGER IF EXISTS trg_payments_updated_at ON payments;
 CREATE TRIGGER trg_payments_updated_at
 BEFORE UPDATE ON payments
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================================
+-- 13. PRESENTATIONS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS presentations (
+    id VARCHAR(50) PRIMARY KEY
+        DEFAULT ('pres_' || nextval('presentations_id_seq')),
+
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    theme VARCHAR(50) DEFAULT 'dark' NOT NULL,
+    slides JSONB DEFAULT '[]'::jsonb NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_by_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_presentations_is_active ON presentations(is_active);
+
+DROP TRIGGER IF EXISTS trg_presentations_updated_at ON presentations;
+CREATE TRIGGER trg_presentations_updated_at
+BEFORE UPDATE ON presentations
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================================
+-- 14. PRESENTATION SESSIONS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS presentation_sessions (
+    id VARCHAR(50) PRIMARY KEY
+        DEFAULT ('sess_' || nextval('presentation_sessions_id_seq')),
+
+    presentation_id VARCHAR(50) NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
+    college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE SET NULL,
+    college_name VARCHAR(200),
+    session_code VARCHAR(20) NOT NULL UNIQUE,
+    status session_status DEFAULT 'DRAFT' NOT NULL,
+    current_slide_index INTEGER DEFAULT 0 NOT NULL,
+    is_quiz_active BOOLEAN DEFAULT FALSE NOT NULL,
+    is_answer_revealed BOOLEAN DEFAULT FALSE NOT NULL,
+    is_leaderboard_active BOOLEAN DEFAULT FALSE NOT NULL,
+    quiz_started_at TIMESTAMPTZ,
+    quiz_time_limit INTEGER DEFAULT 30 NOT NULL,
+    active_attendees_count INTEGER DEFAULT 0 NOT NULL,
+    started_at TIMESTAMPTZ,
+    ended_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_presentation_sessions_code ON presentation_sessions(session_code);
+CREATE INDEX IF NOT EXISTS idx_presentation_sessions_status ON presentation_sessions(status);
+
+DROP TRIGGER IF EXISTS trg_presentation_sessions_updated_at ON presentation_sessions;
+CREATE TRIGGER trg_presentation_sessions_updated_at
+BEFORE UPDATE ON presentation_sessions
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================================
+-- 15. PRESENTATION LEADS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS presentation_leads (
+    id VARCHAR(50) PRIMARY KEY
+        DEFAULT ('lead_' || nextval('presentation_leads_id_seq')),
+
+    session_id VARCHAR(50) NOT NULL REFERENCES presentation_sessions(id) ON DELETE CASCADE,
+    college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE SET NULL,
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+    name VARCHAR(150) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    email VARCHAR(255),
+    branch VARCHAR(100),
+    year_of_study VARCHAR(50),
+    total_score INTEGER DEFAULT 0 NOT NULL,
+    rank INTEGER,
+    streak INTEGER DEFAULT 0 NOT NULL,
+    responses JSONB DEFAULT '{}'::jsonb NOT NULL,
+    joined_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_presentation_leads_session ON presentation_leads(session_id);
+CREATE INDEX IF NOT EXISTS idx_presentation_leads_phone ON presentation_leads(phone);
+CREATE INDEX IF NOT EXISTS idx_presentation_leads_score ON presentation_leads(total_score DESC NULLS LAST);
 
 
 -- ============================================================
@@ -1358,6 +1457,33 @@ SELECT setval(
     )
 );
 
+SELECT setval(
+    'presentations_id_seq',
+    COALESCE(
+        (SELECT MAX(CAST(SUBSTRING(id FROM '^pres_([0-9]+)$') AS BIGINT))
+         FROM presentations WHERE id ~ '^pres_[0-9]+$'),
+        1
+    )
+);
+
+SELECT setval(
+    'presentation_sessions_id_seq',
+    COALESCE(
+        (SELECT MAX(CAST(SUBSTRING(id FROM '^sess_([0-9]+)$') AS BIGINT))
+         FROM presentation_sessions WHERE id ~ '^sess_[0-9]+$'),
+        1
+    )
+);
+
+SELECT setval(
+    'presentation_leads_id_seq',
+    COALESCE(
+        (SELECT MAX(CAST(SUBSTRING(id FROM '^lead_([0-9]+)$') AS BIGINT))
+         FROM presentation_leads WHERE id ~ '^lead_[0-9]+$'),
+        1
+    )
+);
+
 
 -- ============================================================
 -- 32. VERIFICATION
@@ -1392,6 +1518,12 @@ UNION ALL
 SELECT 'enrollments', COUNT(*) FROM enrollments
 UNION ALL
 SELECT 'payments', COUNT(*) FROM payments
+UNION ALL
+SELECT 'presentations', COUNT(*) FROM presentations
+UNION ALL
+SELECT 'presentation_sessions', COUNT(*) FROM presentation_sessions
+UNION ALL
+SELECT 'presentation_leads', COUNT(*) FROM presentation_leads
 ORDER BY table_name;
 
 
