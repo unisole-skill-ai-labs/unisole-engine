@@ -108,27 +108,24 @@ export async function ensureDatabaseSchema() {
     `);
 
     // Ensure default seeded colleges exist
-    const collegesCountRes = await pool.query("SELECT COUNT(*) FROM colleges");
-    if (Number(collegesCountRes.rows[0].count) === 0) {
-      const defaultColleges = [
-        { name: "Delhi Technological University", slug: "delhi-technological-university", shortName: "DTU" },
-        { name: "Indian Institute of Technology Delhi", slug: "iit-delhi", shortName: "IITD" },
-        { name: "Netaji Subhas University of Technology", slug: "nsut-delhi", shortName: "NSUT" },
-        { name: "Indraprastha Institute of Information Technology Delhi", slug: "iiit-delhi", shortName: "IIITD" },
-        { name: "National Institute of Technology", slug: "nit-delhi", shortName: "NIT" },
-        { name: "Anna University", slug: "anna-university", shortName: "AU" },
-        { name: "Other University / College", slug: "other-college", shortName: "OTHER" },
-      ];
-      for (const clg of defaultColleges) {
-        await pool.query(
-          `INSERT INTO colleges (name, slug, short_name, is_active)
-           VALUES ($1, $2, $3, TRUE)
-           ON CONFLICT (slug) DO NOTHING`,
-          [clg.name, clg.slug, clg.shortName]
-        );
-      }
-      console.log("[DB] Seeded initial colleges list.");
+    const defaultColleges = [
+      { name: "Delhi Technological University", slug: "delhi-technological-university", shortName: "DTU" },
+      { name: "Indian Institute of Technology Delhi", slug: "iit-delhi", shortName: "IITD" },
+      { name: "Netaji Subhas University of Technology", slug: "nsut-delhi", shortName: "NSUT" },
+      { name: "Indraprastha Institute of Information Technology Delhi", slug: "iiit-delhi", shortName: "IIITD" },
+      { name: "National Institute of Technology", slug: "nit-delhi", shortName: "NIT" },
+      { name: "Anna University", slug: "anna-university", shortName: "AU" },
+      { name: "Other University / College", slug: "other-college", shortName: "OTHER" },
+    ];
+    for (const clg of defaultColleges) {
+      await pool.query(
+        `INSERT INTO colleges (name, slug, short_name, is_active)
+         VALUES ($1, $2, $3, TRUE)
+         ON CONFLICT (slug) DO UPDATE SET short_name = EXCLUDED.short_name, is_active = TRUE`,
+        [clg.name, clg.slug, clg.shortName]
+      );
     }
+    console.log("[DB] Seeded / verified initial colleges list.");
 
     // Ensure default seeded branches exist for colleges
     const allCollegesRes = await pool.query("SELECT id, short_name FROM colleges WHERE is_active = TRUE");
@@ -252,7 +249,214 @@ export async function ensureDatabaseSchema() {
       console.log("[DB] Seeded initial presentation deck pres_1");
     }
 
-    console.log("[DB] Presentation schema verified & auto-migrated.");
+    // Ensure secondary presentation deck exists
+    const checkPres2 = await pool.query("SELECT COUNT(*) FROM presentations WHERE id = 'pres_2'");
+    if (Number(checkPres2.rows[0].count) === 0) {
+      await pool.query(
+        `INSERT INTO presentations (id, title, description, theme, slides, is_active, created_by_id)
+         VALUES ($1, $2, $3, $4, $5::jsonb, TRUE, $6)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          "pres_2",
+          "AI & Full Stack Career Bootcamp 2026",
+          "Deep dive into production LLM agents, cloud deployment, and landing high-growth software roles.",
+          "light",
+          JSON.stringify([
+            { id: "s1", type: "COVER", title: "AI & Full Stack Career Bootcamp 2026", subtitle: "Unisole Industry Immersion" },
+            { id: "s2", type: "CONTENT", title: "The Next Decade in Software", subtitle: "Full Stack + AI Agents", bullets: ["Agentic workflows replace routine coding", "System design & distributed backends are #1 requirement"] },
+            { id: "s3", type: "QUIZ", title: "Architecture Challenge", question: "Which protocol is ideal for streaming LLM tokens to the frontend?", timeLimit: 25, points: 1000, options: [{ text: "Server-Sent Events (SSE)", isCorrect: true }, { text: "FTP", isCorrect: false }, { text: "SOAP XML", isCorrect: false }] }
+          ]),
+          "usr_1",
+        ]
+      );
+    }
+
+    // Seed Sample Pathways if not existing
+    const pathwaysCountRes = await pool.query("SELECT COUNT(*) FROM pathways");
+    if (Number(pathwaysCountRes.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO pathways (id, title, slug, description, short_description, price_paise, status, is_active)
+        VALUES 
+          ('pwy_fullstack', 'Full Stack Web & Cloud Engineering', 'full-stack-web-engineering', 'Master TypeScript, React, Next.js, Node.js, PostgreSQL and Cloud Deployments from ground up.', 'Complete Full Stack mastery program.', 499900, 'PUBLISHED', TRUE),
+          ('pwy_genai', 'Generative AI & LLM Systems Engineering', 'generative-ai-llm-engineering', 'Build production-ready LLM agents, RAG pipelines, fine-tuned models, and vector database systems.', 'Cutting-edge AI & Agentic development.', 599900, 'PUBLISHED', TRUE),
+          ('pwy_datascience', 'Data Science & Machine Learning Masterclass', 'data-science-machine-learning', 'Comprehensive curriculum spanning Python, statistical modeling, PyTorch, and predictive analytics.', 'Data-driven engineering from scratch.', 449900, 'PUBLISHED', TRUE)
+        ON CONFLICT (slug) DO NOTHING;
+      `);
+      console.log("[DB] Seeded demo pathways.");
+    }
+
+    // Seed Demo Presentation Sessions & Leads for Colleges
+    const dtuRes = await pool.query("SELECT id, name FROM colleges WHERE slug = 'delhi-technological-university' LIMIT 1");
+    const iitdRes = await pool.query("SELECT id, name FROM colleges WHERE slug = 'iit-delhi' LIMIT 1");
+    const nsutRes = await pool.query("SELECT id, name FROM colleges WHERE slug = 'nsut-delhi' LIMIT 1");
+    const pathwaysRes = await pool.query("SELECT id FROM pathways ORDER BY id ASC");
+    const pwyId1 = pathwaysRes.rows[0]?.id || "pwy_1";
+    const pwyId2 = pathwaysRes.rows[1]?.id || pwyId1;
+
+    if (dtuRes.rows.length > 0) {
+      const dtuId = dtuRes.rows[0].id;
+      const dtuName = dtuRes.rows[0].name;
+
+      // Seed DTU sessions
+      await pool.query(
+        `INSERT INTO presentation_sessions (id, presentation_id, college_id, college_name, session_code, status, active_attendees_count, started_at)
+         VALUES 
+           ('sess_dtu_1', 'pres_1', $1, $2, 'DTU-2026', 'LIVE', 48, NOW() - INTERVAL '1 hour'),
+           ('sess_dtu_2', 'pres_2', $1, $2, 'DTU-AI-77', 'ENDED', 84, NOW() - INTERVAL '3 days')
+         ON CONFLICT (session_code) DO NOTHING`,
+        [dtuId, dtuName]
+      );
+
+      // Seed DTU demo student leads
+      const dtuLeadsCount = await pool.query("SELECT COUNT(*) FROM presentation_leads WHERE college_id = $1", [dtuId]);
+      if (Number(dtuLeadsCount.rows[0].count) === 0) {
+        const demoLeads = [
+          { name: "Aarav Sharma", phone: "9811234501", branch: "Computer Science & Engineering", year: "3rd Year", score: 980, rank: 1 },
+          { name: "Priyanshu Verma", phone: "9811234502", branch: "Computer Science & Engineering", year: "3rd Year", score: 920, rank: 2 },
+          { name: "Ananya Iyer", phone: "9811234503", branch: "Artificial Intelligence & Machine Learning", year: "2nd Year", score: 890, rank: 3 },
+          { name: "Rohan Gupta", phone: "9811234504", branch: "Information Technology", year: "4th Year", score: 860, rank: 4 },
+          { name: "Sneha Patel", phone: "9811234505", branch: "Artificial Intelligence & Machine Learning", year: "3rd Year", score: 830, rank: 5 },
+          { name: "Vikrant Malhotra", phone: "9811234506", branch: "Electronics & Communication Engineering", year: "2nd Year", score: 790, rank: 6 },
+          { name: "Divya Nair", phone: "9811234507", branch: "Data Science & Big Data Analytics", year: "3rd Year", score: 750, rank: 7 },
+          { name: "Ayush Mehra", phone: "9811234508", branch: "Mechanical Engineering", year: "4th Year", score: 710, rank: 8 },
+          { name: "Tanvi Saxena", phone: "9811234509", branch: "Computer Science & Engineering", year: "2nd Year", score: 670, rank: 9 },
+          { name: "Kunal Rao", phone: "9811234510", branch: "Electronics & Communication Engineering", year: "3rd Year", score: 620, rank: 10 },
+          { name: "Shreya Sen", phone: "9811234511", branch: "Information Technology", year: "3rd Year", score: 590, rank: 11 },
+          { name: "Harsh Vardhan", phone: "9811234512", branch: "Mechanical Engineering", year: "4th Year", score: 540, rank: 12 },
+          { name: "Riddhima Sethi", phone: "9811234513", branch: "Computer Science & Engineering", year: "1st Year", score: 510, rank: 13 },
+          { name: "Nikhil Joshi", phone: "9811234514", branch: "Electrical & Electronics Engineering", year: "2nd Year", score: 480, rank: 14 },
+          { name: "Kavya Menon", phone: "9811234515", branch: "Artificial Intelligence & Machine Learning", year: "2nd Year", score: 450, rank: 15 },
+        ];
+
+        for (const l of demoLeads) {
+          await pool.query(
+            `INSERT INTO presentation_leads (session_id, college_id, name, phone, branch, year_of_study, total_score, rank)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            ["sess_dtu_1", dtuId, l.name, l.phone, l.branch, l.year, l.score, l.rank]
+          );
+
+          // Also register student in users table
+          const userRes = await pool.query(
+            `INSERT INTO users (phone, name, role, college_id, college_name, branch, is_active)
+             VALUES ($1, $2, 'STUDENT', $3, $4, $5, TRUE)
+             ON CONFLICT (phone) DO UPDATE SET college_id = $3, college_name = $4, branch = $5
+             RETURNING id`,
+            [l.phone, l.name, dtuId, dtuName, l.branch]
+          );
+
+          // Enroll top 6 students in pathways
+          if (l.rank <= 6 && userRes.rows.length > 0) {
+            const uid = userRes.rows[0].id;
+            const pId = l.rank % 2 === 0 ? pwyId1 : pwyId2;
+            await pool.query(
+              `INSERT INTO enrollments (user_id, pathway_id, status, enrolled_at)
+               VALUES ($1, $2, 'ACTIVE', NOW() - INTERVAL '2 days')
+               ON CONFLICT DO NOTHING`,
+              [uid, pId]
+            );
+          }
+        }
+        console.log("[DB] Seeded demo leads, users, and enrollments for DTU.");
+      }
+    }
+
+    if (iitdRes.rows.length > 0) {
+      const iitdId = iitdRes.rows[0].id;
+      const iitdName = iitdRes.rows[0].name;
+
+      await pool.query(
+        `INSERT INTO presentation_sessions (id, presentation_id, college_id, college_name, session_code, status, active_attendees_count, started_at)
+         VALUES ('sess_iitd_1', 'pres_1', $1, $2, 'IITD-TECH', 'ENDED', 112, NOW() - INTERVAL '5 days')
+         ON CONFLICT (session_code) DO NOTHING`,
+        [iitdId, iitdName]
+      );
+
+      const iitdLeadsCount = await pool.query("SELECT COUNT(*) FROM presentation_leads WHERE college_id = $1", [iitdId]);
+      if (Number(iitdLeadsCount.rows[0].count) === 0) {
+        const iitdLeads = [
+          { name: "Siddharth Deshmukh", phone: "9822345601", branch: "Computer Science & Engineering", year: "4th Year", score: 990, rank: 1 },
+          { name: "Meera Krishnan", phone: "9822345602", branch: "Artificial Intelligence & Machine Learning", year: "3rd Year", score: 950, rank: 2 },
+          { name: "Aditya Joshi", phone: "9822345603", branch: "Electronics & Communication Engineering", year: "3rd Year", score: 900, rank: 3 },
+          { name: "Riya Kapoor", phone: "9822345604", branch: "Data Science & Big Data Analytics", year: "2nd Year", score: 850, rank: 4 },
+          { name: "Tushar Bansal", phone: "9822345605", branch: "Computer Science & Engineering", year: "3rd Year", score: 810, rank: 5 },
+        ];
+
+        for (const l of iitdLeads) {
+          await pool.query(
+            `INSERT INTO presentation_leads (session_id, college_id, name, phone, branch, year_of_study, total_score, rank)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            ["sess_iitd_1", iitdId, l.name, l.phone, l.branch, l.year, l.score, l.rank]
+          );
+
+          const userRes = await pool.query(
+            `INSERT INTO users (phone, name, role, college_id, college_name, branch, is_active)
+             VALUES ($1, $2, 'STUDENT', $3, $4, $5, TRUE)
+             ON CONFLICT (phone) DO UPDATE SET college_id = $3, college_name = $4, branch = $5
+             RETURNING id`,
+            [l.phone, l.name, iitdId, iitdName, l.branch]
+          );
+
+          if (userRes.rows.length > 0) {
+            await pool.query(
+              `INSERT INTO enrollments (user_id, pathway_id, status, enrolled_at)
+               VALUES ($1, $2, 'ACTIVE', NOW() - INTERVAL '4 days')
+               ON CONFLICT DO NOTHING`,
+              [userRes.rows[0].id, pwyId1]
+            );
+          }
+        }
+        console.log("[DB] Seeded demo leads, users, and enrollments for IIT Delhi.");
+      }
+    }
+
+    if (nsutRes.rows.length > 0) {
+      const nsutId = nsutRes.rows[0].id;
+      const nsutName = nsutRes.rows[0].name;
+
+      await pool.query(
+        `INSERT INTO presentation_sessions (id, presentation_id, college_id, college_name, session_code, status, active_attendees_count, started_at)
+         VALUES ('sess_nsut_1', 'pres_1', $1, $2, 'NSUT-ROAD', 'ENDED', 65, NOW() - INTERVAL '7 days')
+         ON CONFLICT (session_code) DO NOTHING`,
+        [nsutId, nsutName]
+      );
+
+      const nsutLeadsCount = await pool.query("SELECT COUNT(*) FROM presentation_leads WHERE college_id = $1", [nsutId]);
+      if (Number(nsutLeadsCount.rows[0].count) === 0) {
+        const nsutLeads = [
+          { name: "Varun Singhal", phone: "9833456701", branch: "Computer Science & Engineering", year: "3rd Year", score: 940, rank: 1 },
+          { name: "Neha Aggarwal", phone: "9833456702", branch: "Information Technology", year: "3rd Year", score: 890, rank: 2 },
+          { name: "Abhinav Kaushik", phone: "9833456703", branch: "Electronics & Communication Engineering", year: "2nd Year", score: 820, rank: 3 },
+        ];
+
+        for (const l of nsutLeads) {
+          await pool.query(
+            `INSERT INTO presentation_leads (session_id, college_id, name, phone, branch, year_of_study, total_score, rank)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            ["sess_nsut_1", nsutId, l.name, l.phone, l.branch, l.year, l.score, l.rank]
+          );
+
+          const userRes = await pool.query(
+            `INSERT INTO users (phone, name, role, college_id, college_name, branch, is_active)
+             VALUES ($1, $2, 'STUDENT', $3, $4, $5, TRUE)
+             ON CONFLICT (phone) DO UPDATE SET college_id = $3, college_name = $4, branch = $5
+             RETURNING id`,
+            [l.phone, l.name, nsutId, nsutName, l.branch]
+          );
+
+          if (userRes.rows.length > 0) {
+            await pool.query(
+              `INSERT INTO enrollments (user_id, pathway_id, status, enrolled_at)
+               VALUES ($1, $2, 'ACTIVE', NOW() - INTERVAL '6 days')
+               ON CONFLICT DO NOTHING`,
+              [userRes.rows[0].id, pwyId2]
+            );
+          }
+        }
+        console.log("[DB] Seeded demo leads, users, and enrollments for NSUT.");
+      }
+    }
+
+    console.log("[DB] Presentation schema verified & auto-migrated with demo data.");
   } catch (err) {
     console.error("[DB] Error ensuring schema:", err);
   }
