@@ -187,7 +187,7 @@ export const presentationsService = {
       process.env.SEO_URL ||
       process.env.CLIENT_URL ||
       "https://unisole.org";
-    const joinUrl = `${seoBaseUrl.replace(/\/+$/, "")}/login?redirect=/live/${code}`;
+    const joinUrl = `${seoBaseUrl.replace(/\/+$/, "")}/live/${code}`;
     const qrCodeDataUrl = await QRCode.toDataURL(joinUrl, {
       width: 400,
       margin: 2,
