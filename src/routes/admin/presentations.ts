@@ -28,7 +28,3 @@ adminPresentationsRouter.get(
   "/sessions/:id/leads",
   presentationsController.getSessionLeads
 );
-adminPresentationsRouter.get(
-  "/sessions/:id/leads/export",
-  presentationsController.exportSessionLeadsCsv
-);

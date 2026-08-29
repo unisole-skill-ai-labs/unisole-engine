@@ -112,21 +112,6 @@ export const presentationsController = {
     }
   },
 
-  async exportSessionLeadsCsv(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { filename, csvContent } =
-        await presentationsService.exportSessionLeadsCsv(req.params.id);
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${filename}"`
-      );
-      res.send(csvContent);
-    } catch (err) {
-      next(err);
-    }
-  },
-
   // ==================== PUBLIC: AUDIENCE ====================
   async getPublicSessionByCode(req: Request, res: Response, next: NextFunction) {
     try {

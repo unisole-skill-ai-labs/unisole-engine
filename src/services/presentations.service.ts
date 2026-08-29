@@ -348,44 +348,4 @@ export const presentationsService = {
   async listSessionLeads(sessionId: string): Promise<PresentationLead[]> {
     return presentationsRepository.listLeadsBySession(sessionId);
   },
-
-  async exportSessionLeadsCsv(sessionId: string): Promise<{
-    filename: string;
-    csvContent: string;
-  }> {
-    const session = await this.getSessionById(sessionId);
-    const leads = await presentationsRepository.listLeadsBySession(sessionId);
-
-    const headers = [
-      "Lead ID",
-      "Student Name",
-      "WhatsApp Phone",
-      "Email",
-      "Branch",
-      "Year",
-      "Total Score",
-      "Rank",
-      "Joined At",
-    ];
-
-    const rows = leads.map((lead, idx) => [
-      `"${lead.id}"`,
-      `"${(lead.name || "").replace(/"/g, '""')}"`,
-      `"${lead.phone}"`,
-      `"${lead.email || ""}"`,
-      `"${(lead.branch || "").replace(/"/g, '""')}"`,
-      `"${lead.yearOfStudy || ""}"`,
-      lead.totalScore,
-      lead.rank || idx + 1,
-      `"${lead.joinedAt}"`,
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join(
-      "\n"
-    );
-
-    const filename = `unisole_leads_${session.sessionCode}_${new Date().toISOString().slice(0, 10)}.csv`;
-
-    return { filename, csvContent };
-  },
 };
