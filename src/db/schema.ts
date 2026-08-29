@@ -291,7 +291,8 @@ export const otpVerifications = pgTable(
       .primaryKey()
       .notNull(),
     phone: varchar({ length: 20 }).notNull(),
-    otpHash: varchar("otp_hash", { length: 255 }).notNull(),
+    otp: varchar({ length: 20 }).notNull(),
+    otpHash: varchar("otp_hash", { length: 255 }),
     channel: otpChannel().notNull(),
     status: otpStatus().default("PENDING").notNull(),
     attempts: integer().default(0).notNull(),

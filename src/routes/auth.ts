@@ -42,3 +42,10 @@ authRouter.post(
 );
 
 authRouter.get("/me", authMiddleware, authController.me);
+
+// Simulated External Delivery Gateway (Plug & Play test route)
+authRouter.post(
+  "/mock-delivery-gateway",
+  validateBody({ required: ["phone", "otp"] }),
+  authController.mockDeliveryGateway
+);

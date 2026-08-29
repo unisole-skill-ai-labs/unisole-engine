@@ -28,4 +28,22 @@ export const authController = {
     const user = await authService.me(req.user!.id);
     res.json(user);
   }),
+
+  mockDeliveryGateway: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const { phone, otp, channel, message } = req.body;
+    console.log(`[SIMULATED EXTERNAL GATEWAY] Received OTP dispatch request:`, {
+      phone,
+      otp,
+      channel,
+      message,
+    });
+    res.status(200).json({
+      success: true,
+      status: "DELIVERED",
+      gateway: "SIMULATED_EXTERNAL_SMS_GATEWAY",
+      messageId: `ext_gw_${Date.now()}`,
+      recipient: phone,
+      deliveredAt: new Date().toISOString(),
+    });
+  }),
 };

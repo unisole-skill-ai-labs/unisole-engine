@@ -31,11 +31,15 @@ export async function ensureDatabaseSchema() {
         END;
       END $$;
 
-      -- Add users table columns if missing
+      -- Add users and otp_verifications table columns if missing
       ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(150);
+      ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS otp VARCHAR(20);
+      ALTER TABLE otp_verifications ALTER COLUMN otp_hash DROP NOT NULL;
 
       -- 2. SEQUENCES
+      CREATE SEQUENCE IF NOT EXISTS users_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS otp_verifications_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE SEQUENCE IF NOT EXISTS presentations_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE SEQUENCE IF NOT EXISTS presentation_sessions_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE SEQUENCE IF NOT EXISTS presentation_leads_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
@@ -49,6 +53,35 @@ export async function ensureDatabaseSchema() {
       CREATE SEQUENCE IF NOT EXISTS daily_eod_logs_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
 
       -- 3. TABLES
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('usr_' || nextval('users_id_seq'::regclass)),
+        phone VARCHAR(20) NOT NULL UNIQUE,
+        name VARCHAR(150),
+        college_id VARCHAR(50),
+        college_name VARCHAR(200),
+        branch VARCHAR(100),
+        department_id VARCHAR(50),
+        designation VARCHAR(150),
+        role user_role DEFAULT 'STUDENT' NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS otp_verifications (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('otp_' || nextval('otp_verifications_id_seq'::regclass)),
+        phone VARCHAR(20) NOT NULL,
+        otp VARCHAR(20) NOT NULL,
+        otp_hash VARCHAR(255),
+        channel otp_channel NOT NULL,
+        status otp_status DEFAULT 'PENDING' NOT NULL,
+        attempts INTEGER DEFAULT 0 NOT NULL,
+        max_attempts INTEGER DEFAULT 5 NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        verified_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS colleges (
         id VARCHAR(50) PRIMARY KEY DEFAULT ('clg_' || nextval('colleges_id_seq'::regclass)),
         name VARCHAR(200) NOT NULL,
