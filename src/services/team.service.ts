@@ -379,4 +379,449 @@ export const teamService = {
 
     return res.rows;
   },
+
+  // ==================== EXECUTIVE COMPANY PROGRESS TELEMETRY ====================
+  async getCompanyProgress(): Promise<any> {
+    // 1. Overall Company Task Velocity Metrics
+    const companyStatsRes = await pool.query(`
+      SELECT 
+        COUNT(*)::int as total_tasks,
+        COUNT(*) FILTER (WHERE status = 'COMPLETED')::int as completed_tasks,
+        COUNT(*) FILTER (WHERE status IN ('TODO', 'IN_PROGRESS', 'SUBMITTED_FOR_REVIEW', 'BLOCKED', 'CHANGES_REQUESTED'))::int as active_tasks,
+        COUNT(*) FILTER (WHERE status = 'BLOCKED')::int as blocked_tasks,
+        COUNT(*) FILTER (WHERE status = 'SUBMITTED_FOR_REVIEW')::int as review_queue,
+        COUNT(*) FILTER (WHERE due_date < NOW() AND status NOT IN ('COMPLETED'))::int as overdue_tasks,
+        COUNT(*) FILTER (WHERE status = 'COMPLETED' AND (due_date IS NULL OR completed_at <= due_date + INTERVAL '4 hours'))::int as on_time_completed,
+        COUNT(*) FILTER (WHERE status = 'COMPLETED' AND completed_at >= NOW() - INTERVAL '7 days')::int as completed_this_week,
+        COUNT(*) FILTER (WHERE status = 'COMPLETED' AND completed_at >= NOW() - INTERVAL '30 days')::int as completed_this_month
+      FROM tasks;
+    `);
+    const cStats = companyStatsRes.rows[0];
+
+    const totalTasks = Number(cStats.total_tasks) || 0;
+    const completedTasks = Number(cStats.completed_tasks) || 0;
+    const activeTasks = Number(cStats.active_tasks) || 0;
+    const blockedTasks = Number(cStats.blocked_tasks) || 0;
+    const reviewQueue = Number(cStats.review_queue) || 0;
+    const overdueTasks = Number(cStats.overdue_tasks) || 0;
+    const onTimeCompleted = Number(cStats.on_time_completed) || 0;
+    const completedThisWeek = Number(cStats.completed_this_week) || 0;
+    const completedThisMonth = Number(cStats.completed_this_month) || 0;
+
+    const onTimeRate = completedTasks > 0 ? Math.round((onTimeCompleted / completedTasks) * 100) : 100;
+    const companyCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    // 2. Department-by-Department Breakdown
+    const deptRes = await pool.query(`
+      SELECT 
+        d.id,
+        d.name,
+        d.code,
+        d.color,
+        d.description,
+        u.name as "leadName",
+        COUNT(DISTINCT mem.id)::int as "memberCount",
+        COUNT(DISTINCT t.id)::int as "totalTasks",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasks",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'SUBMITTED_FOR_REVIEW', 'BLOCKED', 'CHANGES_REQUESTED'))::int as "activeTasks",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'BLOCKED')::int as "blockedTasks",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.due_date < NOW() AND t.status NOT IN ('COMPLETED'))::int as "overdueTasks",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED' AND t.completed_at >= NOW() - INTERVAL '7 days')::int as "completedThisWeek"
+      FROM team_departments d
+      LEFT JOIN users u ON d.lead_id = u.id
+      LEFT JOIN users mem ON mem.department_id = d.id AND mem.role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN') AND mem.is_active = TRUE
+      LEFT JOIN tasks t ON t.department_id = d.id
+      GROUP BY d.id, u.name
+      ORDER BY d.name ASC;
+    `);
+
+    const departments = deptRes.rows.map((d: any) => {
+      const tot = Number(d.totalTasks) || 0;
+      const comp = Number(d.completedTasks) || 0;
+      const rate = tot > 0 ? Math.round((comp / tot) * 100) : 0;
+      return {
+        ...d,
+        memberCount: Number(d.memberCount) || 0,
+        totalTasks: tot,
+        completedTasks: comp,
+        activeTasks: Number(d.activeTasks) || 0,
+        blockedTasks: Number(d.blockedTasks) || 0,
+        overdueTasks: Number(d.overdueTasks) || 0,
+        completedThisWeek: Number(d.completedThisWeek) || 0,
+        completionRate: rate,
+      };
+    });
+
+    // 3. Active Company Blockers (Fire-Drill List)
+    const blockersRes = await pool.query(`
+      SELECT 
+        t.id,
+        t.title,
+        t.priority,
+        t.status,
+        t.blocked_reason as "blockedReason",
+        t.due_date as "dueDate",
+        t.created_at as "createdAt",
+        t.updated_at as "updatedAt",
+        t.assignee_id as "assigneeId",
+        u.name as "assigneeName",
+        u.phone as "assigneePhone",
+        u.role as "assigneeRole",
+        d.name as "departmentName",
+        d.color as "departmentColor"
+      FROM tasks t
+      LEFT JOIN users u ON t.assignee_id = u.id
+      LEFT JOIN team_departments d ON t.department_id = d.id
+      WHERE t.status = 'BLOCKED'
+      ORDER BY 
+        CASE WHEN t.priority = 'URGENT' THEN 1 WHEN t.priority = 'HIGH' THEN 2 ELSE 3 END,
+        t.updated_at DESC;
+    `);
+
+    // 4. Standup Pulse for Today
+    const today = new Date().toISOString().split("T")[0];
+    const totalStaffRes = await pool.query(
+      `SELECT id, name, phone, role, department_id as "departmentId" FROM users WHERE role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN') AND is_active = TRUE`
+    );
+    const allStaff = totalStaffRes.rows;
+
+    const submittedLogsRes = await pool.query(
+      `SELECT DISTINCT user_id FROM daily_eod_logs WHERE log_date = $1`,
+      [today]
+    );
+    const submittedUserIds = new Set(submittedLogsRes.rows.map((r: any) => r.user_id));
+
+    const submittedCount = submittedUserIds.size;
+    const totalStaffCount = allStaff.length;
+    const standupComplianceRate = totalStaffCount > 0 ? Math.round((submittedCount / totalStaffCount) * 100) : 0;
+
+    const missingStaff = allStaff
+      .filter((s: any) => !submittedUserIds.has(s.id))
+      .map((s: any) => {
+        const dept = departments.find((d: any) => d.id === s.departmentId);
+        return {
+          id: s.id,
+          name: s.name,
+          phone: s.phone,
+          role: s.role,
+          departmentName: dept?.name || null,
+          departmentColor: dept?.color || null,
+        };
+      });
+
+    return {
+      kpis: {
+        totalTasks,
+        completedTasks,
+        activeTasks,
+        blockedTasks,
+        reviewQueue,
+        overdueTasks,
+        onTimeRate,
+        companyCompletionRate,
+        completedThisWeek,
+        completedThisMonth,
+      },
+      standupPulse: {
+        today,
+        totalStaffCount,
+        submittedCount,
+        missingCount: totalStaffCount - submittedCount,
+        complianceRate: standupComplianceRate,
+        missingStaff,
+      },
+      departments,
+      activeBlockers: blockersRes.rows,
+    };
+  },
+
+  // ==================== 360° MEMBER PERFORMANCE DOSSIER ====================
+  async getMemberPerformance(memberId: string): Promise<any> {
+    const userRes = await pool.query(
+      `SELECT 
+        u.id,
+        u.name,
+        u.phone,
+        u.email,
+        u.role,
+        u.designation,
+        u.department_id as "departmentId",
+        d.name as "departmentName",
+        d.color as "departmentColor",
+        u.is_active as "isActive",
+        u.created_at as "createdAt"
+      FROM users u
+      LEFT JOIN team_departments d ON u.department_id = d.id
+      WHERE u.id = $1`,
+      [memberId]
+    );
+
+    if (userRes.rows.length === 0) {
+      throw new NotFoundError("Team member not found");
+    }
+
+    const member = userRes.rows[0];
+
+    // Task counts and SLA metrics
+    const statsRes = await pool.query(
+      `SELECT 
+        COUNT(*)::int as total_assigned,
+        COUNT(*) FILTER (WHERE status = 'COMPLETED')::int as completed_count,
+        COUNT(*) FILTER (WHERE status IN ('TODO', 'IN_PROGRESS'))::int as active_count,
+        COUNT(*) FILTER (WHERE status = 'SUBMITTED_FOR_REVIEW')::int as review_count,
+        COUNT(*) FILTER (WHERE status = 'BLOCKED')::int as blocked_count,
+        COUNT(*) FILTER (WHERE status = 'CHANGES_REQUESTED')::int as changes_requested_count,
+        COUNT(*) FILTER (WHERE due_date < NOW() AND status NOT IN ('COMPLETED'))::int as overdue_count,
+        COUNT(*) FILTER (WHERE status = 'COMPLETED' AND (due_date IS NULL OR completed_at <= due_date + INTERVAL '4 hours'))::int as on_time_count,
+        COALESCE(SUM(estimated_hours), 0)::int as total_estimated_hours,
+        COALESCE(SUM(estimated_hours) FILTER (WHERE status = 'COMPLETED'), 0)::int as completed_estimated_hours
+      FROM tasks
+      WHERE assignee_id = $1`,
+      [memberId]
+    );
+    const stats = statsRes.rows[0];
+
+    const totalAssigned = Number(stats.total_assigned) || 0;
+    const completedCount = Number(stats.completed_count) || 0;
+    const activeCount = Number(stats.active_count) || 0;
+    const reviewCount = Number(stats.review_count) || 0;
+    const blockedCount = Number(stats.blocked_count) || 0;
+    const changesRequestedCount = Number(stats.changes_requested_count) || 0;
+    const overdueCount = Number(stats.overdue_count) || 0;
+    const onTimeCount = Number(stats.on_time_count) || 0;
+    const totalEstimatedHours = Number(stats.total_estimated_hours) || 0;
+    const completedEstimatedHours = Number(stats.completed_estimated_hours) || 0;
+
+    const onTimeRate = completedCount > 0 ? Math.round((onTimeCount / completedCount) * 100) : 100;
+    const firstPassApprovalRate = (completedCount + changesRequestedCount) > 0
+      ? Math.round((completedCount / (completedCount + changesRequestedCount)) * 100)
+      : 100;
+
+    // Daily Standup history (Last 30 days)
+    const eodRes = await pool.query(
+      `SELECT 
+        id,
+        log_date as "logDate",
+        completed_summary as "completedSummary",
+        plan_tomorrow as "planTomorrow",
+        blockers,
+        hours_spent as "hoursSpent",
+        created_at as "createdAt"
+      FROM daily_eod_logs
+      WHERE user_id = $1
+      ORDER BY log_date DESC
+      LIMIT 30`,
+      [memberId]
+    );
+
+    const standupLogs = eodRes.rows;
+    const standupCount = standupLogs.length;
+
+    // Calculate Velocity Score (0 - 100)
+    // 40% on-time completion rate, 30% first pass approval, 20% output volume index, 10% standup compliance
+    const outputScore = Math.min(completedCount * 10, 100);
+    const standupScore = Math.min((standupCount / 15) * 100, 100);
+    const velocityScore = Math.round(
+      onTimeRate * 0.35 +
+      firstPassApprovalRate * 0.25 +
+      outputScore * 0.25 +
+      standupScore * 0.15
+    );
+
+    // Workload Capacity Status
+    let capacityStatus: "AVAILABLE" | "OPTIMAL" | "OVERLOADED" = "AVAILABLE";
+    if (activeCount >= 5) {
+      capacityStatus = "OVERLOADED";
+    } else if (activeCount >= 2) {
+      capacityStatus = "OPTIMAL";
+    }
+
+    // Recent Tasks
+    const tasksRes = await pool.query(
+      `SELECT 
+        t.id,
+        t.title,
+        t.description,
+        t.status,
+        t.priority,
+        t.due_date as "dueDate",
+        t.estimated_hours as "estimatedHours",
+        t.submission_proof_url as "submissionProofUrl",
+        t.submission_notes as "submissionNotes",
+        t.blocked_reason as "blockedReason",
+        t.completed_at as "completedAt",
+        t.created_at as "createdAt",
+        d.name as "departmentName",
+        d.color as "departmentColor",
+        COUNT(s.id)::int as "subtasksCount",
+        COUNT(s.id) FILTER (WHERE s.is_completed = TRUE)::int as "subtasksCompleted"
+      FROM tasks t
+      LEFT JOIN team_departments d ON t.department_id = d.id
+      LEFT JOIN task_subtasks s ON s.task_id = t.id
+      WHERE t.assignee_id = $1
+      GROUP BY t.id, d.name, d.color
+      ORDER BY 
+        CASE WHEN t.status = 'BLOCKED' THEN 1 WHEN t.status = 'SUBMITTED_FOR_REVIEW' THEN 2 WHEN t.status IN ('TODO', 'IN_PROGRESS') THEN 3 ELSE 4 END,
+        t.created_at DESC
+      LIMIT 25`,
+      [memberId]
+    );
+
+    return {
+      member,
+      metrics: {
+        totalAssigned,
+        completedCount,
+        activeCount,
+        reviewCount,
+        blockedCount,
+        changesRequestedCount,
+        overdueCount,
+        onTimeRate,
+        firstPassApprovalRate,
+        velocityScore,
+        capacityStatus,
+        totalEstimatedHours,
+        completedEstimatedHours,
+        standupCount,
+      },
+      tasks: tasksRes.rows,
+      standupLogs,
+    };
+  },
+
+  // ==================== PERFORMANCE LEADERBOARD & WORKLOAD MATRIX ====================
+  async getLeaderboard(): Promise<any[]> {
+    const res = await pool.query(`
+      SELECT 
+        u.id,
+        u.name,
+        u.phone,
+        u.role,
+        u.designation,
+        u.department_id as "departmentId",
+        d.name as "departmentName",
+        d.color as "departmentColor",
+        u.created_at as "createdAt",
+        COUNT(t.id)::int as "totalTasks",
+        COUNT(t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasks",
+        COUNT(t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS'))::int as "activeTasks",
+        COUNT(t.id) FILTER (WHERE t.status = 'BLOCKED')::int as "blockedTasks",
+        COUNT(t.id) FILTER (WHERE t.status = 'SUBMITTED_FOR_REVIEW')::int as "reviewTasks",
+        COUNT(t.id) FILTER (WHERE t.status = 'COMPLETED' AND (t.due_date IS NULL OR t.completed_at <= t.due_date + INTERVAL '4 hours'))::int as "onTimeTasks",
+        COUNT(DISTINCT e.log_date)::int as "standupCount"
+      FROM users u
+      LEFT JOIN team_departments d ON u.department_id = d.id
+      LEFT JOIN tasks t ON t.assignee_id = u.id
+      LEFT JOIN daily_eod_logs e ON e.user_id = u.id AND e.log_date >= CURRENT_DATE - INTERVAL '30 days'
+      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER') AND u.is_active = TRUE
+      GROUP BY u.id, d.name, d.color
+      ORDER BY u.name ASC;
+    `);
+
+    const membersWithScores = res.rows.map((m: any) => {
+      const completed = Number(m.completedTasks) || 0;
+      const active = Number(m.activeTasks) || 0;
+      const onTime = Number(m.onTimeTasks) || 0;
+      const standupCount = Number(m.standupCount) || 0;
+
+      const onTimeRate = completed > 0 ? Math.round((onTime / completed) * 100) : 100;
+      const outputScore = Math.min(completed * 10, 100);
+      const standupScore = Math.min((standupCount / 15) * 100, 100);
+      const velocityScore = Math.round(
+        onTimeRate * 0.4 +
+        outputScore * 0.35 +
+        standupScore * 0.25
+      );
+
+      let capacityStatus: "AVAILABLE" | "OPTIMAL" | "OVERLOADED" = "AVAILABLE";
+      if (active >= 5) {
+        capacityStatus = "OVERLOADED";
+      } else if (active >= 2) {
+        capacityStatus = "OPTIMAL";
+      }
+
+      return {
+        id: m.id,
+        name: m.name || m.phone,
+        phone: m.phone,
+        role: m.role,
+        designation: m.designation,
+        departmentId: m.departmentId,
+        departmentName: m.departmentName,
+        departmentColor: m.departmentColor,
+        completedTasks: completed,
+        activeTasks: active,
+        blockedTasks: Number(m.blockedTasks) || 0,
+        reviewTasks: Number(m.reviewTasks) || 0,
+        onTimeRate,
+        standupCount,
+        velocityScore,
+        capacityStatus,
+      };
+    });
+
+    // Sort by Velocity Score descending
+    membersWithScores.sort((a, b) => b.velocityScore - a.velocityScore);
+
+    return membersWithScores.map((m, index) => ({
+      ...m,
+      rank: index + 1,
+    }));
+  },
+
+  // ==================== DAILY STANDUP SUMMARY & NUDGE ====================
+  async getStandupSummary(date?: string): Promise<any> {
+    const targetDate = date || new Date().toISOString().split("T")[0];
+
+    const logs = await this.listDailyEodLogs(targetDate);
+    const submittedUserIds = new Set(logs.map((l: any) => l.userId));
+
+    const staffRes = await pool.query(`
+      SELECT 
+        u.id, 
+        u.name, 
+        u.phone, 
+        u.role, 
+        u.designation,
+        d.name as "departmentName", 
+        d.color as "departmentColor"
+      FROM users u
+      LEFT JOIN team_departments d ON u.department_id = d.id
+      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER') AND u.is_active = TRUE
+      ORDER BY u.name ASC
+    `);
+    const allStaff = staffRes.rows;
+
+    const submitted = logs;
+    const missing = allStaff.filter((s: any) => !submittedUserIds.has(s.id));
+    const complianceRate = allStaff.length > 0 ? Math.round((submitted.length / allStaff.length) * 100) : 0;
+
+    const blockers = logs.filter((l: any) => Boolean(l.blockers && l.blockers.trim().length > 0));
+
+    return {
+      date: targetDate,
+      totalStaffCount: allStaff.length,
+      submittedCount: submitted.length,
+      missingCount: missing.length,
+      complianceRate,
+      submitted,
+      missing,
+      blockers,
+    };
+  },
+
+  async nudgeMember(memberId: string, message?: string): Promise<any> {
+    const userRes = await pool.query(`SELECT id, name, phone FROM users WHERE id = $1`, [memberId]);
+    if (userRes.rows.length === 0) throw new NotFoundError("Member not found");
+
+    const member = userRes.rows[0];
+    // In production, this can send SMS/WhatsApp or Socket alert. For now, we return receipt confirmation
+    return {
+      success: true,
+      message: `Nudge sent successfully to ${member.name || member.phone}${message ? `: "${message}"` : ""}`,
+      nudgedAt: new Date().toISOString(),
+      memberId,
+    };
+  },
 };

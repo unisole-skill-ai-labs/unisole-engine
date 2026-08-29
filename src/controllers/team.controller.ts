@@ -85,5 +85,34 @@ export const teamController = {
     const logs = await teamService.listDailyEodLogs(date, userId);
     res.json({ success: true, data: logs });
   }),
+
+  getCompanyProgress: asyncHandler(async (_req: Request, res: Response) => {
+    const progress = await teamService.getCompanyProgress();
+    res.json({ success: true, data: progress });
+  }),
+
+  getMemberPerformance: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const performance = await teamService.getMemberPerformance(id);
+    res.json({ success: true, data: performance });
+  }),
+
+  getLeaderboard: asyncHandler(async (_req: Request, res: Response) => {
+    const leaderboard = await teamService.getLeaderboard();
+    res.json({ success: true, data: leaderboard });
+  }),
+
+  getStandupSummary: asyncHandler(async (req: Request, res: Response) => {
+    const date = req.query.date as string;
+    const summary = await teamService.getStandupSummary(date);
+    res.json({ success: true, data: summary });
+  }),
+
+  nudgeMember: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const message = req.body?.message as string;
+    const result = await teamService.nudgeMember(id, message);
+    res.json({ success: true, data: result });
+  }),
 };
 

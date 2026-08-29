@@ -4,8 +4,15 @@ import { requireRole } from "../../middleware/auth";
 
 export const adminTeamRouter: Router = Router();
 
+// Executive Company Progress & Analytics
+adminTeamRouter.get("/company-progress", teamController.getCompanyProgress);
+adminTeamRouter.get("/leaderboard", teamController.getLeaderboard);
+adminTeamRouter.get("/standup-summary", teamController.getStandupSummary);
+
 // Members directory & management
 adminTeamRouter.get("/members", teamController.listMembers);
+adminTeamRouter.get("/members/:id/performance", teamController.getMemberPerformance);
+adminTeamRouter.post("/members/:id/nudge", teamController.nudgeMember);
 adminTeamRouter.post(
   "/members",
   requireRole(["SUPER_ADMIN"]),
@@ -39,4 +46,5 @@ adminTeamRouter.delete(
   requireRole(["SUPER_ADMIN"]),
   teamController.deleteDepartment
 );
+
 
