@@ -14,8 +14,31 @@ export async function ensureDatabaseSchema() {
       CREATE SEQUENCE IF NOT EXISTS presentations_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE SEQUENCE IF NOT EXISTS presentation_sessions_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE SEQUENCE IF NOT EXISTS presentation_leads_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS colleges_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS branches_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
 
       -- 3. TABLES
+      CREATE TABLE IF NOT EXISTS colleges (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('clg_' || nextval('colleges_id_seq'::regclass)),
+        name VARCHAR(200) NOT NULL,
+        slug VARCHAR(220) NOT NULL UNIQUE,
+        short_name VARCHAR(100),
+        description TEXT,
+        is_active BOOLEAN DEFAULT TRUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS branches (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('brn_' || nextval('branches_id_seq'::regclass)),
+        name VARCHAR(200) NOT NULL,
+        code VARCHAR(100),
+        description TEXT,
+        is_active BOOLEAN DEFAULT TRUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS presentations (
         id VARCHAR(50) PRIMARY KEY DEFAULT ('pres_' || nextval('presentations_id_seq'::regclass)),
         title VARCHAR(255) NOT NULL,
@@ -66,6 +89,8 @@ export async function ensureDatabaseSchema() {
       );
 
       -- 4. INDEXES
+      CREATE INDEX IF NOT EXISTS idx_colleges_is_active ON colleges(is_active);
+      CREATE INDEX IF NOT EXISTS idx_branches_is_active ON branches(is_active);
       CREATE INDEX IF NOT EXISTS idx_presentations_is_active ON presentations(is_active);
       CREATE INDEX IF NOT EXISTS idx_presentation_sessions_code ON presentation_sessions(session_code);
       CREATE INDEX IF NOT EXISTS idx_presentation_sessions_status ON presentation_sessions(status);
@@ -78,6 +103,56 @@ export async function ensureDatabaseSchema() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100);
     `);
+
+    // Ensure default seeded colleges exist
+    const collegesCountRes = await pool.query("SELECT COUNT(*) FROM colleges");
+    if (Number(collegesCountRes.rows[0].count) === 0) {
+      const defaultColleges = [
+        { name: "Delhi Technological University", slug: "delhi-technological-university", shortName: "DTU" },
+        { name: "Indian Institute of Technology Delhi", slug: "iit-delhi", shortName: "IITD" },
+        { name: "Netaji Subhas University of Technology", slug: "nsut-delhi", shortName: "NSUT" },
+        { name: "Indraprastha Institute of Information Technology Delhi", slug: "iiit-delhi", shortName: "IIITD" },
+        { name: "National Institute of Technology", slug: "nit-delhi", shortName: "NIT" },
+        { name: "Anna University", slug: "anna-university", shortName: "AU" },
+        { name: "Other University / College", slug: "other-college", shortName: "OTHER" },
+      ];
+      for (const clg of defaultColleges) {
+        await pool.query(
+          `INSERT INTO colleges (name, slug, short_name, is_active)
+           VALUES ($1, $2, $3, TRUE)
+           ON CONFLICT (slug) DO NOTHING`,
+          [clg.name, clg.slug, clg.shortName]
+        );
+      }
+      console.log("[DB] Seeded initial colleges list.");
+    }
+
+    // Ensure default seeded branches exist
+    const branchesCountRes = await pool.query("SELECT COUNT(*) FROM branches");
+    if (Number(branchesCountRes.rows[0].count) === 0) {
+      const defaultBranches = [
+        { name: "Computer Science & Engineering", code: "CSE" },
+        { name: "Information Technology", code: "IT" },
+        { name: "Artificial Intelligence & Machine Learning", code: "AIML" },
+        { name: "Data Science & Big Data Analytics", code: "DS" },
+        { name: "Electronics & Communication Engineering", code: "ECE" },
+        { name: "Electrical & Electronics Engineering", code: "EEE" },
+        { name: "Mechanical Engineering", code: "MECH" },
+        { name: "Civil Engineering", code: "CIVIL" },
+        { name: "Cyber Security & Digital Forensics", code: "CS" },
+        { name: "Computer Applications (BCA / MCA)", code: "BCA/MCA" },
+        { name: "Management & Business Studies (BBA / MBA)", code: "BBA/MBA" },
+        { name: "Other / Multidisciplinary", code: "OTHER" },
+      ];
+      for (const brn of defaultBranches) {
+        await pool.query(
+          `INSERT INTO branches (name, code, is_active)
+           VALUES ($1, $2, TRUE)`,
+          [brn.name, brn.code]
+        );
+      }
+      console.log("[DB] Seeded initial branches list.");
+    }
 
     // Ensure default seeded presentation deck exists
     const checkRes = await pool.query("SELECT COUNT(*) FROM presentations");

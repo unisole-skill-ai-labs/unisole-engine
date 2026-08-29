@@ -75,6 +75,14 @@ export const collegesIdSeq = pgSequence("colleges_id_seq", {
   cache: "1",
   cycle: false,
 });
+export const branchesIdSeq = pgSequence("branches_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
 export const categoriesIdSeq = pgSequence("categories_id_seq", {
   startWith: "1",
   increment: "1",
@@ -252,6 +260,33 @@ export const colleges = pgTable(
   (table) => [
     index("idx_colleges_is_active").using("btree", table.isActive.asc().nullsLast()),
     unique("uq_colleges_slug").on(table.slug),
+  ]
+);
+
+// ============================================================
+// 3b. BRANCHES
+// ============================================================
+
+export const branches = pgTable(
+  "branches",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('brn_'::text || nextval('branches_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    name: varchar({ length: 200 }).notNull(),
+    code: varchar({ length: 100 }),
+    description: text(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_branches_is_active").using("btree", table.isActive.asc().nullsLast()),
   ]
 );
 
@@ -880,6 +915,7 @@ export const presentationLeads = pgTable(
 export type User = InferSelectModel<typeof users>;
 export type OtpVerification = InferSelectModel<typeof otpVerifications>;
 export type College = InferSelectModel<typeof colleges>;
+export type Branch = InferSelectModel<typeof branches>;
 export type Category = InferSelectModel<typeof categories>;
 export type Pathway = InferSelectModel<typeof pathways>;
 export type PathwayCategory = InferSelectModel<typeof pathwayCategories>;
@@ -903,6 +939,7 @@ export type PresentationLead = InferSelectModel<typeof presentationLeads>;
 export type NewUser = InferInsertModel<typeof users>;
 export type NewOtpVerification = InferInsertModel<typeof otpVerifications>;
 export type NewCollege = InferInsertModel<typeof colleges>;
+export type NewBranch = InferInsertModel<typeof branches>;
 export type NewCategory = InferInsertModel<typeof categories>;
 export type NewPathway = InferInsertModel<typeof pathways>;
 export type NewPathwayCategory = InferInsertModel<typeof pathwayCategories>;

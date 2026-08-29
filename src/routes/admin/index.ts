@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware, requireRole } from "../../middleware/auth";
 import { adminStudentsRouter } from "./students";
 import { adminCollegesRouter } from "./colleges";
+import { adminBranchesRouter } from "./branches";
 import { adminCategoriesRouter } from "./categories";
 import { adminPathwaysRouter } from "./pathways";
 import { adminCoursesRouter } from "./courses";
@@ -18,6 +19,7 @@ adminRouter.use(authMiddleware, requireRole(["ADMIN"]));
 
 adminRouter.use("/students", adminStudentsRouter);
 adminRouter.use("/colleges", adminCollegesRouter);
+adminRouter.use("/branches", adminBranchesRouter);
 adminRouter.use("/categories", adminCategoriesRouter);
 adminRouter.use("/pathways", adminPathwaysRouter);
 adminRouter.use("/courses", adminCoursesRouter);
