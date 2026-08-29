@@ -9,6 +9,7 @@ interface Attendee {
   totalScore: number;
   streak: number;
   rank?: number;
+  joinedAt?: string;
 }
 
 interface SessionState {
@@ -100,6 +101,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
           currentSlideIndex: sessionState.currentSlideIndex,
           buildStep: sessionState.buildStep ?? 0,
           attendeeCount: sessionState.attendees.size,
+          attendees: Array.from(sessionState.attendees.values()),
           quizState: {
             ...sessionState.quizState,
             quizAnswers: Object.fromEntries(
@@ -172,23 +174,33 @@ export function setupPresentationSocket(io: SocketIOServer) {
           currentStreak = dbLead.streak ?? 0;
         }
 
-        sessionState.socketToLead.set(socket.id, leadId);
-        sessionState.attendees.set(leadId, {
+        const attendeeObj: Attendee = {
           socketId: socket.id,
           leadId,
           name: studentName,
           phone,
           totalScore: currentScore,
           streak: currentStreak,
-        });
+          joinedAt: new Date().toISOString(),
+        };
+
+        sessionState.socketToLead.set(socket.id, leadId);
+        sessionState.attendees.set(leadId, attendeeObj);
 
         // Update DB attendee count periodically
         presentationsRepository.updateSession(sessionState.sessionId, {
           activeAttendeesCount: sessionState.attendees.size,
         });
 
-        // Broadcast updated attendee count
+        // Broadcast updated attendee count to everyone
         io.to(room).emit("attendee_count", {
+          count: sessionState.attendees.size,
+        });
+
+        // Send live joined member notification & updated full attendee list to admin
+        io.to(`${room}:admin`).emit("attendee_joined", {
+          attendee: attendeeObj,
+          attendees: Array.from(sessionState.attendees.values()),
           count: sessionState.attendees.size,
         });
 
@@ -482,6 +494,50 @@ export function setupPresentationSocket(io: SocketIOServer) {
       }
     );
 
+    // ==================== PRESENTER: KICK ATTENDEE ====================
+    socket.on(
+      "admin:kick_attendee",
+      async ({
+        sessionCode,
+        leadId,
+      }: {
+        sessionCode: string;
+        leadId: string;
+      }) => {
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = activeSessions.get(code);
+        if (!sessionState) return;
+
+        const target = sessionState.attendees.get(leadId);
+        if (target) {
+          // Notify the kicked student socket directly
+          io.to(target.socketId).emit("audience:kicked", {
+            message: "You have been removed from this live presentation by the host.",
+          });
+
+          sessionState.socketToLead.delete(target.socketId);
+          sessionState.attendees.delete(leadId);
+
+          // Update DB attendee count
+          presentationsRepository.updateSession(sessionState.sessionId, {
+            activeAttendeesCount: sessionState.attendees.size,
+          });
+
+          // Broadcast updated count to all and list to admin
+          io.to(room).emit("attendee_count", {
+            count: sessionState.attendees.size,
+          });
+
+          io.to(`${room}:admin`).emit("attendee_kicked", {
+            leadId,
+            attendees: Array.from(sessionState.attendees.values()),
+            count: sessionState.attendees.size,
+          });
+        }
+      }
+    );
+
     // ==================== PRESENTER: END SESSION ====================
     socket.on(
       "admin:end_session",
@@ -512,6 +568,12 @@ export function setupPresentationSocket(io: SocketIOServer) {
 
           const room = `session:${code}`;
           io.to(room).emit("attendee_count", {
+            count: sessionState.attendees.size,
+          });
+
+          io.to(`${room}:admin`).emit("attendee_left", {
+            leadId,
+            attendees: Array.from(sessionState.attendees.values()),
             count: sessionState.attendees.size,
           });
           break;
