@@ -22,9 +22,36 @@ import { sql, InferSelectModel, InferInsertModel } from "drizzle-orm";
 // ENUMS
 // ============================================================
 
-export const userRole = pgEnum("user_role", ["STUDENT", "ADMIN"]);
+export const userRole = pgEnum("user_role", [
+  "STUDENT",
+  "MEMBER",
+  "ADMIN",
+  "SUPER_ADMIN",
+]);
 export const pathwayStatus = pgEnum("pathway_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export const contentStatus = pgEnum("content_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
+export const taskStatus = pgEnum("task_status", [
+  "TODO",
+  "IN_PROGRESS",
+  "BLOCKED",
+  "SUBMITTED_FOR_REVIEW",
+  "CHANGES_REQUESTED",
+  "COMPLETED",
+]);
+export const taskPriority = pgEnum("task_priority", [
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "URGENT",
+]);
+export const taskActivityType = pgEnum("task_activity_type", [
+  "COMMENT",
+  "STATUS_CHANGE",
+  "SUBMITTED",
+  "CHANGES_REQUESTED",
+  "APPROVED",
+  "BLOCKED",
+]);
 export const enrollmentStatus = pgEnum("enrollment_status", [
   "PENDING",
   "ACTIVE",
@@ -169,6 +196,54 @@ export const presentationLeadsIdSeq = pgSequence(
     cycle: false,
   }
 );
+export const teamDepartmentsIdSeq = pgSequence("team_departments_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const tasksIdSeq = pgSequence("tasks_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const taskSubtasksIdSeq = pgSequence("task_subtasks_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const taskTemplatesIdSeq = pgSequence("task_templates_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const taskCommentsIdSeq = pgSequence("task_comments_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const dailyEodLogsIdSeq = pgSequence("daily_eod_logs_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
 
 // ============================================================
 // 1. USERS
@@ -916,6 +991,226 @@ export const presentationLeads = pgTable(
 );
 
 // ============================================================
+// 12. TEAM & TASK MANAGEMENT TABLES
+// ============================================================
+
+export const teamDepartments = pgTable(
+  "team_departments",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('dept_'::text || nextval('team_departments_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    name: varchar({ length: 150 }).notNull(),
+    code: varchar({ length: 50 }).notNull().unique(),
+    color: varchar({ length: 30 }).default("#6366f1").notNull(),
+    description: text(),
+    leadId: varchar("lead_id", { length: 50 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.leadId],
+      foreignColumns: [users.id],
+      name: "fk_dept_lead",
+    }).onDelete("set null"),
+  ]
+);
+
+export const taskTemplates = pgTable(
+  "task_templates",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('tmpl_'::text || nextval('task_templates_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    title: varchar({ length: 255 }).notNull(),
+    departmentId: varchar("department_id", { length: 50 }),
+    description: text(),
+    defaultChecklist: jsonb("default_checklist")
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    guidelinesUrl: text("guidelines_url"),
+    estimatedHours: integer("estimated_hours").default(2),
+    createdById: varchar("created_by_id", { length: 50 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.departmentId],
+      foreignColumns: [teamDepartments.id],
+      name: "fk_template_dept",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [users.id],
+      name: "fk_template_creator",
+    }).onDelete("set null"),
+  ]
+);
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('task_'::text || nextval('tasks_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    title: varchar({ length: 255 }).notNull(),
+    description: text(),
+    status: taskStatus().default("TODO").notNull(),
+    priority: taskPriority().default("MEDIUM").notNull(),
+    assigneeId: varchar("assignee_id", { length: 50 }),
+    reporterId: varchar("reporter_id", { length: 50 }),
+    departmentId: varchar("department_id", { length: 50 }),
+    templateId: varchar("template_id", { length: 50 }),
+    dueDate: timestamp("due_date", { withTimezone: true, mode: "string" }),
+    estimatedHours: integer("estimated_hours"),
+    submissionProofUrl: text("submission_proof_url"),
+    submissionNotes: text("submission_notes"),
+    blockedReason: text("blocked_reason"),
+    relatedEntityType: varchar("related_entity_type", { length: 50 }), // 'COLLEGE', 'PATHWAY', 'PRESENTATION', etc.
+    relatedEntityId: varchar("related_entity_id", { length: 50 }),
+    relatedEntityName: varchar("related_entity_name", { length: 255 }),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_tasks_assignee").using("btree", table.assigneeId.asc().nullsLast()),
+    index("idx_tasks_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_tasks_department").using("btree", table.departmentId.asc().nullsLast()),
+    index("idx_tasks_due_date").using("btree", table.dueDate.asc().nullsLast()),
+    foreignKey({
+      columns: [table.assigneeId],
+      foreignColumns: [users.id],
+      name: "fk_tasks_assignee",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.reporterId],
+      foreignColumns: [users.id],
+      name: "fk_tasks_reporter",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.departmentId],
+      foreignColumns: [teamDepartments.id],
+      name: "fk_tasks_dept",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.templateId],
+      foreignColumns: [taskTemplates.id],
+      name: "fk_tasks_template",
+    }).onDelete("set null"),
+  ]
+);
+
+export const taskSubtasks = pgTable(
+  "task_subtasks",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('stask_'::text || nextval('task_subtasks_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    taskId: varchar("task_id", { length: 50 }).notNull(),
+    title: varchar({ length: 255 }).notNull(),
+    isCompleted: boolean("is_completed").default(false).notNull(),
+    orderIndex: integer("order_index").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_subtasks_task").using("btree", table.taskId.asc().nullsLast()),
+    foreignKey({
+      columns: [table.taskId],
+      foreignColumns: [tasks.id],
+      name: "fk_subtasks_task",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const taskComments = pgTable(
+  "task_comments",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('tcomm_'::text || nextval('task_comments_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    taskId: varchar("task_id", { length: 50 }).notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    content: text().notNull(),
+    activityType: taskActivityType("activity_type").default("COMMENT").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_comments_task").using("btree", table.taskId.asc().nullsLast()),
+    foreignKey({
+      columns: [table.taskId],
+      foreignColumns: [tasks.id],
+      name: "fk_comments_task",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_comments_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const dailyEodLogs = pgTable(
+  "daily_eod_logs",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('eod_'::text || nextval('daily_eod_logs_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    logDate: varchar("log_date", { length: 10 }).notNull(), // 'YYYY-MM-DD'
+    completedSummary: text("completed_summary").notNull(),
+    planTomorrow: text("plan_tomorrow").notNull(),
+    blockers: text("blockers"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_eod_user").using("btree", table.userId.asc().nullsLast()),
+    index("idx_eod_date").using("btree", table.logDate.asc().nullsLast()),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_eod_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+// ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
@@ -938,6 +1233,12 @@ export type Payment = InferSelectModel<typeof payments>;
 export type Presentation = InferSelectModel<typeof presentations>;
 export type PresentationSession = InferSelectModel<typeof presentationSessions>;
 export type PresentationLead = InferSelectModel<typeof presentationLeads>;
+export type TeamDepartment = InferSelectModel<typeof teamDepartments>;
+export type TaskTemplate = InferSelectModel<typeof taskTemplates>;
+export type Task = InferSelectModel<typeof tasks>;
+export type TaskSubtask = InferSelectModel<typeof taskSubtasks>;
+export type TaskComment = InferSelectModel<typeof taskComments>;
+export type DailyEodLog = InferSelectModel<typeof dailyEodLogs>;
 
 // ============================================================
 // INSERT TYPES (write to DB)
@@ -962,3 +1263,9 @@ export type NewPayment = InferInsertModel<typeof payments>;
 export type NewPresentation = InferInsertModel<typeof presentations>;
 export type NewPresentationSession = InferInsertModel<typeof presentationSessions>;
 export type NewPresentationLead = InferInsertModel<typeof presentationLeads>;
+export type NewTeamDepartment = InferInsertModel<typeof teamDepartments>;
+export type NewTaskTemplate = InferInsertModel<typeof taskTemplates>;
+export type NewTask = InferInsertModel<typeof tasks>;
+export type NewTaskSubtask = InferInsertModel<typeof taskSubtasks>;
+export type NewTaskComment = InferInsertModel<typeof taskComments>;
+export type NewDailyEodLog = InferInsertModel<typeof dailyEodLogs>;

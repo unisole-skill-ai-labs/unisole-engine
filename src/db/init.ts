@@ -8,6 +8,20 @@ export async function ensureDatabaseSchema() {
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'session_status') THEN
           CREATE TYPE "session_status" AS ENUM('DRAFT', 'LIVE', 'PAUSED', 'ENDED');
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_status') THEN
+          CREATE TYPE "task_status" AS ENUM('TODO', 'IN_PROGRESS', 'BLOCKED', 'SUBMITTED_FOR_REVIEW', 'CHANGES_REQUESTED', 'COMPLETED');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_priority') THEN
+          CREATE TYPE "task_priority" AS ENUM('LOW', 'MEDIUM', 'HIGH', 'URGENT');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_activity_type') THEN
+          CREATE TYPE "task_activity_type" AS ENUM('COMMENT', 'STATUS_CHANGE', 'SUBMITTED', 'CHANGES_REQUESTED', 'APPROVED', 'BLOCKED');
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'MEMBER';
+          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'SUPER_ADMIN';
+        END IF;
       END $$;
 
       -- 2. SEQUENCES
@@ -16,6 +30,12 @@ export async function ensureDatabaseSchema() {
       CREATE SEQUENCE IF NOT EXISTS presentation_leads_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE SEQUENCE IF NOT EXISTS colleges_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE SEQUENCE IF NOT EXISTS branches_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS team_departments_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS tasks_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS task_subtasks_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS task_templates_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS task_comments_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS daily_eod_logs_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
 
       -- 3. TABLES
       CREATE TABLE IF NOT EXISTS colleges (
@@ -89,6 +109,81 @@ export async function ensureDatabaseSchema() {
         joined_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS team_departments (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('dept_' || nextval('team_departments_id_seq'::regclass)),
+        name VARCHAR(150) NOT NULL,
+        code VARCHAR(50) NOT NULL UNIQUE,
+        color VARCHAR(30) DEFAULT '#6366f1' NOT NULL,
+        description TEXT,
+        lead_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS task_templates (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('tmpl_' || nextval('task_templates_id_seq'::regclass)),
+        title VARCHAR(255) NOT NULL,
+        department_id VARCHAR(50) REFERENCES team_departments(id) ON DELETE SET NULL,
+        description TEXT,
+        default_checklist JSONB DEFAULT '[]'::jsonb NOT NULL,
+        guidelines_url TEXT,
+        estimated_hours INTEGER DEFAULT 2,
+        created_by_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS tasks (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('task_' || nextval('tasks_id_seq'::regclass)),
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        status VARCHAR(50) DEFAULT 'TODO' NOT NULL,
+        priority VARCHAR(50) DEFAULT 'MEDIUM' NOT NULL,
+        assignee_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+        reporter_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+        department_id VARCHAR(50) REFERENCES team_departments(id) ON DELETE SET NULL,
+        template_id VARCHAR(50) REFERENCES task_templates(id) ON DELETE SET NULL,
+        due_date TIMESTAMPTZ,
+        estimated_hours INTEGER,
+        submission_proof_url TEXT,
+        submission_notes TEXT,
+        blocked_reason TEXT,
+        related_entity_type VARCHAR(50),
+        related_entity_id VARCHAR(50),
+        related_entity_name VARCHAR(255),
+        completed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS task_subtasks (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('stask_' || nextval('task_subtasks_id_seq'::regclass)),
+        task_id VARCHAR(50) NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        is_completed BOOLEAN DEFAULT FALSE NOT NULL,
+        order_index INTEGER DEFAULT 0 NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS task_comments (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('tcomm_' || nextval('task_comments_id_seq'::regclass)),
+        task_id VARCHAR(50) NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        activity_type VARCHAR(50) DEFAULT 'COMMENT' NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS daily_eod_logs (
+        id VARCHAR(50) PRIMARY KEY DEFAULT ('eod_' || nextval('daily_eod_logs_id_seq'::regclass)),
+        user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        log_date VARCHAR(10) NOT NULL,
+        completed_summary TEXT NOT NULL,
+        plan_tomorrow TEXT NOT NULL,
+        blockers TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
       -- 4. INDEXES
       CREATE INDEX IF NOT EXISTS idx_colleges_is_active ON colleges(is_active);
       CREATE INDEX IF NOT EXISTS idx_branches_college ON branches(college_id);
@@ -99,12 +194,22 @@ export async function ensureDatabaseSchema() {
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_session ON presentation_leads(session_id);
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_phone ON presentation_leads(phone);
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_score ON presentation_leads(total_score DESC NULLS LAST);
+      CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+      CREATE INDEX IF NOT EXISTS idx_tasks_department ON tasks(department_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+      CREATE INDEX IF NOT EXISTS idx_subtasks_task ON task_subtasks(task_id);
+      CREATE INDEX IF NOT EXISTS idx_comments_task ON task_comments(task_id);
+      CREATE INDEX IF NOT EXISTS idx_eod_user ON daily_eod_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_eod_date ON daily_eod_logs(log_date);
 
       -- 5. ENSURE REQUIRED COLUMNS & FOREIGN KEYS
       ALTER TABLE branches ADD COLUMN IF NOT EXISTS college_id VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(100);
     `);
 
     // Ensure default seeded colleges exist
@@ -456,7 +561,72 @@ export async function ensureDatabaseSchema() {
       }
     }
 
-    console.log("[DB] Presentation schema verified & auto-migrated with demo data.");
+    // ============================================================
+    // SEED DEPARTMENTS & SOP TEMPLATES & DEMO TASKS
+    // ============================================================
+    await pool.query(`
+      INSERT INTO team_departments (id, name, code, color, description)
+      VALUES 
+        ('dept_content', 'Curriculum & Content', 'CONTENT', '#6366f1', 'Course syllabus drafting, video lecture recordings, and quizzes.'),
+        ('dept_outreach', 'College Outreach & BD', 'OUTREACH', '#06b6d4', 'College partnerships, MoUs, campus leads, and dean communications.'),
+        ('dept_tech', 'Tech & Product', 'TECH', '#10b981', 'Admin console, SEO engine, live projector features, and bug fixes.'),
+        ('dept_ops', 'Presentation & Operations', 'OPERATIONS', '#f59e0b', 'Live presentation moderation, hardware projector setup, and lead QA.')
+      ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color;
+    `);
+
+    await pool.query(`
+      INSERT INTO task_templates (id, title, department_id, description, default_checklist, guidelines_url, estimated_hours)
+      VALUES 
+        ('tmpl_presentation_prep', 'College Presentation & Roadshow Prep', 'dept_ops', 'Standard procedure before hosting a live auditorium session.', 
+         '["1. Download approved pitch deck from Canva / Drive", "2. Verify session code & test live QR projector", "3. Configure 3 interactive quiz questions in Live Projector", "4. Run audio & screen mirroring test in auditorium", "5. Assign 2 floor volunteers for student check-ins"]'::jsonb, 
+         'https://unisole.app/docs/sop/presentations', 3),
+
+        ('tmpl_module_qc', 'Course Module & Video QC', 'dept_content', 'Quality assurance checklist before publishing any learning module.',
+         '["1. Verify video audio clarity & 1080p resolution", "2. Confirm lecture notes & cheat-sheet PDF attached", "3. Add minimum 5 knowledge check questions", "4. Validate prerequisite skill tags", "5. Test playback on mobile viewport"]'::jsonb,
+         'https://unisole.app/docs/sop/content-qc', 2),
+
+        ('tmpl_college_onboard', 'College Onboarding & MoU Execution', 'dept_outreach', 'Checklist for onboarding a partner university.',
+         '["1. Obtain signed MoU document from college registrar", "2. Collect official list of branch codes & student intake", "3. Seed college record & campus admin credentials", "4. Schedule kickoff auditorium presentation date", "5. Deliver promotional banners & WhatsApp flyers"]'::jsonb,
+         'https://unisole.app/docs/sop/college-onboarding', 5),
+
+        ('tmpl_bug_fix', 'Feature Delivery & Bug Resolution', 'dept_tech', 'Engineering QA checklist prior to production deployment.',
+         '["1. Reproduce issue on local/staging environment", "2. Implement fix with typescript type compliance", "3. Verify dark/light mode and mobile responsiveness", "4. Test with edge cases and network latency", "5. Verify no regression on existing routes"]'::jsonb,
+         'https://unisole.app/docs/sop/tech-qa', 2)
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // Ensure starter demo tasks exist if table is empty
+    const tasksCountRes = await pool.query("SELECT COUNT(*) FROM tasks");
+    if (Number(tasksCountRes.rows[0].count) === 0) {
+      // Find an admin or first user
+      const userAdminRes = await pool.query("SELECT id FROM users WHERE role = 'ADMIN' OR role = 'SUPER_ADMIN' LIMIT 1");
+      const adminId = userAdminRes.rows.length > 0 ? userAdminRes.rows[0].id : null;
+
+      await pool.query(`
+        INSERT INTO tasks (id, title, description, status, priority, department_id, template_id, due_date, estimated_hours, related_entity_type, related_entity_name)
+        VALUES 
+          ('task_demo_1', 'Prepare Live Presentation Decks for IIT Delhi Session', 'Review keynote slides, configure auditorium projector polls, and test attendee QR scanner on staging.', 'IN_PROGRESS', 'URGENT', 'dept_ops', 'tmpl_presentation_prep', NOW() + INTERVAL '1 day', 3, 'COLLEGE', 'IIT Delhi'),
+          ('task_demo_2', 'Biotech Pathway Module 3 Video QC & Quiz Review', 'Review recorded video lectures for clarity and ensure 5 practice questions are attached.', 'SUBMITTED_FOR_REVIEW', 'HIGH', 'dept_content', 'tmpl_module_qc', NOW() + INTERVAL '2 days', 2, 'PATHWAY', 'Bio-Technology & Health Tech'),
+          ('task_demo_3', 'Onboard NSUT Electronics & Communication Branch', 'Upload branch student roster and configure pathway catalog for 2nd and 3rd year students.', 'TODO', 'MEDIUM', 'dept_outreach', 'tmpl_college_onboard', NOW() + INTERVAL '4 days', 5, 'COLLEGE', 'NSUT Delhi'),
+          ('task_demo_4', 'Refactor Admin Session Analytics Export & Leaderboard', 'Ensure CSV export is formatted properly and leaderboard points reflect correctly in dark mode.', 'COMPLETED', 'LOW', 'dept_tech', 'tmpl_bug_fix', NOW() - INTERVAL '1 day', 2, 'TECH', 'Session Analytics');
+      `);
+
+      await pool.query(`
+        INSERT INTO task_subtasks (task_id, title, is_completed, order_index)
+        VALUES
+          ('task_demo_1', 'Download approved pitch deck from Canva', TRUE, 1),
+          ('task_demo_1', 'Verify session code & test live QR projector', TRUE, 2),
+          ('task_demo_1', 'Configure 3 interactive quiz questions in Live Projector', FALSE, 3),
+          ('task_demo_1', 'Run audio & screen mirroring test in auditorium', FALSE, 4),
+          ('task_demo_2', 'Verify video audio clarity & 1080p resolution', TRUE, 1),
+          ('task_demo_2', 'Confirm lecture notes PDF attached', TRUE, 2),
+          ('task_demo_2', 'Add minimum 5 knowledge check questions', TRUE, 3);
+      `);
+
+      console.log("[DB] Seeded starter tasks and subtasks.");
+    }
+
+    console.log("[DB] Presentation & Team management schema verified & auto-migrated.");
   } catch (err) {
     console.error("[DB] Error ensuring schema:", err);
   }

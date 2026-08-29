@@ -17,11 +17,21 @@ import {
   presentations,
   presentationSessions,
   presentationLeads,
+  teamDepartments,
+  tasks,
+  taskSubtasks,
+  taskTemplates,
+  taskComments,
+  dailyEodLogs,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
   enrollments: many(enrollments),
   payments: many(payments),
+  assignedTasks: many(tasks, { relationName: "taskAssignee" }),
+  reportedTasks: many(tasks, { relationName: "taskReporter" }),
+  taskComments: many(taskComments),
+  dailyEodLogs: many(dailyEodLogs),
 }));
 
 export const enrollmentsRelations = relations(enrollments, ({ one, many }) => ({
@@ -167,6 +177,75 @@ export const presentationLeadsRelations = relations(presentationLeads, ({ one })
   }),
   user: one(users, {
     fields: [presentationLeads.userId],
+    references: [users.id],
+  }),
+}));
+
+export const teamDepartmentsRelations = relations(teamDepartments, ({ one, many }) => ({
+  lead: one(users, {
+    fields: [teamDepartments.leadId],
+    references: [users.id],
+  }),
+  tasks: many(tasks),
+  templates: many(taskTemplates),
+}));
+
+export const taskTemplatesRelations = relations(taskTemplates, ({ one, many }) => ({
+  department: one(teamDepartments, {
+    fields: [taskTemplates.departmentId],
+    references: [teamDepartments.id],
+  }),
+  createdBy: one(users, {
+    fields: [taskTemplates.createdById],
+    references: [users.id],
+  }),
+  tasks: many(tasks),
+}));
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  assignee: one(users, {
+    fields: [tasks.assigneeId],
+    references: [users.id],
+    relationName: "taskAssignee",
+  }),
+  reporter: one(users, {
+    fields: [tasks.reporterId],
+    references: [users.id],
+    relationName: "taskReporter",
+  }),
+  department: one(teamDepartments, {
+    fields: [tasks.departmentId],
+    references: [teamDepartments.id],
+  }),
+  template: one(taskTemplates, {
+    fields: [tasks.templateId],
+    references: [taskTemplates.id],
+  }),
+  subtasks: many(taskSubtasks),
+  comments: many(taskComments),
+}));
+
+export const taskSubtasksRelations = relations(taskSubtasks, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskSubtasks.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const taskCommentsRelations = relations(taskComments, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskComments.taskId],
+    references: [tasks.id],
+  }),
+  user: one(users, {
+    fields: [taskComments.userId],
+    references: [users.id],
+  }),
+}));
+
+export const dailyEodLogsRelations = relations(dailyEodLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [dailyEodLogs.userId],
     references: [users.id],
   }),
 }));

@@ -11,12 +11,23 @@ import { adminLessonsRouter } from "./lessons";
 import { adminEnrollmentsRouter } from "./enrollments";
 import { adminPaymentsRouter } from "./payments";
 import { adminPresentationsRouter } from "./presentations";
+import { adminTasksRouter } from "./tasks";
+import { adminTeamRouter } from "./team";
+import { adminTemplatesRouter } from "./templates";
+import { adminDailyLogsRouter } from "./daily-logs";
 
 export const adminRouter: Router = Router();
 
-// Protect all admin routes with authentication and ADMIN role check
-adminRouter.use(authMiddleware, requireRole(["ADMIN"]));
+// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER)
+adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER"]));
 
+// Team & Task Management
+adminRouter.use("/tasks", adminTasksRouter);
+adminRouter.use("/team", adminTeamRouter);
+adminRouter.use("/templates", adminTemplatesRouter);
+adminRouter.use("/daily-logs", adminDailyLogsRouter);
+
+// Platform entities & content
 adminRouter.use("/students", adminStudentsRouter);
 adminRouter.use("/colleges", adminCollegesRouter);
 adminRouter.use("/branches", adminBranchesRouter);
@@ -26,5 +37,8 @@ adminRouter.use("/courses", adminCoursesRouter);
 adminRouter.use("/modules", adminModulesRouter);
 adminRouter.use("/lessons", adminLessonsRouter);
 adminRouter.use("/enrollments", adminEnrollmentsRouter);
-adminRouter.use("/payments", adminPaymentsRouter);
 adminRouter.use("/presentations", adminPresentationsRouter);
+
+// Protected sensitive finance ledger (Super Admin only)
+adminRouter.use("/payments", requireRole(["SUPER_ADMIN", "ADMIN"]), adminPaymentsRouter);
+
