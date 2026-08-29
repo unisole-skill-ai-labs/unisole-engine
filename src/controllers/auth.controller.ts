@@ -29,6 +29,11 @@ export const authController = {
     res.json(user);
   }),
 
+  updateProfile: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const result = await authService.updateProfile(req.user!.id, req.body);
+    res.json(result);
+  }),
+
   mockDeliveryGateway: asyncHandler(async (req: CustomRequest, res: Response) => {
     const { phone, otp, channel, message } = req.body;
     console.log(`[SIMULATED EXTERNAL GATEWAY] Received OTP dispatch request:`, {

@@ -42,6 +42,8 @@ authRouter.post(
 );
 
 authRouter.get("/me", authMiddleware, authController.me);
+authRouter.put("/profile", authMiddleware, authController.updateProfile);
+authRouter.post("/update-profile", authMiddleware, authController.updateProfile);
 
 // Simulated External Delivery Gateway (Plug & Play test route)
 authRouter.post(

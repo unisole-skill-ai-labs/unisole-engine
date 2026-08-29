@@ -134,6 +134,8 @@ export const authService = {
     const resolvedBranch = (branch || "").trim() || null;
     const resolvedCollegeId = (collegeId || "").trim() || null;
 
+    const isNew = !user;
+
     if (!user) {
       // User doesn't exist -> Create new user with role 'STUDENT'
       const userName =
@@ -177,7 +179,46 @@ export const authService = {
     }
 
     const tokens = generateTokens(user!);
-    return { ...tokens, user };
+    return { ...tokens, user, isNewUser: isNew };
+  },
+
+  async updateProfile(
+    userId: string,
+    body: {
+      name?: string;
+      college?: string;
+      collegeName?: string;
+      collegeId?: string;
+      branch?: string;
+    }
+  ) {
+    const user = await usersRepository.getById(userId);
+    if (!user) throw new NotFoundError("User not found");
+
+    const updateData: Partial<User> = {};
+    if (body.name && body.name.trim()) {
+      updateData.name = toTitleCase(body.name.trim());
+    }
+
+    const resolvedCollegeName = (body.collegeName || body.college || "").trim();
+    if (resolvedCollegeName) {
+      updateData.collegeName = resolvedCollegeName;
+    }
+    if (body.collegeId !== undefined) {
+      updateData.collegeId = body.collegeId ? body.collegeId.trim() : null;
+    }
+    if (body.branch !== undefined) {
+      updateData.branch = body.branch ? body.branch.trim() : null;
+    }
+
+    let updatedUser = user;
+    if (Object.keys(updateData).length > 0) {
+      const res = await usersRepository.update(userId, updateData);
+      if (res) updatedUser = res;
+    }
+
+    const tokens = generateTokens(updatedUser);
+    return { ...tokens, user: updatedUser };
   },
 
   async refreshToken(body: { refreshToken?: string }) {
