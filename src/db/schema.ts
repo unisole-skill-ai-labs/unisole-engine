@@ -274,6 +274,7 @@ export const branches = pgTable(
       .default(sql`('brn_'::text || nextval('branches_id_seq'::regclass))`)
       .primaryKey()
       .notNull(),
+    collegeId: varchar("college_id", { length: 50 }),
     name: varchar({ length: 200 }).notNull(),
     code: varchar({ length: 100 }),
     description: text(),
@@ -286,7 +287,13 @@ export const branches = pgTable(
       .notNull(),
   },
   (table) => [
+    index("idx_branches_college").using("btree", table.collegeId.asc().nullsLast()),
     index("idx_branches_is_active").using("btree", table.isActive.asc().nullsLast()),
+    foreignKey({
+      columns: [table.collegeId],
+      foreignColumns: [colleges.id],
+      name: "fk_branches_college",
+    }).onDelete("cascade"),
   ]
 );
 

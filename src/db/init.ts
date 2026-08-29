@@ -31,6 +31,7 @@ export async function ensureDatabaseSchema() {
 
       CREATE TABLE IF NOT EXISTS branches (
         id VARCHAR(50) PRIMARY KEY DEFAULT ('brn_' || nextval('branches_id_seq'::regclass)),
+        college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE CASCADE,
         name VARCHAR(200) NOT NULL,
         code VARCHAR(100),
         description TEXT,
@@ -90,6 +91,7 @@ export async function ensureDatabaseSchema() {
 
       -- 4. INDEXES
       CREATE INDEX IF NOT EXISTS idx_colleges_is_active ON colleges(is_active);
+      CREATE INDEX IF NOT EXISTS idx_branches_college ON branches(college_id);
       CREATE INDEX IF NOT EXISTS idx_branches_is_active ON branches(is_active);
       CREATE INDEX IF NOT EXISTS idx_presentations_is_active ON presentations(is_active);
       CREATE INDEX IF NOT EXISTS idx_presentation_sessions_code ON presentation_sessions(session_code);
@@ -98,7 +100,8 @@ export async function ensureDatabaseSchema() {
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_phone ON presentation_leads(phone);
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_score ON presentation_leads(total_score DESC NULLS LAST);
 
-      -- 5. ENSURE USERS TABLE HAS COLLEGE AND BRANCH COLUMNS
+      -- 5. ENSURE REQUIRED COLUMNS & FOREIGN KEYS
+      ALTER TABLE branches ADD COLUMN IF NOT EXISTS college_id VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100);
@@ -127,23 +130,42 @@ export async function ensureDatabaseSchema() {
       console.log("[DB] Seeded initial colleges list.");
     }
 
-    // Ensure default seeded branches exist
-    const branchesCountRes = await pool.query("SELECT COUNT(*) FROM branches");
-    if (Number(branchesCountRes.rows[0].count) === 0) {
-      const defaultBranches = [
-        { name: "Computer Science & Engineering", code: "CSE" },
-        { name: "Information Technology", code: "IT" },
-        { name: "Artificial Intelligence & Machine Learning", code: "AIML" },
-        { name: "Data Science & Big Data Analytics", code: "DS" },
-        { name: "Electronics & Communication Engineering", code: "ECE" },
-        { name: "Electrical & Electronics Engineering", code: "EEE" },
-        { name: "Mechanical Engineering", code: "MECH" },
-        { name: "Civil Engineering", code: "CIVIL" },
-        { name: "Cyber Security & Digital Forensics", code: "CS" },
-        { name: "Computer Applications (BCA / MCA)", code: "BCA/MCA" },
-        { name: "Management & Business Studies (BBA / MBA)", code: "BBA/MBA" },
-        { name: "Other / Multidisciplinary", code: "OTHER" },
-      ];
+    // Ensure default seeded branches exist for colleges
+    const allCollegesRes = await pool.query("SELECT id, short_name FROM colleges WHERE is_active = TRUE");
+    const defaultBranches = [
+      { name: "Computer Science & Engineering", code: "CSE" },
+      { name: "Information Technology", code: "IT" },
+      { name: "Artificial Intelligence & Machine Learning", code: "AIML" },
+      { name: "Data Science & Big Data Analytics", code: "DS" },
+      { name: "Electronics & Communication Engineering", code: "ECE" },
+      { name: "Electrical & Electronics Engineering", code: "EEE" },
+      { name: "Mechanical Engineering", code: "MECH" },
+      { name: "Civil Engineering", code: "CIVIL" },
+      { name: "Cyber Security & Digital Forensics", code: "CS" },
+      { name: "Computer Applications (BCA / MCA)", code: "BCA/MCA" },
+      { name: "Management & Business Studies (BBA / MBA)", code: "BBA/MBA" },
+      { name: "Other / Multidisciplinary", code: "OTHER" },
+    ];
+
+    for (const clg of allCollegesRes.rows) {
+      const countRes = await pool.query(
+        "SELECT COUNT(*) FROM branches WHERE college_id = $1",
+        [clg.id]
+      );
+      if (Number(countRes.rows[0].count) === 0) {
+        for (const brn of defaultBranches) {
+          await pool.query(
+            `INSERT INTO branches (college_id, name, code, is_active)
+             VALUES ($1, $2, $3, TRUE)`,
+            [clg.id, brn.name, brn.code]
+          );
+        }
+      }
+    }
+
+    // Also ensure global fallback branches exist with college_id IS NULL
+    const globalBranchesCountRes = await pool.query("SELECT COUNT(*) FROM branches WHERE college_id IS NULL");
+    if (Number(globalBranchesCountRes.rows[0].count) === 0) {
       for (const brn of defaultBranches) {
         await pool.query(
           `INSERT INTO branches (name, code, is_active)
@@ -151,7 +173,6 @@ export async function ensureDatabaseSchema() {
           [brn.name, brn.code]
         );
       }
-      console.log("[DB] Seeded initial branches list.");
     }
 
     // Ensure default seeded presentation deck exists

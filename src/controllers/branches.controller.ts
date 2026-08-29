@@ -3,11 +3,13 @@ import { branchesService } from "../services/branches.service";
 import { asyncHandler } from "../middleware/async-handler";
 
 export const branchesController = {
-  list: asyncHandler(async (_req: Request, res: Response) => {
-    res.json(await branchesService.list());
+  list: asyncHandler(async (req: Request, res: Response) => {
+    const collegeId = req.query.collegeId as string | undefined;
+    res.json(await branchesService.list(collegeId));
   }),
-  listActive: asyncHandler(async (_req: Request, res: Response) => {
-    res.json(await branchesService.listActive());
+  listActive: asyncHandler(async (req: Request, res: Response) => {
+    const collegeId = req.query.collegeId as string | undefined;
+    res.json(await branchesService.listActive(collegeId));
   }),
   getById: asyncHandler(async (req: Request, res: Response) => {
     res.json(await branchesService.getById(req.params.id));

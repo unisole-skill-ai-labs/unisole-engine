@@ -3,12 +3,12 @@ import { Branch, NewBranch } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 
 export const branchesService = {
-  async list(): Promise<Branch[]> {
-    return branchesRepository.list();
+  async list(collegeId?: string): Promise<Branch[]> {
+    return branchesRepository.list(collegeId);
   },
 
-  async listActive(): Promise<Branch[]> {
-    return branchesRepository.listActive();
+  async listActive(collegeId?: string): Promise<Branch[]> {
+    return branchesRepository.listActive(collegeId);
   },
 
   async getById(id: string): Promise<Branch> {
@@ -18,12 +18,13 @@ export const branchesService = {
   },
 
   async create(body: Record<string, unknown>): Promise<Branch> {
-    const { name, code, description, isActive } = body as any;
+    const { name, code, description, isActive, collegeId } = body as any;
     if (!name || typeof name !== "string" || !name.trim()) {
       throw new ValidationError("Branch name is required");
     }
 
     return branchesRepository.create({
+      collegeId: collegeId ? String(collegeId).trim() : null,
       name: name.trim(),
       code: code ? String(code).trim().toUpperCase() : null,
       description: description ? String(description).trim() : null,
@@ -36,6 +37,7 @@ export const branchesService = {
     if (!existing) throw new NotFoundError("Branch not found");
 
     const data: Partial<NewBranch> = {};
+    if (body.collegeId !== undefined) data.collegeId = body.collegeId ? String(body.collegeId).trim() : null;
     if (body.name !== undefined) data.name = String(body.name).trim();
     if (body.code !== undefined) data.code = body.code ? String(body.code).trim().toUpperCase() : null;
     if (body.description !== undefined) data.description = body.description ? String(body.description).trim() : null;
