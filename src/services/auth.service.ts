@@ -119,8 +119,16 @@ export const authService = {
       throw new ValidationError("Invalid or expired verification code");
     }
 
-    // Look up user by phone number
+    // Look up user by normalized phone (+91...) or raw 10-digit phone
+    const clean10Digit = normalizedPhone.slice(-10);
     let user = await usersRepository.getByPhone(normalizedPhone);
+    if (!user) {
+      user = await usersRepository.getByPhone(clean10Digit);
+      if (user) {
+        // Upgrade user's phone in DB to normalized E.164 (+91) format
+        user = await usersRepository.update(user.id, { phone: normalizedPhone });
+      }
+    }
 
     const resolvedCollegeName = (collegeName || college || "").trim() || null;
     const resolvedBranch = (branch || "").trim() || null;

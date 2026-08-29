@@ -17,12 +17,23 @@ export async function ensureDatabaseSchema() {
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_activity_type') THEN
           CREATE TYPE "task_activity_type" AS ENUM('COMMENT', 'STATUS_CHANGE', 'SUBMITTED', 'CHANGES_REQUESTED', 'APPROVED', 'BLOCKED');
         END IF;
-
-        IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'MEMBER';
-          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'SUPER_ADMIN';
-        END IF;
       END $$;
+
+      -- Alter user_role enum if needed
+      DO $$ BEGIN
+        BEGIN
+          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'MEMBER';
+        EXCEPTION WHEN duplicate_object THEN null;
+        END;
+        BEGIN
+          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'SUPER_ADMIN';
+        EXCEPTION WHEN duplicate_object THEN null;
+        END;
+      END $$;
+
+      -- Add users table columns if missing
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(150);
 
       -- 2. SEQUENCES
       CREATE SEQUENCE IF NOT EXISTS presentations_id_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
@@ -577,21 +588,26 @@ export async function ensureDatabaseSchema() {
     // ============================================================
     // SEED TEAM MEMBERS & ROLES
     // ============================================================
+    // Ensure legacy numbers without +91 are cleaned up
+    await pool.query(`
+      DELETE FROM users WHERE phone IN ('9876543210', '9816012345', '9811122233', '9822233344', '9833344455', '9844455566', '9855566677', '9866677788', '9877788899');
+    `);
+
     const seedTeamMembers = [
       // 👑 Super Admins (Founders / Leadership)
-      { name: "Girish", phone: "9876543210", role: "SUPER_ADMIN", designation: "Co-Founder & Tech Lead", dept: "dept_tech" },
-      { name: "Ajay Mokta", phone: "9816012345", role: "SUPER_ADMIN", designation: "Co-Founder & Operations Head", dept: "dept_ops" },
+      { name: "Girish", phone: "+919876543210", role: "SUPER_ADMIN", designation: "Co-Founder & Tech Lead", dept: "dept_tech" },
+      { name: "Ajay Mokta", phone: "+919816012345", role: "SUPER_ADMIN", designation: "Co-Founder & Operations Head", dept: "dept_ops" },
 
       // 🛡️ Admins (Department Leads / Managers)
-      { name: "Priya Sharma", phone: "9811122233", role: "ADMIN", designation: "Lead Curriculum Architect", dept: "dept_content" },
-      { name: "Rahul Verma", phone: "9822233344", role: "ADMIN", designation: "Head of College Partnerships", dept: "dept_outreach" },
-      { name: "Vikram Malhotra", phone: "9833344455", role: "ADMIN", designation: "Live Events & Roadshow Director", dept: "dept_ops" },
+      { name: "Priya Sharma", phone: "+919811122233", role: "ADMIN", designation: "Lead Curriculum Architect", dept: "dept_content" },
+      { name: "Rahul Verma", phone: "+919822233344", role: "ADMIN", designation: "Head of College Partnerships", dept: "dept_outreach" },
+      { name: "Vikram Malhotra", phone: "+919833344455", role: "ADMIN", designation: "Live Events & Roadshow Director", dept: "dept_ops" },
 
       // 👥 Members (Specialists / Learners / Staff / Interns)
-      { name: "Sneha Patel", phone: "9844455566", role: "MEMBER", designation: "Video QC & Quiz Creator", dept: "dept_content" },
-      { name: "Ananya Das", phone: "9855566677", role: "MEMBER", designation: "College Onboarding Specialist", dept: "dept_outreach" },
-      { name: "Rohan Mehta", phone: "9866677788", role: "MEMBER", designation: "Auditorium Stage Coordinator", dept: "dept_ops" },
-      { name: "Kavita Joshi", phone: "9877788899", role: "MEMBER", designation: "Frontend UI Associate", dept: "dept_tech" },
+      { name: "Sneha Patel", phone: "+919844455566", role: "MEMBER", designation: "Video QC & Quiz Creator", dept: "dept_content" },
+      { name: "Ananya Das", phone: "+919855566677", role: "MEMBER", designation: "College Onboarding Specialist", dept: "dept_outreach" },
+      { name: "Rohan Mehta", phone: "+919866677788", role: "MEMBER", designation: "Auditorium Stage Coordinator", dept: "dept_ops" },
+      { name: "Kavita Joshi", phone: "+919877788899", role: "MEMBER", designation: "Frontend UI Associate", dept: "dept_tech" },
     ];
 
     const memberMap: Record<string, string> = {};
