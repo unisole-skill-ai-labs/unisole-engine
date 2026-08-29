@@ -11,6 +11,7 @@ import {
   PresentationSession,
   PresentationLead,
 } from "../db/schema";
+import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 
 function generateSessionCode(prefix = "UNI"): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -23,6 +24,10 @@ function generateSessionCode(prefix = "UNI"): string {
 
 export const presentationsService = {
   // ==================== PRESENTATION DECKS ====================
+  getTemplateSlides(): any[] {
+    return UNISOLE_AI_CAMPUS_DECK_SLIDES;
+  },
+
   async list(): Promise<Presentation[]> {
     return presentationsRepository.listPresentations();
   },
@@ -46,65 +51,10 @@ export const presentationsService = {
       throw new ValidationError("Title is required");
     }
 
-    const defaultSlides = data.slides && data.slides.length > 0
-      ? data.slides
-      : [
-          {
-            id: "slide_1",
-            type: "COVER",
-            title: data.title.trim(),
-            subtitle: "Unisole College Roadshow & Career Pitch",
-            badge: "Interactive Session",
-            theme: "dark",
-          },
-          {
-            id: "slide_2",
-            type: "CONTENT",
-            title: "Why Industry Skills Matter Today",
-            subtitle: "Bridging the gap between college & top tech careers",
-            bullets: [
-              "Over 85% of tech companies require hands-on production experience.",
-              "Traditional syllabus vs. Modern AI & Full-Stack ecosystems.",
-              "Unisole structured pathways: Mentorship, Projects & Certifications.",
-            ],
-          },
-          {
-            id: "slide_3",
-            type: "POLL",
-            title: "Live Pulse Check",
-            question: "Which tech domain are you most passionate about pursuing?",
-            options: [
-              "Full Stack & Cloud Architecture",
-              "AI, GenAI & Machine Learning",
-              "Data Science & Analytics",
-              "Cybersecurity & DevOps",
-            ],
-          },
-          {
-            id: "slide_4",
-            type: "QUIZ",
-            title: "Fast-Finger Tech Challenge",
-            question: "In Modern Web Development, what is the primary role of WebSockets?",
-            timeLimit: 20,
-            points: 1000,
-            options: [
-              { text: "Server-side rendering HTML files", isCorrect: false },
-              { text: "Two-way real-time bidirectional communication", isCorrect: true },
-              { text: "Encrypting database passwords", isCorrect: false },
-              { text: "Compressing static images for SEO", isCorrect: false },
-            ],
-          },
-          {
-            id: "slide_5",
-            type: "OFFER_CTA",
-            title: "Exclusive College Campus Grant",
-            subtitle: "Thank you for joining today's session!",
-            badge: "Special 40% Scholarship",
-            couponCode: "CAMPUS40",
-            buttonText: "Claim Your Spot on Unisole LMS",
-            targetUrl: "https://unisole.in/programs",
-          },
-        ];
+    const defaultSlides =
+      data.slides && data.slides.length > 0
+        ? data.slides
+        : UNISOLE_AI_CAMPUS_DECK_SLIDES;
 
     return presentationsRepository.createPresentation({
       title: data.title.trim(),

@@ -1,4 +1,5 @@
-import { pool } from "../db";
+import { pool } from "../db.js";
+import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 
 async function execSql(name: string, sql: string, params: any[] = []) {
   try {
@@ -412,6 +413,38 @@ export async function ensureDatabaseSchema() {
        'https://unisole.app/docs/sop/tech-qa', 2)
     ON CONFLICT (id) DO NOTHING
   `);
+
+  // Seed Flagship UNISOLE AI Campus Program Presentation Deck
+  try {
+    const presTitle = "UNISOLE AI Campus Program (Animated)";
+    const existingPres = await pool.query(
+      "SELECT id FROM presentations WHERE title = $1 LIMIT 1",
+      [presTitle]
+    );
+
+    if (!existingPres.rows || existingPres.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO presentations (id, title, description, theme, slides, is_active)
+         VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, TRUE)
+         ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title`,
+        [
+          presTitle,
+          "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
+          "dark",
+          JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
+        ]
+      );
+      console.log("[DB] Seeded flagship presentation: UNISOLE AI Campus Program (Animated)");
+    } else {
+      // Update with latest slides template
+      await pool.query(
+        `UPDATE presentations SET slides = $1 WHERE id = $2`,
+        [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), existingPres.rows[0].id]
+      );
+    }
+  } catch (err: any) {
+    console.warn("[DB] Could not seed flagship presentation deck:", err.message);
+  }
 
   console.log("[DB] Schema synchronization and migrations finished successfully.");
 }
