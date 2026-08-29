@@ -45,8 +45,60 @@ interface SessionState {
 
 const activeSessions = new Map<string, SessionState>();
 
+export async function getOrCreateSessionState(
+  sessionCode: string,
+  fallbackSessionId?: string
+): Promise<SessionState | null> {
+  const code = sessionCode.toUpperCase();
+  let sessionState = activeSessions.get(code);
+  if (!sessionState) {
+    const session = await presentationsRepository.getSessionByCode(code);
+    if (!session && !fallbackSessionId) return null;
+    const presentation = session
+      ? await presentationsRepository.getPresentationById(session.presentationId)
+      : null;
+
+    sessionState = {
+      sessionId: session?.id ?? fallbackSessionId ?? "",
+      sessionCode: code,
+      presentationId: presentation?.id ?? "",
+      slides: (presentation?.slides as any[]) ?? [],
+      currentSlideIndex: session?.currentSlideIndex ?? 0,
+      buildStep: 0,
+      attendees: new Map(),
+      socketToLead: new Map(),
+      quizState: {
+        isQuizActive: session?.isQuizActive ?? false,
+        isAnswerRevealed: session?.isAnswerRevealed ?? false,
+        isLeaderboardActive: session?.isLeaderboardActive ?? false,
+        slideId: null,
+        slideType: null,
+        question: null,
+        startedAt: null,
+        timeLimit: 30,
+        pollCounts: {},
+        quizAnswers: new Map(),
+      },
+    };
+    activeSessions.set(code, sessionState);
+  }
+  return sessionState;
+}
+
 export function setupPresentationSocket(io: SocketIOServer) {
   io.on("connection", (socket: Socket) => {
+    // Helper to purge previous session rooms on this socket to prevent cross-session event leakage
+    const sanitizeSessionRooms = (currentCode: string) => {
+      for (const roomName of Array.from(socket.rooms)) {
+        if (
+          roomName.startsWith("session:") &&
+          !roomName.startsWith(`session:${currentCode}`)
+        ) {
+          socket.leave(roomName);
+        }
+      }
+    };
+
     // ==================== ADMIN / PRESENTER JOIN ====================
     socket.on(
       "admin:join",
@@ -57,44 +109,16 @@ export function setupPresentationSocket(io: SocketIOServer) {
         sessionCode: string;
         sessionId: string;
       }) => {
+        if (!sessionCode) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
+
+        sanitizeSessionRooms(code);
         socket.join(room);
         socket.join(`${room}:admin`);
 
-        let sessionState = activeSessions.get(code);
-        if (!sessionState) {
-          const session = await presentationsRepository.getSessionByCode(code);
-          const presentation = session
-            ? await presentationsRepository.getPresentationById(
-                session.presentationId
-              )
-            : null;
-
-          sessionState = {
-            sessionId: session?.id ?? sessionId,
-            sessionCode: code,
-            presentationId: presentation?.id ?? "",
-            slides: (presentation?.slides as any[]) ?? [],
-            currentSlideIndex: session?.currentSlideIndex ?? 0,
-            buildStep: 0,
-            attendees: new Map(),
-            socketToLead: new Map(),
-            quizState: {
-              isQuizActive: session?.isQuizActive ?? false,
-              isAnswerRevealed: session?.isAnswerRevealed ?? false,
-              isLeaderboardActive: session?.isLeaderboardActive ?? false,
-              slideId: null,
-              slideType: null,
-              question: null,
-              startedAt: null,
-              timeLimit: 30,
-              pollCounts: {},
-              quizAnswers: new Map(),
-            },
-          };
-          activeSessions.set(code, sessionState);
-        }
+        const sessionState = await getOrCreateSessionState(code, sessionId);
+        if (!sessionState) return;
 
         // Send full sync state to admin
         socket.emit("sync_state", {
@@ -127,43 +151,15 @@ export function setupPresentationSocket(io: SocketIOServer) {
         studentName: string;
         phone: string;
       }) => {
+        if (!sessionCode || !leadId) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
+
+        sanitizeSessionRooms(code);
         socket.join(room);
 
-        let sessionState = activeSessions.get(code);
-        if (!sessionState) {
-          const session = await presentationsRepository.getSessionByCode(code);
-          const presentation = session
-            ? await presentationsRepository.getPresentationById(
-                session.presentationId
-              )
-            : null;
-
-          sessionState = {
-            sessionId: session?.id ?? "",
-            sessionCode: code,
-            presentationId: presentation?.id ?? "",
-            slides: (presentation?.slides as any[]) ?? [],
-            currentSlideIndex: session?.currentSlideIndex ?? 0,
-            buildStep: 0,
-            attendees: new Map(),
-            socketToLead: new Map(),
-            quizState: {
-              isQuizActive: session?.isQuizActive ?? false,
-              isAnswerRevealed: session?.isAnswerRevealed ?? false,
-              isLeaderboardActive: session?.isLeaderboardActive ?? false,
-              slideId: null,
-              slideType: null,
-              question: null,
-              startedAt: null,
-              timeLimit: 30,
-              pollCounts: {},
-              quizAnswers: new Map(),
-            },
-          };
-          activeSessions.set(code, sessionState);
-        }
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
 
         // Fetch lead details if existing
         let currentScore = 0;
@@ -233,9 +229,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
         slideIndex: number;
         buildStep?: number;
       }) => {
+        if (!sessionCode) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
-        const sessionState = activeSessions.get(code);
+        const sessionState = await getOrCreateSessionState(code);
         if (!sessionState) return;
 
         const isSlideChanged = sessionState.currentSlideIndex !== slideIndex;
@@ -288,9 +285,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
         slideType: string;
         timeLimit?: number;
       }) => {
+        if (!sessionCode) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
-        const sessionState = activeSessions.get(code);
+        const sessionState = await getOrCreateSessionState(code);
         if (!sessionState) return;
 
         const duration = timeLimit || 30;
@@ -344,9 +342,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
         optionIndex: number;
         isCorrect?: boolean;
       }) => {
+        if (!sessionCode || !leadId) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
-        const sessionState = activeSessions.get(code);
+        const sessionState = await getOrCreateSessionState(code);
         if (!sessionState || !sessionState.quizState.isQuizActive) return;
 
         // Check if user already submitted for this slide
@@ -430,9 +429,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
         sessionCode: string;
         correctOptionIndex?: number;
       }) => {
+        if (!sessionCode) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
-        const sessionState = activeSessions.get(code);
+        const sessionState = await getOrCreateSessionState(code);
         if (!sessionState) return;
 
         sessionState.quizState.isQuizActive = false;
@@ -458,9 +458,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
     socket.on(
       "admin:show_leaderboard",
       async ({ sessionCode }: { sessionCode: string }) => {
+        if (!sessionCode) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
-        const sessionState = activeSessions.get(code);
+        const sessionState = await getOrCreateSessionState(code);
         if (!sessionState) return;
 
         sessionState.quizState.isLeaderboardActive = true;
@@ -485,6 +486,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
         sessionCode: string;
         emoji: string;
       }) => {
+        if (!sessionCode) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
         io.to(room).emit("reaction_pulse", {
@@ -504,9 +506,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
         sessionCode: string;
         leadId: string;
       }) => {
+        if (!sessionCode || !leadId) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
-        const sessionState = activeSessions.get(code);
+        const sessionState = await getOrCreateSessionState(code);
         if (!sessionState) return;
 
         const target = sessionState.attendees.get(leadId);
@@ -542,14 +545,17 @@ export function setupPresentationSocket(io: SocketIOServer) {
     socket.on(
       "admin:end_session",
       async ({ sessionCode }: { sessionCode: string }) => {
+        if (!sessionCode) return;
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
-        const sessionState = activeSessions.get(code);
+        const sessionState = await getOrCreateSessionState(code);
         if (sessionState) {
           presentationsRepository.updateSession(sessionState.sessionId, {
             status: "ENDED",
             endedAt: new Date().toISOString(),
+            activeAttendeesCount: 0,
           });
+          activeSessions.delete(code);
         }
 
         io.to(room).emit("session_ended", {
@@ -566,6 +572,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
           sessionState.socketToLead.delete(socket.id);
           sessionState.attendees.delete(leadId);
 
+          presentationsRepository.updateSession(sessionState.sessionId, {
+            activeAttendeesCount: sessionState.attendees.size,
+          });
+
           const room = `session:${code}`;
           io.to(room).emit("attendee_count", {
             count: sessionState.attendees.size,
@@ -576,7 +586,6 @@ export function setupPresentationSocket(io: SocketIOServer) {
             attendees: Array.from(sessionState.attendees.values()),
             count: sessionState.attendees.size,
           });
-          break;
         }
       }
     });

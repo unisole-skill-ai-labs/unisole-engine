@@ -16,7 +16,7 @@ import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 function generateSessionCode(prefix = "UNI"): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let random = "";
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     random += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return `${prefix}${random}`;
