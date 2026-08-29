@@ -5,6 +5,7 @@ import { collegesController } from "../../controllers/colleges.controller";
 import { branchesController } from "../../controllers/branches.controller";
 import { presentationsController } from "../../controllers/presentations.controller";
 import { validateBody } from "../../middleware/validate";
+import { ensureDatabaseSchema } from "../../db/init";
 
 export const publicRouter: Router = Router();
 
@@ -25,3 +26,13 @@ publicRouter.post(
   validateBody({ required: ["name", "phone"] }),
   presentationsController.joinPublicSession
 );
+
+// Trigger manual DB schema sync if needed
+publicRouter.post("/sync-db", async (_req, res) => {
+  try {
+    await ensureDatabaseSchema();
+    res.json({ success: true, message: "Database schema synchronized successfully." });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
