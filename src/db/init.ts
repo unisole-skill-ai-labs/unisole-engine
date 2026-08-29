@@ -562,7 +562,7 @@ export async function ensureDatabaseSchema() {
     }
 
     // ============================================================
-    // SEED DEPARTMENTS & SOP TEMPLATES & DEMO TASKS
+    // SEED DEPARTMENTS
     // ============================================================
     await pool.query(`
       INSERT INTO team_departments (id, name, code, color, description)
@@ -574,6 +574,64 @@ export async function ensureDatabaseSchema() {
       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color;
     `);
 
+    // ============================================================
+    // SEED TEAM MEMBERS & ROLES
+    // ============================================================
+    const seedTeamMembers = [
+      // 👑 Super Admins (Founders / Leadership)
+      { name: "Girish", phone: "9876543210", role: "SUPER_ADMIN", designation: "Co-Founder & Tech Lead", dept: "dept_tech" },
+      { name: "Ajay Mokta", phone: "9816012345", role: "SUPER_ADMIN", designation: "Co-Founder & Operations Head", dept: "dept_ops" },
+
+      // 🛡️ Admins (Department Leads / Managers)
+      { name: "Priya Sharma", phone: "9811122233", role: "ADMIN", designation: "Lead Curriculum Architect", dept: "dept_content" },
+      { name: "Rahul Verma", phone: "9822233344", role: "ADMIN", designation: "Head of College Partnerships", dept: "dept_outreach" },
+      { name: "Vikram Malhotra", phone: "9833344455", role: "ADMIN", designation: "Live Events & Roadshow Director", dept: "dept_ops" },
+
+      // 👥 Members (Specialists / Learners / Staff / Interns)
+      { name: "Sneha Patel", phone: "9844455566", role: "MEMBER", designation: "Video QC & Quiz Creator", dept: "dept_content" },
+      { name: "Ananya Das", phone: "9855566677", role: "MEMBER", designation: "College Onboarding Specialist", dept: "dept_outreach" },
+      { name: "Rohan Mehta", phone: "9866677788", role: "MEMBER", designation: "Auditorium Stage Coordinator", dept: "dept_ops" },
+      { name: "Kavita Joshi", phone: "9877788899", role: "MEMBER", designation: "Frontend UI Associate", dept: "dept_tech" },
+    ];
+
+    const memberMap: Record<string, string> = {};
+
+    for (const m of seedTeamMembers) {
+      const uRes = await pool.query(
+        `INSERT INTO users (phone, name, role, department_id, designation, is_active)
+         VALUES ($1, $2, $3, $4, $5, TRUE)
+         ON CONFLICT (phone) DO UPDATE SET 
+           name = EXCLUDED.name, 
+           role = EXCLUDED.role, 
+           department_id = EXCLUDED.department_id, 
+           designation = EXCLUDED.designation,
+           is_active = TRUE
+         RETURNING id`,
+        [m.phone, m.name, m.role, m.dept, m.designation]
+      );
+      if (uRes.rows.length > 0) {
+        memberMap[m.name] = uRes.rows[0].id;
+      }
+    }
+    console.log("[DB] Seeded 9 team members with roles (Super Admin, Admin, Member).");
+
+    // Assign Department Leads
+    if (memberMap["Priya Sharma"]) {
+      await pool.query("UPDATE team_departments SET lead_id = $1 WHERE code = 'CONTENT'", [memberMap["Priya Sharma"]]);
+    }
+    if (memberMap["Rahul Verma"]) {
+      await pool.query("UPDATE team_departments SET lead_id = $1 WHERE code = 'OUTREACH'", [memberMap["Rahul Verma"]]);
+    }
+    if (memberMap["Girish"]) {
+      await pool.query("UPDATE team_departments SET lead_id = $1 WHERE code = 'TECH'", [memberMap["Girish"]]);
+    }
+    if (memberMap["Ajay Mokta"]) {
+      await pool.query("UPDATE team_departments SET lead_id = $1 WHERE code = 'OPERATIONS'", [memberMap["Ajay Mokta"]]);
+    }
+
+    // ============================================================
+    // SEED SOP TEMPLATES
+    // ============================================================
     await pool.query(`
       INSERT INTO task_templates (id, title, department_id, description, default_checklist, guidelines_url, estimated_hours)
       VALUES 
@@ -595,39 +653,124 @@ export async function ensureDatabaseSchema() {
       ON CONFLICT (id) DO NOTHING;
     `);
 
-    // Ensure starter demo tasks exist if table is empty
-    const tasksCountRes = await pool.query("SELECT COUNT(*) FROM tasks");
-    if (Number(tasksCountRes.rows[0].count) === 0) {
-      // Find an admin or first user
-      const userAdminRes = await pool.query("SELECT id FROM users WHERE role = 'ADMIN' OR role = 'SUPER_ADMIN' LIMIT 1");
-      const adminId = userAdminRes.rows.length > 0 ? userAdminRes.rows[0].id : null;
+    // ============================================================
+    // SEED DUMMY TASKS & SUBTASKS & COMMENTS ACROSS ALL STATUSES
+    // ============================================================
+    // Clean old demo tasks if needed to ensure fresh rich data
+    await pool.query("DELETE FROM tasks WHERE id LIKE 'task_demo_%'");
 
-      await pool.query(`
-        INSERT INTO tasks (id, title, description, status, priority, department_id, template_id, due_date, estimated_hours, related_entity_type, related_entity_name)
-        VALUES 
-          ('task_demo_1', 'Prepare Live Presentation Decks for IIT Delhi Session', 'Review keynote slides, configure auditorium projector polls, and test attendee QR scanner on staging.', 'IN_PROGRESS', 'URGENT', 'dept_ops', 'tmpl_presentation_prep', NOW() + INTERVAL '1 day', 3, 'COLLEGE', 'IIT Delhi'),
-          ('task_demo_2', 'Biotech Pathway Module 3 Video QC & Quiz Review', 'Review recorded video lectures for clarity and ensure 5 practice questions are attached.', 'SUBMITTED_FOR_REVIEW', 'HIGH', 'dept_content', 'tmpl_module_qc', NOW() + INTERVAL '2 days', 2, 'PATHWAY', 'Bio-Technology & Health Tech'),
-          ('task_demo_3', 'Onboard NSUT Electronics & Communication Branch', 'Upload branch student roster and configure pathway catalog for 2nd and 3rd year students.', 'TODO', 'MEDIUM', 'dept_outreach', 'tmpl_college_onboard', NOW() + INTERVAL '4 days', 5, 'COLLEGE', 'NSUT Delhi'),
-          ('task_demo_4', 'Refactor Admin Session Analytics Export & Leaderboard', 'Ensure CSV export is formatted properly and leaderboard points reflect correctly in dark mode.', 'COMPLETED', 'LOW', 'dept_tech', 'tmpl_bug_fix', NOW() - INTERVAL '1 day', 2, 'TECH', 'Session Analytics');
-      `);
+    const rohanId = memberMap["Rohan Mehta"] || null;
+    const snehaId = memberMap["Sneha Patel"] || null;
+    const ananyaId = memberMap["Ananya Das"] || null;
+    const kavitaId = memberMap["Kavita Joshi"] || null;
+    const rahulId = memberMap["Rahul Verma"] || null;
+    const girishId = memberMap["Girish"] || null;
+    const ajayId = memberMap["Ajay Mokta"] || null;
+    const priyaId = memberMap["Priya Sharma"] || null;
 
+    // 1. IN_PROGRESS Tasks
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, status, priority, assignee_id, reporter_id, department_id, template_id, due_date, estimated_hours, related_entity_type, related_entity_name)
+      VALUES 
+        ('task_demo_1', 'Prepare Live Keynote Slides & Projector Polls for IIT Delhi Session', 'Review keynote slides, configure auditorium projector polls, and test attendee QR scanner on staging.', 'IN_PROGRESS', 'URGENT', $1, $2, 'dept_ops', 'tmpl_presentation_prep', NOW() + INTERVAL '1 day', 3, 'COLLEGE', 'IIT Delhi'),
+        ('task_demo_2', 'Biotech Pathway Module 3 Video QC & Quiz Review', 'Review recorded video lectures for clarity and ensure 5 practice questions are attached.', 'IN_PROGRESS', 'HIGH', $3, $4, 'dept_content', 'tmpl_module_qc', NOW() + INTERVAL '2 days', 2, 'PATHWAY', 'Bio-Technology & Health Tech'),
+        ('task_demo_3', 'Setup Dark Mode Color Tokens & Mobile Responsive Shell', 'Implement CSS variables for dark/light mode and test hamburger menu on iOS & Android devices.', 'IN_PROGRESS', 'MEDIUM', $5, $6, 'dept_tech', 'tmpl_bug_fix', NOW() + INTERVAL '3 days', 4, 'TECH', 'Admin Console');
+    `, [rohanId, ajayId, snehaId, priyaId, kavitaId, girishId]);
+
+    // 2. BLOCKED Task
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, status, priority, assignee_id, reporter_id, department_id, template_id, due_date, estimated_hours, blocked_reason, related_entity_type, related_entity_name)
+      VALUES 
+        ('task_demo_4', 'Execute MoU with NSUT Delhi Registrar Office', 'Submit final memorandum of understanding document for dean and registrar signatures.', 'BLOCKED', 'HIGH', $1, $2, 'dept_outreach', 'tmpl_college_onboard', NOW() + INTERVAL '4 hours', 5, 'Waiting for legal team to approve revised MoU clause 4 regarding student data privacy.', 'COLLEGE', 'NSUT Delhi');
+    `, [ananyaId, rahulId]);
+
+    // 3. SUBMITTED_FOR_REVIEW Tasks
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, status, priority, assignee_id, reporter_id, department_id, template_id, due_date, estimated_hours, submission_proof_url, submission_notes, related_entity_type, related_entity_name)
+      VALUES 
+        ('task_demo_5', 'AI & Full Stack 2026 Curriculum Syllabus Revision', 'Refactored Python and Generative AI modules with updated industry project briefs.', 'SUBMITTED_FOR_REVIEW', 'HIGH', $1, $2, 'dept_content', 'tmpl_module_qc', NOW() + INTERVAL '1 day', 3, 'https://docs.google.com/document/d/1Unisole-AI-2026-Curriculum', 'Added 6 new hands-on mini projects and updated LangChain module.', 'PATHWAY', 'Artificial Intelligence & ML'),
+        ('task_demo_6', 'NSUT Auditorium Sound Check & Dual Projector Mirroring', 'Performed dry run in main hall with dual screen projection and attendee QR code scanner.', 'SUBMITTED_FOR_REVIEW', 'URGENT', $3, $4, 'dept_ops', 'tmpl_presentation_prep', NOW() + INTERVAL '6 hours', 2, 'https://unisole.app/staging/projector/sess_nsut_1', 'Tested live QR projector and audio feedback on staging auditorium.', 'PRESENTATION', 'Session NSUT-ROAD');
+    `, [snehaId, priyaId, rohanId, ajayId]);
+
+    // 4. CHANGES_REQUESTED Task
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, status, priority, assignee_id, reporter_id, department_id, template_id, due_date, estimated_hours, related_entity_type, related_entity_name)
+      VALUES 
+        ('task_demo_7', 'Draft 10 Placement Assessment Questions for Cloud Computing', 'Create multiple choice and scenario questions for 3rd year placement test.', 'CHANGES_REQUESTED', 'MEDIUM', $1, $2, 'dept_content', 'tmpl_module_qc', NOW() + INTERVAL '1 day', 2, 'PATHWAY', 'Cloud Architecture');
+    `, [snehaId, priyaId]);
+
+    // 5. TODO Tasks
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, status, priority, assignee_id, reporter_id, department_id, due_date, estimated_hours, related_entity_type, related_entity_name)
+      VALUES 
+        ('task_demo_8', 'Campus Outreach Campaign for DTU Tech Fest 2026', 'Distribute digital banners and WhatsApp promotional kits to student coordinators.', 'TODO', 'MEDIUM', $1, $2, 'dept_outreach', NOW() + INTERVAL '5 days', 6, 'COLLEGE', 'DTU Delhi'),
+        ('task_demo_9', 'Optimize Database Connection Pool & Real-time Sockets', 'Tune PostgreSQL connection pooling and implement heartbeat monitoring for socket cluster.', 'TODO', 'HIGH', $3, $3, 'dept_tech', NOW() + INTERVAL '7 days', 8, 'TECH', 'Unisole Engine API'),
+        ('task_demo_10', 'Audit September Roadshow Hardware Kits & Projectors', 'Inspect HDMI transmitters, backup microphones, and projector stands before tour.', 'TODO', 'LOW', $4, $4, 'dept_ops', NOW() + INTERVAL '4 days', 3, 'OPERATIONS', 'Hardware Ops');
+    `, [rahulId, ajayId, girishId, ajayId]);
+
+    // 6. COMPLETED Tasks
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, status, priority, assignee_id, reporter_id, department_id, template_id, due_date, estimated_hours, completed_at, related_entity_type, related_entity_name)
+      VALUES 
+        ('task_demo_11', 'Onboard IIT Delhi Computer Science Branch Roster', 'Uploaded 340 students and mapped branch pathways catalog.', 'COMPLETED', 'HIGH', $1, $2, 'dept_outreach', 'tmpl_college_onboard', NOW() - INTERVAL '1 day', 4, NOW() - INTERVAL '1 day', 'COLLEGE', 'IIT Delhi'),
+        ('task_demo_12', 'Deploy Presentation Polls Real-Time Socket Engine', 'Implemented server-side socket broadcast for live leaderboards.', 'COMPLETED', 'HIGH', $3, $3, 'dept_tech', 'tmpl_bug_fix', NOW() - INTERVAL '2 days', 5, NOW() - INTERVAL '2 days', 'TECH', 'Socket Server');
+    `, [ajayId, rahulId, girishId]);
+
+    // Seed Subtasks
+    await pool.query(`
+      INSERT INTO task_subtasks (task_id, title, is_completed, order_index)
+      VALUES
+        ('task_demo_1', 'Download approved pitch deck from Canva', TRUE, 1),
+        ('task_demo_1', 'Verify session code & test live QR projector', TRUE, 2),
+        ('task_demo_1', 'Configure 3 interactive quiz questions in Live Projector', FALSE, 3),
+        ('task_demo_1', 'Run audio & screen mirroring test in auditorium', FALSE, 4),
+
+        ('task_demo_2', 'Verify video audio clarity & 1080p resolution', TRUE, 1),
+        ('task_demo_2', 'Confirm lecture notes PDF attached', TRUE, 2),
+        ('task_demo_2', 'Add minimum 5 knowledge check questions', FALSE, 3),
+        ('task_demo_2', 'Validate prerequisite skill tags', FALSE, 4),
+
+        ('task_demo_4', 'Obtain signed MoU document from college registrar', FALSE, 1),
+        ('task_demo_4', 'Resolve data privacy legal clarification with dean', FALSE, 2),
+        ('task_demo_4', 'Collect official list of branch codes & student intake', FALSE, 3),
+
+        ('task_demo_5', 'Review GenAI and Prompt Engineering syllabus', TRUE, 1),
+        ('task_demo_5', 'Add 6 real-world capstone assignments', TRUE, 2),
+        ('task_demo_5', 'Verify quiz answer keys', TRUE, 3);
+    `);
+
+    // Seed Comments & Activities
+    if (rohanId && ajayId && snehaId && priyaId) {
       await pool.query(`
-        INSERT INTO task_subtasks (task_id, title, is_completed, order_index)
+        INSERT INTO task_comments (task_id, user_id, content, activity_type, created_at)
         VALUES
-          ('task_demo_1', 'Download approved pitch deck from Canva', TRUE, 1),
-          ('task_demo_1', 'Verify session code & test live QR projector', TRUE, 2),
-          ('task_demo_1', 'Configure 3 interactive quiz questions in Live Projector', FALSE, 3),
-          ('task_demo_1', 'Run audio & screen mirroring test in auditorium', FALSE, 4),
-          ('task_demo_2', 'Verify video audio clarity & 1080p resolution', TRUE, 1),
-          ('task_demo_2', 'Confirm lecture notes PDF attached', TRUE, 2),
-          ('task_demo_2', 'Add minimum 5 knowledge check questions', TRUE, 3);
-      `);
-
-      console.log("[DB] Seeded starter tasks and subtasks.");
+          ('task_demo_1', $1, 'Started configuring the 3 interactive polls on the projector stage.', 'STATUS_CHANGE', NOW() - INTERVAL '3 hours'),
+          ('task_demo_1', $2, 'Make sure question 2 has a 30-second timer set.', 'COMMENT', NOW() - INTERVAL '2 hours'),
+          ('task_demo_4', $3, '🚨 Flagged as BLOCKED: Waiting for legal team to approve revised MoU clause 4.', 'BLOCKED', NOW() - INTERVAL '4 hours'),
+          ('task_demo_5', $4, 'Submitted task for Leader Review. Output: https://docs.google.com/document/d/1Unisole-AI-2026-Curriculum', 'SUBMITTED', NOW() - INTERVAL '1 hour'),
+          ('task_demo_7', $5, '🔁 Changes Requested: Please add 3 scenario-based Kubernetes questions.', 'CHANGES_REQUESTED', NOW() - INTERVAL '5 hours');
+      `, [rohanId, ajayId, ananyaId, snehaId, priyaId]);
     }
 
-    console.log("[DB] Presentation & Team management schema verified & auto-migrated.");
+    // Seed Today's Daily Standup EOD Logs
+    const todayStr = new Date().toISOString().split("T")[0];
+    await pool.query("DELETE FROM daily_eod_logs WHERE log_date = $1", [todayStr]);
+
+    if (snehaId && rohanId && ananyaId && kavitaId) {
+      await pool.query(`
+        INSERT INTO daily_eod_logs (user_id, log_date, completed_summary, plan_tomorrow, blockers)
+        VALUES
+          ($1, $2, '• Completed AI & Full-Stack 2026 syllabus draft and submitted for review.\n• Started video QC for Biotech Module 3.', '• Finish Biotech Module 3 quiz questions.\n• Revise Cloud Computing assessment based on Priya feedback.', NULL),
+          ($3, $2, '• Conducted auditorium audio test for IIT Delhi session.\n• Submitted projector setup proof.', '• Arrive at IIT Delhi hall by 8:30 AM for live setup.\n• Coordinate with floor volunteers.', NULL),
+          ($4, $2, '• Followed up with NSUT registrar.\n• Prepared onboarding flyer graphics.', '• Meet with legal advisor at 11:00 AM to unblock MoU clause 4.\n• Upload branch codes.', 'Need legal team approval for NSUT MoU clause.'),
+          ($5, $2, '• Implemented CSS dark mode variables on Admin tasks dashboard.\n• Tested responsive drawer layout.', '• Finalize calendar deadline grid view.\n• Run cross-browser compatibility tests.', NULL);
+      `, [snehaId, todayStr, rohanId, ananyaId, kavitaId]);
+      console.log("[DB] Seeded 4 daily EOD standup logs for today.");
+    }
+
+    console.log("[DB] Presentation & Team management schema verified & auto-migrated with complete demo data.");
   } catch (err) {
     console.error("[DB] Error ensuring schema:", err);
   }
 }
+

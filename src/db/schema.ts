@@ -261,6 +261,8 @@ export const users = pgTable(
     collegeId: varchar("college_id", { length: 50 }),
     collegeName: varchar("college_name", { length: 200 }),
     branch: varchar({ length: 100 }),
+    departmentId: varchar("department_id", { length: 50 }),
+    designation: varchar({ length: 150 }),
     role: userRole().default("STUDENT").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })

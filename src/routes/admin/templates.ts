@@ -10,3 +10,14 @@ adminTemplatesRouter.post(
   requireRole(["SUPER_ADMIN", "ADMIN"]),
   teamController.createTemplate
 );
+adminTemplatesRouter.patch(
+  "/:id",
+  requireRole(["SUPER_ADMIN", "ADMIN"]),
+  teamController.updateTemplate
+);
+adminTemplatesRouter.delete(
+  "/:id",
+  requireRole(["SUPER_ADMIN"]),
+  teamController.deleteTemplate
+);
+

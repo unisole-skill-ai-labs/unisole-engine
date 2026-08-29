@@ -10,10 +10,21 @@ export const teamController = {
     res.json({ success: true, data: members });
   }),
 
+  createMember: asyncHandler(async (req: Request, res: Response) => {
+    const created = await teamService.createMember(req.body);
+    res.status(201).json({ success: true, data: created });
+  }),
+
   updateMember: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const updated = await teamService.updateMember(id, req.body);
     res.json({ success: true, data: updated });
+  }),
+
+  deleteMember: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await teamService.deleteMember(id);
+    res.json({ success: true, message: "Member deactivated successfully" });
   }),
 
   listDepartments: asyncHandler(async (_req: Request, res: Response) => {
@@ -26,6 +37,18 @@ export const teamController = {
     res.status(201).json({ success: true, data: created });
   }),
 
+  updateDepartment: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const updated = await teamService.updateDepartment(id, req.body);
+    res.json({ success: true, data: updated });
+  }),
+
+  deleteDepartment: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await teamService.deleteDepartment(id);
+    res.json({ success: true, message: "Department deleted successfully" });
+  }),
+
   listTemplates: asyncHandler(async (req: Request, res: Response) => {
     const departmentId = req.query.departmentId as string;
     const templates = await teamService.listTemplates(departmentId);
@@ -36,6 +59,18 @@ export const teamController = {
     const createdById = req.user?.id || "admin";
     const created = await teamService.createTemplate(req.body, createdById);
     res.status(201).json({ success: true, data: created });
+  }),
+
+  updateTemplate: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const updated = await teamService.updateTemplate(id, req.body);
+    res.json({ success: true, data: updated });
+  }),
+
+  deleteTemplate: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await teamService.deleteTemplate(id);
+    res.json({ success: true, message: "SOP Template deleted successfully" });
   }),
 
   submitDailyEod: asyncHandler(async (req: CustomRequest, res: Response) => {
@@ -51,3 +86,4 @@ export const teamController = {
     res.json({ success: true, data: logs });
   }),
 };
+

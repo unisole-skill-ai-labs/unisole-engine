@@ -2,6 +2,7 @@ import { db, pool } from "../db";
 import { eq, desc, asc, and, ilike } from "drizzle-orm";
 import {
   users,
+  tasks,
   teamDepartments,
   taskTemplates,
   dailyEodLogs,
@@ -49,9 +50,54 @@ export const teamService = {
     return res.rows;
   },
 
+  async createMember(data: {
+    phone: string;
+    name: string;
+    role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
+    departmentId?: string;
+    designation?: string;
+  }): Promise<any> {
+    if (!data.phone || !data.name) {
+      throw new ValidationError("Phone number and name are required");
+    }
+
+    const cleanPhone = data.phone.replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      throw new ValidationError("Please provide a valid 10-digit mobile number");
+    }
+
+    const existing = await db.select().from(users).where(eq(users.phone, cleanPhone)).limit(1);
+    if (existing.length > 0) {
+      // Update existing user to team role
+      await db
+        .update(users)
+        .set({
+          name: data.name.trim(),
+          role: (data.role as any) || "MEMBER",
+          departmentId: data.departmentId || null,
+          designation: data.designation || null,
+          isActive: true,
+        })
+        .where(eq(users.phone, cleanPhone));
+    } else {
+      await db.insert(users).values({
+        phone: cleanPhone,
+        name: data.name.trim(),
+        role: (data.role as any) || "MEMBER",
+        departmentId: data.departmentId || null,
+        designation: data.designation || null,
+        isActive: true,
+      });
+    }
+
+    const members = await this.listMembers();
+    return members.find((m) => m.phone === cleanPhone);
+  },
+
   async updateMember(
     userId: string,
     data: {
+      name?: string;
       role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
       departmentId?: string;
       designation?: string;
@@ -62,6 +108,7 @@ export const teamService = {
     if (userRes.length === 0) throw new NotFoundError("User not found");
 
     const updatePayload: any = {};
+    if (data.name !== undefined) updatePayload.name = data.name.trim();
     if (data.role !== undefined) updatePayload.role = data.role;
     if (data.departmentId !== undefined) updatePayload.departmentId = data.departmentId || null;
     if (data.designation !== undefined) updatePayload.designation = data.designation;
@@ -71,6 +118,15 @@ export const teamService = {
 
     const updated = await this.listMembers();
     return updated.find((m) => m.id === userId);
+  },
+
+  async deleteMember(userId: string): Promise<boolean> {
+    const userRes = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (userRes.length === 0) throw new NotFoundError("User not found");
+
+    // Deactivate user rather than hard-deleting foreign keys
+    await db.update(users).set({ isActive: false, role: "STUDENT" }).where(eq(users.id, userId));
+    return true;
   },
 
   // ==================== DEPARTMENTS ====================
@@ -126,6 +182,41 @@ export const teamService = {
       .returning();
 
     return created;
+  },
+
+  async updateDepartment(
+    departmentId: string,
+    data: {
+      name?: string;
+      color?: string;
+      description?: string;
+      leadId?: string;
+    }
+  ): Promise<any> {
+    const deptRes = await db.select().from(teamDepartments).where(eq(teamDepartments.id, departmentId)).limit(1);
+    if (deptRes.length === 0) throw new NotFoundError("Department not found");
+
+    const updatePayload: any = {};
+    if (data.name !== undefined) updatePayload.name = data.name.trim();
+    if (data.color !== undefined) updatePayload.color = data.color;
+    if (data.description !== undefined) updatePayload.description = data.description;
+    if (data.leadId !== undefined) updatePayload.leadId = data.leadId || null;
+
+    await db.update(teamDepartments).set(updatePayload).where(eq(teamDepartments.id, departmentId));
+
+    const depts = await this.listDepartments();
+    return depts.find((d) => d.id === departmentId);
+  },
+
+  async deleteDepartment(departmentId: string): Promise<boolean> {
+    const deptRes = await db.select().from(teamDepartments).where(eq(teamDepartments.id, departmentId)).limit(1);
+    if (deptRes.length === 0) throw new NotFoundError("Department not found");
+
+    // Unlink users and tasks before deletion
+    await db.update(users).set({ departmentId: null }).where(eq(users.departmentId, departmentId));
+    await db.update(tasks).set({ departmentId: null }).where(eq(tasks.departmentId, departmentId));
+    await db.delete(teamDepartments).where(eq(teamDepartments.id, departmentId));
+    return true;
   },
 
   // ==================== SOP TEMPLATES ====================
@@ -186,6 +277,42 @@ export const teamService = {
       .returning();
 
     return created;
+  },
+
+  async updateTemplate(
+    templateId: string,
+    data: {
+      title?: string;
+      description?: string;
+      departmentId?: string;
+      defaultChecklist?: string[];
+      guidelinesUrl?: string;
+      estimatedHours?: number;
+    }
+  ): Promise<any> {
+    const tmplRes = await db.select().from(taskTemplates).where(eq(taskTemplates.id, templateId)).limit(1);
+    if (tmplRes.length === 0) throw new NotFoundError("Template not found");
+
+    const updatePayload: any = {};
+    if (data.title !== undefined) updatePayload.title = data.title.trim();
+    if (data.description !== undefined) updatePayload.description = data.description;
+    if (data.departmentId !== undefined) updatePayload.departmentId = data.departmentId || null;
+    if (data.defaultChecklist !== undefined) updatePayload.defaultChecklist = data.defaultChecklist as any;
+    if (data.guidelinesUrl !== undefined) updatePayload.guidelinesUrl = data.guidelinesUrl;
+    if (data.estimatedHours !== undefined) updatePayload.estimatedHours = data.estimatedHours;
+
+    await db.update(taskTemplates).set(updatePayload).where(eq(taskTemplates.id, templateId));
+
+    const list = await this.listTemplates();
+    return list.find((t) => t.id === templateId);
+  },
+
+  async deleteTemplate(templateId: string): Promise<boolean> {
+    const tmplRes = await db.select().from(taskTemplates).where(eq(taskTemplates.id, templateId)).limit(1);
+    if (tmplRes.length === 0) throw new NotFoundError("Template not found");
+
+    await db.delete(taskTemplates).where(eq(taskTemplates.id, templateId));
+    return true;
   },
 
   // ==================== DAILY EOD LOGS ====================

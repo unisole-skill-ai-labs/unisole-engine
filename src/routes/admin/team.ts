@@ -4,12 +4,22 @@ import { requireRole } from "../../middleware/auth";
 
 export const adminTeamRouter: Router = Router();
 
-// Members directory
+// Members directory & management
 adminTeamRouter.get("/members", teamController.listMembers);
+adminTeamRouter.post(
+  "/members",
+  requireRole(["SUPER_ADMIN"]),
+  teamController.createMember
+);
 adminTeamRouter.patch(
   "/members/:id",
   requireRole(["SUPER_ADMIN"]),
   teamController.updateMember
+);
+adminTeamRouter.delete(
+  "/members/:id",
+  requireRole(["SUPER_ADMIN"]),
+  teamController.deleteMember
 );
 
 // Departments
@@ -19,3 +29,14 @@ adminTeamRouter.post(
   requireRole(["SUPER_ADMIN", "ADMIN"]),
   teamController.createDepartment
 );
+adminTeamRouter.patch(
+  "/departments/:id",
+  requireRole(["SUPER_ADMIN", "ADMIN"]),
+  teamController.updateDepartment
+);
+adminTeamRouter.delete(
+  "/departments/:id",
+  requireRole(["SUPER_ADMIN"]),
+  teamController.deleteDepartment
+);
+
