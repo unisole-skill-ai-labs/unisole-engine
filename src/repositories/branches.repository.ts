@@ -4,42 +4,52 @@ import { branches, Branch, NewBranch } from "../db/schema";
 
 export const branchesRepository = {
   async list(collegeId?: string): Promise<Branch[]> {
-    if (collegeId) {
-      return db
-        .select()
-        .from(branches)
-        .where(eq(branches.collegeId, collegeId))
-        .orderBy(branches.name);
+    try {
+      if (collegeId) {
+        return await db
+          .select()
+          .from(branches)
+          .where(eq(branches.collegeId, collegeId))
+          .orderBy(branches.name);
+      }
+      return await db.select().from(branches).orderBy(branches.name);
+    } catch (err: any) {
+      console.warn("[branchesRepository.list] Warning:", err.message);
+      return [];
     }
-    return db.select().from(branches).orderBy(branches.name);
   },
 
   async listActive(collegeId?: string): Promise<Branch[]> {
-    if (collegeId) {
-      // First check if this college has specific branches
-      const collegeBranches = await db
-        .select()
-        .from(branches)
-        .where(and(eq(branches.collegeId, collegeId), eq(branches.isActive, true)))
-        .orderBy(branches.name);
+    try {
+      if (collegeId) {
+        // First check if this college has specific branches
+        const collegeBranches = await db
+          .select()
+          .from(branches)
+          .where(and(eq(branches.collegeId, collegeId), eq(branches.isActive, true)))
+          .orderBy(branches.name);
 
-      if (collegeBranches.length > 0) {
-        return collegeBranches;
+        if (collegeBranches.length > 0) {
+          return collegeBranches;
+        }
+
+        // If no specific branches yet, return global template branches (collegeId is null)
+        return await db
+          .select()
+          .from(branches)
+          .where(and(isNull(branches.collegeId), eq(branches.isActive, true)))
+          .orderBy(branches.name);
       }
 
-      // If no specific branches yet, return global template branches (collegeId is null)
-      return db
+      return await db
         .select()
         .from(branches)
-        .where(and(isNull(branches.collegeId), eq(branches.isActive, true)))
+        .where(eq(branches.isActive, true))
         .orderBy(branches.name);
+    } catch (err: any) {
+      console.warn("[branchesRepository.listActive] Warning:", err.message);
+      return [];
     }
-
-    return db
-      .select()
-      .from(branches)
-      .where(eq(branches.isActive, true))
-      .orderBy(branches.name);
   },
 
   async listByCollege(collegeId: string): Promise<Branch[]> {

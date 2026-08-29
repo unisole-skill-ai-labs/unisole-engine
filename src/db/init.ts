@@ -307,6 +307,29 @@ export async function ensureDatabaseSchema() {
     ON CONFLICT (slug) DO NOTHING
   `);
 
+  await execSql("seed standard branches", `
+    INSERT INTO branches (name, code, description, is_active)
+    SELECT d.name, d.code, d.description, TRUE
+    FROM (
+      VALUES 
+        ('Computer Science & Engineering', 'CSE', 'Core computing, systems, and software engineering.'),
+        ('Information Technology', 'IT', 'Software applications, cloud computing, and networking.'),
+        ('Artificial Intelligence & Machine Learning', 'AIML', 'Deep learning, NLP, computer vision, and AI systems.'),
+        ('Data Science & Big Data Analytics', 'DS', 'Data engineering, analytics, and business intelligence.'),
+        ('Electronics & Communication Engineering', 'ECE', 'Embedded systems, IoT, and telecommunications.'),
+        ('Electrical & Electronics Engineering', 'EEE', 'Power systems, circuit design, and electronics.'),
+        ('Mechanical Engineering', 'MECH', 'Robotics, CAD/CAM, and mechanical systems.'),
+        ('Civil Engineering', 'CIVIL', 'Structural engineering and infrastructure development.'),
+        ('Cyber Security & Digital Forensics', 'CS', 'Network security, cryptography, and digital forensics.'),
+        ('Computer Applications', 'BCA / MCA', 'Application development and software systems.'),
+        ('Management & Business Studies', 'BBA / MBA', 'Business strategy, tech management, and operations.'),
+        ('Other / Multidisciplinary', 'OTHER', 'Multidisciplinary, design, sciences, or specialized engineering.')
+    ) AS d(name, code, description)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM branches WHERE branches.name = d.name AND branches.college_id IS NULL
+    )
+  `);
+
   await execSql("seed departments", `
     INSERT INTO team_departments (id, name, code, color, description)
     VALUES 
