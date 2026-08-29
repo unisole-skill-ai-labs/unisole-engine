@@ -17,6 +17,7 @@ interface SessionState {
   presentationId: string;
   slides: any[];
   currentSlideIndex: number;
+  buildStep?: number;
   attendees: Map<string, Attendee>; // leadId -> Attendee
   socketToLead: Map<string, string>; // socketId -> leadId
   quizState: {
@@ -75,6 +76,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
             presentationId: presentation?.id ?? "",
             slides: (presentation?.slides as any[]) ?? [],
             currentSlideIndex: session?.currentSlideIndex ?? 0,
+            buildStep: 0,
             attendees: new Map(),
             socketToLead: new Map(),
             quizState: {
@@ -96,6 +98,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
         // Send full sync state to admin
         socket.emit("sync_state", {
           currentSlideIndex: sessionState.currentSlideIndex,
+          buildStep: sessionState.buildStep ?? 0,
           attendeeCount: sessionState.attendees.size,
           quizState: {
             ...sessionState.quizState,
@@ -141,6 +144,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
             presentationId: presentation?.id ?? "",
             slides: (presentation?.slides as any[]) ?? [],
             currentSlideIndex: session?.currentSlideIndex ?? 0,
+            buildStep: 0,
             attendees: new Map(),
             socketToLead: new Map(),
             quizState: {
@@ -192,6 +196,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const myAnswer = sessionState.quizState.quizAnswers.get(leadId);
         socket.emit("sync_state", {
           currentSlideIndex: sessionState.currentSlideIndex,
+          buildStep: sessionState.buildStep ?? 0,
           attendeeCount: sessionState.attendees.size,
           quizState: {
             ...sessionState.quizState,
@@ -210,40 +215,48 @@ export function setupPresentationSocket(io: SocketIOServer) {
       async ({
         sessionCode,
         slideIndex,
+        buildStep,
       }: {
         sessionCode: string;
         slideIndex: number;
+        buildStep?: number;
       }) => {
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
         const sessionState = activeSessions.get(code);
         if (!sessionState) return;
 
+        const isSlideChanged = sessionState.currentSlideIndex !== slideIndex;
         sessionState.currentSlideIndex = slideIndex;
-        // Reset quiz state on slide change
-        sessionState.quizState = {
-          isQuizActive: false,
-          isAnswerRevealed: false,
-          isLeaderboardActive: false,
-          slideId: null,
-          slideType: null,
-          question: null,
-          startedAt: null,
-          timeLimit: 30,
-          pollCounts: {},
-          quizAnswers: new Map(),
-        };
+        sessionState.buildStep = typeof buildStep === "number" ? buildStep : 0;
 
-        // Persist slide change
-        presentationsRepository.updateSession(sessionState.sessionId, {
-          currentSlideIndex: slideIndex,
-          isQuizActive: false,
-          isAnswerRevealed: false,
-          isLeaderboardActive: false,
-        });
+        if (isSlideChanged) {
+          // Reset quiz state on actual slide change
+          sessionState.quizState = {
+            isQuizActive: false,
+            isAnswerRevealed: false,
+            isLeaderboardActive: false,
+            slideId: null,
+            slideType: null,
+            question: null,
+            startedAt: null,
+            timeLimit: 30,
+            pollCounts: {},
+            quizAnswers: new Map(),
+          };
+
+          // Persist slide change
+          presentationsRepository.updateSession(sessionState.sessionId, {
+            currentSlideIndex: slideIndex,
+            isQuizActive: false,
+            isAnswerRevealed: false,
+            isLeaderboardActive: false,
+          });
+        }
 
         io.to(room).emit("slide_updated", {
           slideIndex,
+          buildStep: sessionState.buildStep,
           quizState: sessionState.quizState,
         });
       }
