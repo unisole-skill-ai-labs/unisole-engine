@@ -13,7 +13,6 @@ lmsRouter.use(authMiddleware);
 
 // Profile
 lmsRouter.get("/me", authController.me);
-lmsRouter.put("/profile", authController.updateProfile);
 
 // Pathways & Content
 lmsRouter.get("/pathways", lmsController.getMyPathways);
