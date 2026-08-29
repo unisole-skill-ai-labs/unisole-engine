@@ -13,12 +13,16 @@ function generateTokens(user: {
   phone: string;
   role: string;
   name?: string | null;
+  collegeName?: string | null;
+  branch?: string | null;
 }) {
   const payload = {
     id: user.id,
     phone: user.phone,
     role: user.role,
     name: user.name,
+    collegeName: user.collegeName,
+    branch: user.branch,
   };
   const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
   const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, {
@@ -32,6 +36,35 @@ function generateTokens(user: {
 }
 
 export const authService = {
+  async checkUser(body: { phone?: string }) {
+    const { phone } = body;
+    if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
+      throw new ValidationError("Mobile number is required");
+    }
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      throw new ValidationError("Please provide a valid 10-digit mobile number");
+    }
+
+    const user = await usersRepository.getByPhone(normalizedPhone);
+    if (!user) {
+      return { exists: false };
+    }
+
+    return {
+      exists: true,
+      user: {
+        id: user.id,
+        phone: user.phone,
+        name: user.name,
+        role: user.role,
+        collegeId: user.collegeId,
+        collegeName: user.collegeName,
+        branch: user.branch,
+      },
+    };
+  },
+
   async sendOtp(body: { phone?: string; channel?: string }) {
     const { phone, channel } = body;
     if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
@@ -42,13 +75,33 @@ export const authService = {
       throw new ValidationError("Please provide a valid 10-digit mobile number");
     }
 
-    const otpChannel = channel === "WHATSAPP" ? "WHATSAPP" as const : "SMS" as const;
+    const existingUser = await usersRepository.getByPhone(normalizedPhone);
+    const otpChannel = channel === "WHATSAPP" ? ("WHATSAPP" as const) : ("SMS" as const);
     const result = await otpService.sendOtp(normalizedPhone, otpChannel);
-    return result;
+
+    return {
+      ...result,
+      exists: !!existingUser,
+      user: existingUser
+        ? {
+            name: existingUser.name,
+            phone: existingUser.phone,
+            role: existingUser.role,
+          }
+        : undefined,
+    };
   },
 
-  async verifyOtp(body: { phone?: string; otp?: string; name?: string }) {
-    const { phone, otp, name } = body;
+  async verifyOtp(body: {
+    phone?: string;
+    otp?: string;
+    name?: string;
+    college?: string;
+    collegeName?: string;
+    collegeId?: string;
+    branch?: string;
+  }) {
+    const { phone, otp, name, college, collegeName, collegeId, branch } = body;
     if (!phone) {
       throw new ValidationError("Mobile number is required");
     }
@@ -69,6 +122,10 @@ export const authService = {
     // Look up user by phone number
     let user = await usersRepository.getByPhone(normalizedPhone);
 
+    const resolvedCollegeName = (collegeName || college || "").trim() || null;
+    const resolvedBranch = (branch || "").trim() || null;
+    const resolvedCollegeId = (collegeId || "").trim() || null;
+
     if (!user) {
       // User doesn't exist -> Create new user with role 'STUDENT'
       const userName =
@@ -77,11 +134,15 @@ export const authService = {
       user = await usersRepository.create({
         phone: normalizedPhone,
         name: userName,
+        collegeId: resolvedCollegeId,
+        collegeName: resolvedCollegeName,
+        branch: resolvedBranch,
         role: "STUDENT",
         isActive: true,
       });
     } else {
-      // If existing user was provided a new name and had a generic name, update it
+      // If existing user provided updated profile fields, update them
+      const updateData: Partial<User> = {};
       if (name && name.trim()) {
         const formattedName = toTitleCase(name);
         if (
@@ -89,8 +150,21 @@ export const authService = {
           user.name.startsWith("Learner ") ||
           user.name !== formattedName
         ) {
-          user = await usersRepository.update(user.id, { name: formattedName });
+          updateData.name = formattedName;
         }
+      }
+      if (resolvedCollegeName && (!user.collegeName || user.collegeName !== resolvedCollegeName)) {
+        updateData.collegeName = resolvedCollegeName;
+      }
+      if (resolvedCollegeId && (!user.collegeId || user.collegeId !== resolvedCollegeId)) {
+        updateData.collegeId = resolvedCollegeId;
+      }
+      if (resolvedBranch && (!user.branch || user.branch !== resolvedBranch)) {
+        updateData.branch = resolvedBranch;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        user = await usersRepository.update(user.id, updateData);
       }
     }
 

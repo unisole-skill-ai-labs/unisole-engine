@@ -13,7 +13,14 @@ const authLimiter = createRateLimiter({
   message: "Too many authentication requests, please try again in 15 minutes",
 });
 
-// Mobile OTP Authentication
+// Mobile OTP Authentication & User Lookup
+authRouter.post(
+  "/check-user",
+  authLimiter,
+  validateBody({ required: ["phone"] }),
+  authController.checkUser
+);
+
 authRouter.post(
   "/send-otp",
   authLimiter,

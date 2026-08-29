@@ -175,6 +175,9 @@ export const users = pgTable(
       .notNull(),
     phone: varchar({ length: 20 }).notNull(),
     name: varchar({ length: 150 }),
+    collegeId: varchar("college_id", { length: 50 }),
+    collegeName: varchar("college_name", { length: 200 }),
+    branch: varchar({ length: 100 }),
     role: userRole().default("STUDENT").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })

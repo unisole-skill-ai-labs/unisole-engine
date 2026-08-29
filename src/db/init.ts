@@ -72,6 +72,11 @@ export async function ensureDatabaseSchema() {
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_session ON presentation_leads(session_id);
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_phone ON presentation_leads(phone);
       CREATE INDEX IF NOT EXISTS idx_presentation_leads_score ON presentation_leads(total_score DESC NULLS LAST);
+
+      -- 5. ENSURE USERS TABLE HAS COLLEGE AND BRANCH COLUMNS
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100);
     `);
 
     // Ensure default seeded presentation deck exists

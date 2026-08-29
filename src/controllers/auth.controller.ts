@@ -4,6 +4,11 @@ import { asyncHandler } from "../middleware/async-handler";
 import { CustomRequest } from "../middleware/auth";
 
 export const authController = {
+  checkUser: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const result = await authService.checkUser(req.body);
+    res.status(200).json(result);
+  }),
+
   sendOtp: asyncHandler(async (req: CustomRequest, res: Response) => {
     const result = await authService.sendOtp(req.body);
     res.status(200).json(result);
