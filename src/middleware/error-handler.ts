@@ -57,31 +57,17 @@ export function errorHandler(
   }
 
   // 500 Unhandled / Database / System Errors
-  if (allowInternalDetails) {
-    // In development or for authenticated administrators: return full error body & diagnostics
-    res.status(500).json({
-      error: message,
-      message,
-      name,
-      code: code || "INTERNAL_SERVER_ERROR",
-      ...(detail ? { detail } : {}),
-      ...(details !== undefined ? { details } : {}),
-      ...(table ? { table } : {}),
-      ...(column ? { column } : {}),
-      ...(constraint ? { constraint } : {}),
-      ...(stack ? { stack } : {}),
-      requestId,
-      path: req.originalUrl || req.url,
-      timestamp: new Date().toISOString(),
-    });
-    return;
-  }
-
-  // In production for public end-users: protect internal secrets while providing correlation requestId
   res.status(500).json({
-    error: "An unexpected error occurred. Please try again later.",
-    message: "An unexpected error occurred. Please try again later.",
-    code: "INTERNAL_SERVER_ERROR",
+    error: message || "An unexpected error occurred. Please try again later.",
+    message: message || "An unexpected error occurred. Please try again later.",
+    code: code || "INTERNAL_SERVER_ERROR",
+    ...(detail ? { detail } : {}),
+    ...(details !== undefined ? { details } : {}),
+    ...(table ? { table } : {}),
+    ...(column ? { column } : {}),
+    ...(constraint ? { constraint } : {}),
+    ...(allowInternalDetails && stack ? { stack } : {}),
     requestId,
+    timestamp: new Date().toISOString(),
   });
 }

@@ -15,9 +15,6 @@ import { ensureDatabaseSchema } from "./db/init";
 
 dotenv.config();
 
-// Ensure DB tables exist on startup
-ensureDatabaseSchema();
-
 const app = express();
 const server = http.createServer(app);
 
@@ -59,7 +56,19 @@ app.use("/api/webhooks", webhooksRouter);
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = Number(process.env.PORT ?? 3000);
-server.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+async function bootstrap() {
+  try {
+    console.log("[BOOTSTRAP] Initializing database schema and seeds...");
+    await ensureDatabaseSchema();
+    console.log("[BOOTSTRAP] Database verified successfully.");
+  } catch (err) {
+    console.error("[BOOTSTRAP] Database initialization notice:", err);
+  }
+
+  const PORT = Number(process.env.PORT ?? 3000);
+  server.listen(PORT, () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
+  });
+}
+
+bootstrap();
