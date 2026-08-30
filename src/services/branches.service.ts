@@ -5,15 +5,26 @@ import { NotFoundError, ValidationError } from "../errors";
 
 export const branchesService = {
   async list(collegeId?: string): Promise<any[]> {
-    const list = await branchesRepository.list(collegeId);
-    const allStudents = await collegesRepository.getAllStudents();
+    let resolvedCollegeId = collegeId;
+    if (collegeId) {
+      const col = (await collegesRepository.getById(collegeId)) || (await collegesRepository.getBySlug(collegeId));
+      if (col) resolvedCollegeId = col.id;
+    }
 
-    return list.map((b) => {
+    const list = await branchesRepository.list(resolvedCollegeId);
+    let allStudents: any[] = [];
+    try {
+      allStudents = await collegesRepository.getAllStudents();
+    } catch (err) {
+      console.warn("[branchesService.list] students fetch warning:", err);
+    }
+
+    return (list || []).map((b) => {
       const bNameLower = b.name.toLowerCase();
       const bCodeLower = (b.code || "").toLowerCase();
-      const count = allStudents.filter((s) => {
-        if (collegeId && s.collegeId && s.collegeId !== collegeId) return false;
-        if (!collegeId && b.collegeId && s.collegeId && s.collegeId !== b.collegeId) return false;
+      const count = (allStudents || []).filter((s) => {
+        if (resolvedCollegeId && s.collegeId && s.collegeId !== resolvedCollegeId) return false;
+        if (!resolvedCollegeId && b.collegeId && s.collegeId && s.collegeId !== b.collegeId) return false;
         const studentBranch = (s.branch || "").toLowerCase();
         if (!studentBranch) return false;
         return (
@@ -51,8 +62,14 @@ export const branchesService = {
       throw new ValidationError("College is required for branch creation");
     }
 
+    const trimmedCollegeId = String(collegeId).trim();
+    const college = (await collegesRepository.getById(trimmedCollegeId)) || (await collegesRepository.getBySlug(trimmedCollegeId));
+    if (!college) {
+      throw new NotFoundError(`College with ID "${collegeId}" does not exist. Please refresh the page or select a valid institution.`);
+    }
+
     return branchesRepository.create({
-      collegeId: String(collegeId).trim(),
+      collegeId: college.id,
       name: name.trim(),
       code: code ? String(code).trim().toUpperCase() : null,
       description: description ? String(description).trim() : null,
