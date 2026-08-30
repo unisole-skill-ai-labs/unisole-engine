@@ -6,6 +6,8 @@ interface Attendee {
   leadId: string;
   name: string;
   phone: string;
+  branch?: string;
+  yearOfStudy?: string;
   totalScore: number;
   streak: number;
   rank?: number;
@@ -19,6 +21,7 @@ interface SessionState {
   slides: any[];
   currentSlideIndex: number;
   buildStep?: number;
+  isPresentationStarted: boolean;
   attendees: Map<string, Attendee>; // leadId -> Attendee
   socketToLead: Map<string, string>; // socketId -> leadId
   quizState: {
@@ -45,6 +48,33 @@ interface SessionState {
 
 const activeSessions = new Map<string, SessionState>();
 
+export function getBranchDistribution(sessionState: SessionState) {
+  const counts: Record<string, number> = {};
+  let total = 0;
+  for (const attendee of sessionState.attendees.values()) {
+    const b =
+      attendee.branch && attendee.branch.trim()
+        ? attendee.branch.trim()
+        : "General / Other";
+    counts[b] = (counts[b] || 0) + 1;
+    total += 1;
+  }
+
+  const distribution = Object.entries(counts)
+    .map(([branch, count]) => ({
+      branch,
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    totalAttendees: total,
+    distribution,
+    counts,
+  };
+}
+
 export async function getOrCreateSessionState(
   sessionCode: string,
   fallbackSessionId?: string
@@ -58,6 +88,11 @@ export async function getOrCreateSessionState(
       ? await presentationsRepository.getPresentationById(session.presentationId)
       : null;
 
+    const isStarted =
+      (session?.currentSlideIndex && session.currentSlideIndex > 0) ||
+      Boolean(session?.isQuizActive) ||
+      false;
+
     sessionState = {
       sessionId: session?.id ?? fallbackSessionId ?? "",
       sessionCode: code,
@@ -65,6 +100,7 @@ export async function getOrCreateSessionState(
       slides: (presentation?.slides as any[]) ?? [],
       currentSlideIndex: session?.currentSlideIndex ?? 0,
       buildStep: 0,
+      isPresentationStarted: isStarted,
       attendees: new Map(),
       socketToLead: new Map(),
       quizState: {
@@ -120,12 +156,16 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const sessionState = await getOrCreateSessionState(code, sessionId);
         if (!sessionState) return;
 
+        const branchStats = getBranchDistribution(sessionState);
+
         // Send full sync state to admin
         socket.emit("sync_state", {
           currentSlideIndex: sessionState.currentSlideIndex,
           buildStep: sessionState.buildStep ?? 0,
+          isPresentationStarted: sessionState.isPresentationStarted,
           attendeeCount: sessionState.attendees.size,
           attendees: Array.from(sessionState.attendees.values()),
+          branchStats,
           quizState: {
             ...sessionState.quizState,
             quizAnswers: Object.fromEntries(
@@ -145,11 +185,15 @@ export function setupPresentationSocket(io: SocketIOServer) {
         leadId,
         studentName,
         phone,
+        branch,
+        yearOfStudy,
       }: {
         sessionCode: string;
         leadId: string;
         studentName: string;
         phone: string;
+        branch?: string;
+        yearOfStudy?: string;
       }) => {
         if (!sessionCode || !leadId) return;
         const code = sessionCode.toUpperCase();
@@ -164,10 +208,15 @@ export function setupPresentationSocket(io: SocketIOServer) {
         // Fetch lead details if existing
         let currentScore = 0;
         let currentStreak = 0;
+        let dbBranch = branch;
+        let dbYear = yearOfStudy;
+
         const dbLead = await presentationsRepository.getLeadById(leadId);
         if (dbLead) {
           currentScore = dbLead.totalScore ?? 0;
           currentStreak = dbLead.streak ?? 0;
+          if (!dbBranch && dbLead.branch) dbBranch = dbLead.branch;
+          if (!dbYear && dbLead.yearOfStudy) dbYear = dbLead.yearOfStudy;
         }
 
         const attendeeObj: Attendee = {
@@ -175,6 +224,8 @@ export function setupPresentationSocket(io: SocketIOServer) {
           leadId,
           name: studentName,
           phone,
+          branch: dbBranch || "General / Other",
+          yearOfStudy: dbYear || "",
           totalScore: currentScore,
           streak: currentStreak,
           joinedAt: new Date().toISOString(),
@@ -188,24 +239,31 @@ export function setupPresentationSocket(io: SocketIOServer) {
           activeAttendeesCount: sessionState.attendees.size,
         });
 
+        const branchStats = getBranchDistribution(sessionState);
+        const attendeesList = Array.from(sessionState.attendees.values());
+
         // Broadcast updated attendee count to everyone
         io.to(room).emit("attendee_count", {
           count: sessionState.attendees.size,
         });
 
-        // Send live joined member notification & updated full attendee list to admin
-        io.to(`${room}:admin`).emit("attendee_joined", {
+        // Broadcast live joined member notification & updated full attendee list to room
+        io.to(room).emit("attendee_joined", {
           attendee: attendeeObj,
-          attendees: Array.from(sessionState.attendees.values()),
+          attendees: attendeesList,
           count: sessionState.attendees.size,
+          branchStats,
         });
 
-        // Send current slide & quiz state to joining audience
+        // Send current slide, isPresentationStarted & branch stats to joining audience
         const myAnswer = sessionState.quizState.quizAnswers.get(leadId);
         socket.emit("sync_state", {
           currentSlideIndex: sessionState.currentSlideIndex,
           buildStep: sessionState.buildStep ?? 0,
+          isPresentationStarted: sessionState.isPresentationStarted,
           attendeeCount: sessionState.attendees.size,
+          attendees: attendeesList,
+          branchStats,
           quizState: {
             ...sessionState.quizState,
             myResponse: myAnswer ?? null,
@@ -215,6 +273,85 @@ export function setupPresentationSocket(io: SocketIOServer) {
           myRank: getStudentRank(sessionState, leadId),
           leaderboard: getLeaderboard(sessionState).slice(0, 10),
         });
+      }
+    );
+
+    // ==================== PRESENTER: START PRESENTATION (LEAVE LOBBY) ====================
+    socket.on(
+      "admin:start_presentation",
+      async ({ sessionCode }: { sessionCode: string }) => {
+        if (!sessionCode) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
+
+        sessionState.isPresentationStarted = true;
+        presentationsRepository.updateSession(sessionState.sessionId, {
+          status: "LIVE",
+          startedAt: new Date().toISOString(),
+        });
+
+        io.to(room).emit("presentation_started", {
+          isPresentationStarted: true,
+          currentSlideIndex: sessionState.currentSlideIndex,
+          buildStep: sessionState.buildStep ?? 0,
+        });
+      }
+    );
+
+    // ==================== PRESENTER: RESET TO LOBBY ====================
+    socket.on(
+      "admin:reset_to_lobby",
+      async ({ sessionCode }: { sessionCode: string }) => {
+        if (!sessionCode) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
+
+        sessionState.isPresentationStarted = false;
+        const branchStats = getBranchDistribution(sessionState);
+        const attendeesList = Array.from(sessionState.attendees.values());
+
+        io.to(room).emit("lobby_mode_entered", {
+          isPresentationStarted: false,
+          branchStats,
+          attendees: attendeesList,
+        });
+      }
+    );
+
+    // ==================== AUDIENCE: UPDATE BRANCH ====================
+    socket.on(
+      "audience:update_branch",
+      async ({
+        sessionCode,
+        leadId,
+        branch,
+      }: {
+        sessionCode: string;
+        leadId: string;
+        branch: string;
+      }) => {
+        if (!sessionCode || !leadId || !branch) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
+
+        const attendee = sessionState.attendees.get(leadId);
+        if (attendee) {
+          attendee.branch = branch.trim();
+          presentationsRepository.updateLead(leadId, { branch: branch.trim() });
+          const branchStats = getBranchDistribution(sessionState);
+          const attendeesList = Array.from(sessionState.attendees.values());
+
+          io.to(room).emit("branch_distribution_updated", {
+            branchStats,
+            attendees: attendeesList,
+          });
+        }
       }
     );
 
@@ -235,6 +372,15 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const room = `session:${code}`;
         const sessionState = await getOrCreateSessionState(code);
         if (!sessionState) return;
+
+        if (!sessionState.isPresentationStarted) {
+          sessionState.isPresentationStarted = true;
+          io.to(room).emit("presentation_started", {
+            isPresentationStarted: true,
+            currentSlideIndex: slideIndex,
+            buildStep: typeof buildStep === "number" ? buildStep : 0,
+          });
+        }
 
         const isSlideChanged = sessionState.currentSlideIndex !== slideIndex;
         sessionState.currentSlideIndex = slideIndex;
@@ -552,15 +698,19 @@ export function setupPresentationSocket(io: SocketIOServer) {
             activeAttendeesCount: sessionState.attendees.size,
           });
 
-          // Broadcast updated count to all and list to admin
+          const branchStats = getBranchDistribution(sessionState);
+          const attendeesList = Array.from(sessionState.attendees.values());
+
+          // Broadcast updated count to all and list to room
           io.to(room).emit("attendee_count", {
             count: sessionState.attendees.size,
           });
 
-          io.to(`${room}:admin`).emit("attendee_kicked", {
+          io.to(room).emit("attendee_kicked", {
             leadId,
-            attendees: Array.from(sessionState.attendees.values()),
+            attendees: attendeesList,
             count: sessionState.attendees.size,
+            branchStats,
           });
         }
       }
@@ -601,15 +751,19 @@ export function setupPresentationSocket(io: SocketIOServer) {
             activeAttendeesCount: sessionState.attendees.size,
           });
 
+          const branchStats = getBranchDistribution(sessionState);
+          const attendeesList = Array.from(sessionState.attendees.values());
+
           const room = `session:${code}`;
           io.to(room).emit("attendee_count", {
             count: sessionState.attendees.size,
           });
 
-          io.to(`${room}:admin`).emit("attendee_left", {
+          io.to(room).emit("attendee_left", {
             leadId,
-            attendees: Array.from(sessionState.attendees.values()),
+            attendees: attendeesList,
             count: sessionState.attendees.size,
+            branchStats,
           });
         }
       }
