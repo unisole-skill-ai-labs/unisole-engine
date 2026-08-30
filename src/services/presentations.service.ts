@@ -385,4 +385,226 @@ export const presentationsService = {
   async listSessionLeads(sessionId: string): Promise<PresentationLead[]> {
     return presentationsRepository.listLeadsBySession(sessionId);
   },
+
+  async getSessionAnalytics(sessionId: string): Promise<any> {
+    const session = await presentationsRepository.getSessionById(sessionId);
+    if (!session) throw new NotFoundError("Session not found");
+
+    const presentation = await presentationsRepository.getPresentationById(
+      session.presentationId
+    );
+    const leads = await presentationsRepository.listLeadsBySession(sessionId);
+
+    // 1. Calculate Timings & Duration
+    const startedAt = session.startedAt || session.createdAt;
+    const endedAt =
+      session.endedAt || (session.status === "ENDED" ? session.updatedAt : null);
+    let durationSeconds = 0;
+    if (startedAt && endedAt) {
+      durationSeconds = Math.max(
+        0,
+        Math.floor(
+          (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
+        )
+      );
+    } else if (startedAt) {
+      durationSeconds = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
+      );
+    }
+
+    // 2. Branch breakdown
+    const branchCounts: Record<string, number> = {};
+    leads.forEach((l) => {
+      const b = (l.branch || "Other").trim();
+      branchCounts[b] = (branchCounts[b] || 0) + 1;
+    });
+
+    // 3. Quiz & Survey Analysis per slide
+    const slides = (presentation?.slides as any[]) || [];
+    const questionAnalytics: any[] = [];
+    const surveyAnalytics: any[] = [];
+
+    slides.forEach((slide, idx) => {
+      const slideId = slide.id || `slide-${idx}`;
+      const slideType = (slide.type || "").toUpperCase();
+
+      // Check if Quiz slide
+      if (
+        slideType.includes("QUIZ") ||
+        slide.quizQuestion ||
+        slide.correctOptionIndex !== undefined
+      ) {
+        const options = slide.options || slide.quizOptions || [];
+        const correctIndex = slide.correctOptionIndex ?? 0;
+        const optionStats = options.map((opt: any, optIdx: number) => ({
+          index: optIdx,
+          label:
+            typeof opt === "string"
+              ? opt
+              : (opt as any)?.text || `Option ${optIdx + 1}`,
+          votes: 0,
+          percentage: 0,
+          isCorrect: optIdx === correctIndex,
+        }));
+
+        let totalAnswers = 0;
+        let correctCount = 0;
+        let totalTimeMs = 0;
+
+        leads.forEach((l) => {
+          const resp = (l.responses as any)?.[slideId];
+          if (resp && resp.optionIndex !== undefined) {
+            totalAnswers++;
+            const chosen = Number(resp.optionIndex);
+            if (optionStats[chosen]) {
+              optionStats[chosen].votes++;
+            }
+            if (chosen === correctIndex) {
+              correctCount++;
+            }
+            if (resp.timeTakenMs) {
+              totalTimeMs += Number(resp.timeTakenMs);
+            }
+          }
+        });
+
+        if (totalAnswers > 0) {
+          optionStats.forEach((o: any) => {
+            o.percentage = Math.round((o.votes / totalAnswers) * 100);
+          });
+        }
+
+        questionAnalytics.push({
+          slideIndex: idx,
+          slideId,
+          title: slide.title || `Quiz ${questionAnalytics.length + 1}`,
+          question:
+            slide.quizQuestion ||
+            slide.title ||
+            slide.subtitle ||
+            "Speed Quiz Question",
+          correctOptionIndex: correctIndex,
+          correctOptionLabel: optionStats[correctIndex]?.label || "N/A",
+          options: optionStats,
+          totalSubmissions: totalAnswers,
+          correctCount,
+          accuracyRate:
+            totalAnswers > 0 ? Math.round((correctCount / totalAnswers) * 100) : 0,
+          averageTimeMs:
+            totalAnswers > 0 ? Math.round(totalTimeMs / totalAnswers) : 0,
+        });
+      }
+
+      // Check if Poll / Survey slide
+      if (
+        slideType.includes("POLL") ||
+        slideType.includes("SURVEY") ||
+        slideType === "CAREER_SURVEY" ||
+        slide.pollOptions ||
+        (slide.options && slide.correctOptionIndex === undefined)
+      ) {
+        const options = slide.pollOptions || slide.options || [];
+        const optionStats = options.map((opt: any, optIdx: number) => ({
+          index: optIdx,
+          label:
+            typeof opt === "string"
+              ? opt
+              : opt?.text || opt?.label || `Option ${optIdx + 1}`,
+          votes: 0,
+          percentage: 0,
+          branchBreakdown: {} as Record<string, number>,
+        }));
+
+        let totalVotes = 0;
+
+        leads.forEach((l) => {
+          const resp = (l.responses as any)?.[slideId];
+          if (resp && resp.optionIndex !== undefined) {
+            totalVotes++;
+            const chosen = Number(resp.optionIndex);
+            if (optionStats[chosen]) {
+              optionStats[chosen].votes++;
+              const b = (l.branch || "Other").trim();
+              optionStats[chosen].branchBreakdown[b] =
+                (optionStats[chosen].branchBreakdown[b] || 0) + 1;
+            }
+          }
+        });
+
+        if (totalVotes > 0) {
+          optionStats.forEach((o: any) => {
+            o.percentage = Math.round((o.votes / totalVotes) * 100);
+          });
+        }
+
+        surveyAnalytics.push({
+          slideIndex: idx,
+          slideId,
+          title: slide.title || `Survey ${surveyAnalytics.length + 1}`,
+          subtitle: slide.subtitle || "",
+          options: optionStats,
+          totalVotes,
+        });
+      }
+    });
+
+    // 4. Overall Scores & Participation
+    const totalLeads = leads.length;
+    const scores = leads.map((l) => l.totalScore || 0);
+    const avgScore =
+      totalLeads > 0
+        ? Math.round(scores.reduce((a, b) => a + b, 0) / totalLeads)
+        : 0;
+    const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
+    const activeParticipants = leads.filter(
+      (l) => Object.keys((l.responses as any) || {}).length > 0
+    ).length;
+    const participationRate =
+      totalLeads > 0
+        ? Math.round((activeParticipants / totalLeads) * 100)
+        : 0;
+
+    return {
+      session: {
+        id: session.id,
+        sessionCode: session.sessionCode,
+        collegeId: session.collegeId,
+        collegeName: session.collegeName,
+        presentationId: session.presentationId,
+        presentationTitle: presentation?.title || "Presentation Deck",
+        status: session.status,
+        startedAt,
+        endedAt,
+        durationSeconds,
+        totalSlides: slides.length,
+      },
+      summary: {
+        totalAttendees: totalLeads,
+        activeParticipants,
+        participationRate,
+        averageScore: avgScore,
+        highestScore: maxScore,
+        totalQuizzes: questionAnalytics.length,
+        totalSurveys: surveyAnalytics.length,
+        branchDistribution: branchCounts,
+      },
+      questions: questionAnalytics,
+      surveys: surveyAnalytics,
+      leads: leads.map((l, index) => ({
+        id: l.id,
+        name: l.name,
+        phone: l.phone,
+        email: l.email,
+        branch: l.branch || "Not Specified",
+        yearOfStudy: l.yearOfStudy || "Not Specified",
+        totalScore: l.totalScore || 0,
+        rank: index + 1,
+        streak: l.streak || 0,
+        joinedAt: l.joinedAt,
+        responsesCount: Object.keys((l.responses as any) || {}).length,
+      })),
+    };
+  },
 };

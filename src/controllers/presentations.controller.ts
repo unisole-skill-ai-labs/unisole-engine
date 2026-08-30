@@ -113,6 +113,15 @@ export const presentationsController = {
     }
   },
 
+  async getSessionAnalytics(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await presentationsService.getSessionAnalytics(req.params.id);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // ==================== PUBLIC: AUDIENCE ====================
   async getPublicSessionByCode(req: Request, res: Response, next: NextFunction) {
     try {
