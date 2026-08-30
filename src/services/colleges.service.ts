@@ -99,9 +99,11 @@ export const collegesService = {
     if (!existing) throw new NotFoundError("College not found");
 
     const data: Partial<NewCollege> = {};
-    if (body.name !== undefined) data.name = body.name as string;
-    if (body.slug !== undefined) data.slug = body.slug as string;
-    if (body.shortName !== undefined) data.shortName = body.shortName as string;
+    if (body.name !== undefined) data.name = String(body.name).trim();
+    if (body.slug !== undefined) data.slug = String(body.slug).trim();
+    if (body.shortName !== undefined) data.shortName = body.shortName ? String(body.shortName).trim() : null;
+    if (body.description !== undefined) data.description = body.description ? String(body.description).trim() : null;
+    if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
     if (Object.keys(data).length === 0) throw new ValidationError("No valid fields provided");
 
     const updated = await collegesRepository.update(id, data);
