@@ -190,6 +190,24 @@ export async function ensureDatabaseSchema() {
     END $$;
   `);
 
+  // Ensure pathway_colleges table cascade constraint
+  await execSql("fk pathway_colleges.college_id", `
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_pathway_colleges_college'
+      ) THEN
+        ALTER TABLE pathway_colleges DROP CONSTRAINT fk_pathway_colleges_college;
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'pathway_colleges'
+      ) THEN
+        ALTER TABLE pathway_colleges 
+        ADD CONSTRAINT fk_pathway_colleges_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `);
+
   await execSql("create table presentation_sessions", `
     CREATE TABLE IF NOT EXISTS presentation_sessions (
       id VARCHAR(50) PRIMARY KEY DEFAULT ('sess_' || nextval('presentation_sessions_id_seq'::regclass)),

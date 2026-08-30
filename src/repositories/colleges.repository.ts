@@ -43,6 +43,12 @@ export const collegesRepository = {
   },
 
   async remove(id: string): Promise<College | null> {
+    // Unlink users associated with this college
+    await db
+      .update(users)
+      .set({ collegeId: null, collegeName: null })
+      .where(eq(users.collegeId, id));
+
     const rows = await db.delete(colleges).where(eq(colleges.id, id)).returning();
     return rows[0] ?? null;
   },

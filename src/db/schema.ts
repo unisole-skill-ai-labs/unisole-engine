@@ -499,7 +499,7 @@ export const pathwayColleges = pgTable(
       columns: [table.collegeId],
       foreignColumns: [colleges.id],
       name: "fk_pathway_colleges_college",
-    }).onDelete("restrict"),
+    }).onDelete("cascade"),
     primaryKey({
       columns: [table.pathwayId, table.collegeId],
       name: "pathway_colleges_pkey",
