@@ -11,7 +11,9 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx src/scripts/migrate.ts",
-    "db:seed": "tsx src/scripts/seed.ts"
+    "db:seed": "tsx src/scripts/seed.ts",
+    "db:seed:partners": "tsx src/scripts/seed-partner-colleges.ts",
+    "db:seed:demo": "tsx src/scripts/seed-demo-analytics.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

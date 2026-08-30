@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY tsconfig.json drizzle.config.ts ./
+COPY drizzle ./drizzle
 COPY src ./src
 
 RUN npm run build
@@ -20,6 +21,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/drizzle ./drizzle
 
 EXPOSE 3000
 

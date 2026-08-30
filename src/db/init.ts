@@ -1,5 +1,4 @@
 import { pool } from "../db.js";
-import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 
 async function execSql(name: string, sql: string, params: any[] = []) {
   try {
@@ -411,42 +410,10 @@ export async function ensureDatabaseSchema() {
   `);
 
   // ============================================================
-  // SEED INITIAL COLLEGES & DEPARTMENTS & TEAM MEMBERS
+  // FOUNDATIONAL SYSTEM DATA (Safe, Idempotent, Non-destructive)
   // ============================================================
-  await execSql("seed colleges", `
-    INSERT INTO colleges (name, slug, short_name, description)
-    VALUES 
-      ('Indian Institute of Technology Delhi', 'iit-delhi', 'IIT Delhi', 'Premier engineering and research institution located in New Delhi.'),
-      ('Netaji Subhas University of Technology', 'nsut-delhi', 'NSUT', 'Top state university known for computing, electronics, and technical innovation.'),
-      ('Delhi Technological University', 'dtu-delhi', 'DTU', 'Pioneering technical university with expansive engineering branches.'),
-      ('Indraprastha Institute of Information Technology Delhi', 'iiit-delhi', 'IIIT Delhi', 'Excellence in computer science, AI, and information technology.'),
-      ('Birla Institute of Technology and Science Pilani', 'bits-pilani', 'BITS Pilani', 'Nationally renowned private technical institute known for meritocracy.')
-    ON CONFLICT (slug) DO NOTHING
-  `);
 
-  await execSql("seed standard branches for colleges", `
-    INSERT INTO branches (college_id, name, code, description, is_active)
-    SELECT c.id, d.name, d.code, d.description, TRUE
-    FROM colleges c
-    CROSS JOIN (
-      VALUES 
-        ('Computer Science & Engineering', 'CSE', 'Core computing, systems, and software engineering.'),
-        ('Information Technology', 'IT', 'Software applications, cloud computing, and networking.'),
-        ('Artificial Intelligence & Machine Learning', 'AIML', 'Deep learning, NLP, computer vision, and AI systems.'),
-        ('Data Science & Big Data Analytics', 'DS', 'Data engineering, analytics, and business intelligence.'),
-        ('Electronics & Communication Engineering', 'ECE', 'Embedded systems, IoT, and telecommunications.'),
-        ('Electrical & Electronics Engineering', 'EEE', 'Power systems, circuit design, and electronics.'),
-        ('Mechanical Engineering', 'MECH', 'Robotics, CAD/CAM, and mechanical systems.'),
-        ('Civil Engineering', 'CIVIL', 'Structural engineering and infrastructure development.'),
-        ('Computer Applications', 'BCA / MCA', 'Application development and software systems.'),
-        ('Management & Business Studies', 'BBA / MBA', 'Business strategy, tech management, and operations.'),
-        ('Other / Multidisciplinary', 'OTHER', 'Multidisciplinary, design, sciences, or specialized engineering.')
-    ) AS d(name, code, description)
-    WHERE NOT EXISTS (
-      SELECT 1 FROM branches b WHERE b.college_id = c.id AND b.name = d.name
-    )
-  `);
-
+  // Ensure default system departments exist without overriding custom changes
   await execSql("seed departments", `
     INSERT INTO team_departments (id, name, code, color, description)
     VALUES 
@@ -454,61 +421,17 @@ export async function ensureDatabaseSchema() {
       ('dept_outreach', 'College Outreach & BD', 'OUTREACH', '#06b6d4', 'College partnerships, MoUs, campus leads, and dean communications.'),
       ('dept_tech', 'Tech & Product', 'TECH', '#10b981', 'Admin console, SEO engine, live projector features, and bug fixes.'),
       ('dept_ops', 'Presentation & Operations', 'OPERATIONS', '#f59e0b', 'Live presentation moderation, hardware projector setup, and lead QA.')
-    ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color
+    ON CONFLICT (code) DO NOTHING
   `);
 
-  // Seed Team Members & Roles
-  await execSql("clean legacy users", `
-    DELETE FROM users WHERE phone IN ('9876543210', '9816012345', '9811122233', '9822233344', '9833344455', '9844455566', '9855566677', '9866677788', '9877788899')
+  // Ensure an initial Super Admin exists only if no admin accounts exist
+  await execSql("ensure initial super admin", `
+    INSERT INTO users (phone, name, role, designation, is_active)
+    SELECT '+919876543210', 'Admin', 'SUPER_ADMIN', 'Platform Administrator', TRUE
+    WHERE NOT EXISTS (SELECT 1 FROM users WHERE role IN ('SUPER_ADMIN', 'ADMIN') LIMIT 1)
   `);
 
-  const seedTeamMembers = [
-    { name: "Girish", phone: "+919876543210", role: "SUPER_ADMIN", designation: "Co-Founder & Tech Lead", dept: "dept_tech" },
-    { name: "Ajay Mokta", phone: "+919816012345", role: "SUPER_ADMIN", designation: "Co-Founder & Operations Head", dept: "dept_ops" },
-    { name: "Priya Sharma", phone: "+919811122233", role: "ADMIN", designation: "Lead Curriculum Architect", dept: "dept_content" },
-    { name: "Rahul Verma", phone: "+919822233344", role: "ADMIN", designation: "Head of College Partnerships", dept: "dept_outreach" },
-    { name: "Vikram Malhotra", phone: "+919833344455", role: "ADMIN", designation: "Live Events & Roadshow Director", dept: "dept_ops" },
-    { name: "Sneha Patel", phone: "+919844455566", role: "MEMBER", designation: "Video QC & Quiz Creator", dept: "dept_content" },
-    { name: "Ananya Das", phone: "+919855566677", role: "MEMBER", designation: "College Onboarding Specialist", dept: "dept_outreach" },
-    { name: "Rohan Mehta", phone: "+919866677788", role: "MEMBER", designation: "Auditorium Stage Coordinator", dept: "dept_ops" },
-    { name: "Kavita Joshi", phone: "+919877788899", role: "MEMBER", designation: "Frontend UI Associate", dept: "dept_tech" },
-  ];
-
-  const memberMap: Record<string, string> = {};
-
-  for (const m of seedTeamMembers) {
-    const uRes = await execSql("seed member " + m.name, `
-      INSERT INTO users (phone, name, role, department_id, designation, is_active)
-      VALUES ($1, $2, $3, $4, $5, TRUE)
-      ON CONFLICT (phone) DO UPDATE SET 
-        name = EXCLUDED.name, 
-        role = EXCLUDED.role, 
-        department_id = EXCLUDED.department_id, 
-        designation = EXCLUDED.designation,
-        is_active = TRUE
-      RETURNING id
-    `, [m.phone, m.name, m.role, m.dept, m.designation]);
-
-    if (uRes && uRes.rows && uRes.rows.length > 0) {
-      memberMap[m.name] = uRes.rows[0].id;
-    }
-  }
-
-  // Assign Dept Leads
-  if (memberMap["Priya Sharma"]) {
-    await execSql("lead content", "UPDATE team_departments SET lead_id = $1 WHERE code = 'CONTENT'", [memberMap["Priya Sharma"]]);
-  }
-  if (memberMap["Rahul Verma"]) {
-    await execSql("lead outreach", "UPDATE team_departments SET lead_id = $1 WHERE code = 'OUTREACH'", [memberMap["Rahul Verma"]]);
-  }
-  if (memberMap["Girish"]) {
-    await execSql("lead tech", "UPDATE team_departments SET lead_id = $1 WHERE code = 'TECH'", [memberMap["Girish"]]);
-  }
-  if (memberMap["Ajay Mokta"]) {
-    await execSql("lead ops", "UPDATE team_departments SET lead_id = $1 WHERE code = 'OPERATIONS'", [memberMap["Ajay Mokta"]]);
-  }
-
-  // Seed SOP templates
+  // Seed standard SOP task templates if not already present
   await execSql("seed sop templates", `
     INSERT INTO task_templates (id, title, department_id, description, default_checklist, guidelines_url, estimated_hours)
     VALUES 
@@ -529,56 +452,6 @@ export async function ensureDatabaseSchema() {
        'https://unisole.app/docs/sop/tech-qa', 2)
     ON CONFLICT (id) DO NOTHING
   `);
-
-  // Backfill any existing presentations without college_id
-  await execSql("backfill presentations college", `
-    UPDATE presentations
-    SET 
-      college_id = (SELECT id FROM colleges ORDER BY id ASC LIMIT 1),
-      college_name = (SELECT name FROM colleges ORDER BY id ASC LIMIT 1)
-    WHERE college_id IS NULL
-  `);
-
-  // Seed Flagship UNISOLE AI Campus Program Presentation Deck for Default College
-  try {
-    const firstCollegeRes = await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1");
-    const defaultCollege = firstCollegeRes.rows[0];
-
-    const presTitle = "UNISOLE AI Campus Program (Animated)";
-    const existingPres = await pool.query(
-      "SELECT id FROM presentations WHERE title = $1 LIMIT 1",
-      [presTitle]
-    );
-
-    if (!existingPres.rows || existingPres.rows.length === 0) {
-      if (defaultCollege) {
-        await pool.query(
-          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
-           VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, $5, $6, TRUE)
-           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
-          [
-            defaultCollege.id,
-            defaultCollege.name,
-            presTitle,
-            "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
-            "dark",
-            JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
-          ]
-        );
-        console.log(`[DB] Seeded flagship presentation: UNISOLE AI Campus Program for ${defaultCollege.name}`);
-      }
-    } else {
-      // Update with latest slides template and college
-      if (defaultCollege) {
-        await pool.query(
-          `UPDATE presentations SET slides = $1, college_id = COALESCE(college_id, $2), college_name = COALESCE(college_name, $3) WHERE id = $4`,
-          [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), defaultCollege.id, defaultCollege.name, existingPres.rows[0].id]
-        );
-      }
-    }
-  } catch (err: any) {
-    console.warn("[DB] Could not seed flagship presentation deck:", err.message);
-  }
 
   console.log("[DB] Schema synchronization and migrations finished successfully.");
 }

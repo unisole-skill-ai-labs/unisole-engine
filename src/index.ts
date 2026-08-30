@@ -58,7 +58,7 @@ app.use(errorHandler);
 
 async function bootstrap() {
   try {
-    console.log("[BOOTSTRAP] Initializing database schema and seeds...");
+    console.log("[BOOTSTRAP] Verifying database connectivity and schema migrations...");
     await ensureDatabaseSchema();
     console.log("[BOOTSTRAP] Database verified successfully.");
   } catch (err) {

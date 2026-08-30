@@ -30,42 +30,8 @@ export const collegesRepository = {
 
   async create(data: NewCollege): Promise<College> {
     const id = data.id || `clg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    try {
-      const rows = await db.insert(colleges).values({ ...data, id }).returning();
-      return rows[0];
-    } catch (err: any) {
-      console.warn("[collegesRepository.create] Primary insert attempt failed, triggering self-healing migration:", err?.message || err);
-
-      try {
-        await pool.query("ALTER TABLE colleges ADD COLUMN IF NOT EXISTS short_name VARCHAR(100)");
-        await pool.query("ALTER TABLE colleges ADD COLUMN IF NOT EXISTS description TEXT");
-        await pool.query("ALTER TABLE colleges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
-      } catch (migErr) {
-        console.warn("[collegesRepository.create] Auto-migration notice:", migErr);
-      }
-
-      try {
-        const res = await pool.query(
-          `INSERT INTO colleges (id, name, slug, short_name, description, is_active, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-           RETURNING *`,
-          [id, data.name, data.slug, data.shortName ?? null, data.description ?? null, data.isActive ?? true]
-        );
-        return res.rows[0];
-      } catch (rawErr: any) {
-        try {
-          const res2 = await pool.query(
-            `INSERT INTO colleges (id, name, slug, is_active, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, NOW(), NOW())
-             RETURNING *`,
-            [id, data.name, data.slug, data.isActive ?? true]
-          );
-          return res2.rows[0];
-        } catch (innerErr) {
-          throw rawErr || innerErr;
-        }
-      }
-    }
+    const rows = await db.insert(colleges).values({ ...data, id }).returning();
+    return rows[0];
   },
 
   async update(id: string, data: Partial<Omit<NewCollege, "id">>): Promise<College | null> {
