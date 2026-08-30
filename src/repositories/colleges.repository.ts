@@ -47,7 +47,15 @@ export const collegesRepository = {
     return rows[0] ?? null;
   },
 
-  // Analytics Helpers
+  // Analytics & Hierarchy Helpers
+  async getCollegePresentations(collegeId: string) {
+    return db
+      .select()
+      .from(presentations)
+      .where(eq(presentations.collegeId, collegeId))
+      .orderBy(desc(presentations.createdAt));
+  },
+
   async getCollegeBranches(collegeId: string) {
     return db
       .select()

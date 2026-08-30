@@ -5,7 +5,8 @@ export const presentationsController = {
   // ==================== ADMIN: PRESENTATION DECKS ====================
   async list(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await presentationsService.list();
+      const collegeId = req.query.collegeId as string | undefined;
+      const data = await presentationsService.list(collegeId);
       res.json({ success: true, data });
     } catch (err) {
       next(err);

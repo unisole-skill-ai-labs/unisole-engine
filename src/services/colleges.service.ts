@@ -47,14 +47,20 @@ export const collegesService = {
     if (body.name !== undefined) data.name = body.name as string;
     if (body.slug !== undefined) data.slug = body.slug as string;
     if (body.shortName !== undefined) data.shortName = body.shortName as string;
-    if (body.description !== undefined) data.description = body.description as string;
-    if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
-
     if (Object.keys(data).length === 0) throw new ValidationError("No valid fields provided");
 
     const updated = await collegesRepository.update(id, data);
     if (!updated) throw new NotFoundError("College not found");
     return updated;
+  },
+
+  async remove(id: string): Promise<College> {
+    const existing = await collegesRepository.getById(id);
+    if (!existing) throw new NotFoundError("College not found");
+
+    const deleted = await collegesRepository.remove(id);
+    if (!deleted) throw new NotFoundError("College not found");
+    return deleted;
   },
 
   async getCollegeAnalytics(id: string) {
@@ -67,6 +73,7 @@ export const collegesService = {
 
     // 1. Fetch related data
     const collegeBranches = await collegesRepository.getCollegeBranches(college.id);
+    const collegePresentations = await collegesRepository.getCollegePresentations(college.id);
     const sessions = await collegesRepository.getCollegeSessions(college.id, college.name);
     const sessionIds = sessions.map((s) => s.id);
     const leads = await collegesRepository.getCollegeLeads(college.id, sessionIds);
@@ -75,6 +82,7 @@ export const collegesService = {
     const enrollments = await collegesRepository.getStudentsEnrollments(studentIds);
 
     // 2. Aggregate Overview KPIs
+    const totalDecksCount = collegePresentations.length;
     const totalDecksGiven = sessions.length;
     const totalLeadsCaptured = leads.length;
     const enrolledUserIds = new Set(enrollments.map((e) => e.userId));
@@ -170,6 +178,7 @@ export const collegesService = {
     return {
       college,
       stats: {
+        totalDecksCount,
         totalDecksGiven,
         totalLeadsCaptured,
         totalLearnersEnrolled,
@@ -179,6 +188,7 @@ export const collegesService = {
         topScorer,
       },
       branchBreakdown,
+      presentations: collegePresentations,
       sessions,
       recentLeads: leads.slice(0, 100),
       enrolledStudents: Array.from(enrolledStudentsMap.values()),

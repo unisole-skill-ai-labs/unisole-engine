@@ -22,6 +22,9 @@ export const collegesController = {
   update: asyncHandler(async (req: Request, res: Response) => {
     res.json(await collegesService.update(req.params.id, req.body));
   }),
+  delete: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await collegesService.remove(req.params.id));
+  }),
   getAnalytics: asyncHandler(async (req: Request, res: Response) => {
     res.json(await collegesService.getCollegeAnalytics(req.params.id));
   }),

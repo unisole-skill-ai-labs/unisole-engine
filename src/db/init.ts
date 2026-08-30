@@ -150,6 +150,8 @@ export async function ensureDatabaseSchema() {
   await execSql("create table presentations", `
     CREATE TABLE IF NOT EXISTS presentations (
       id VARCHAR(50) PRIMARY KEY DEFAULT ('pres_' || nextval('presentations_id_seq'::regclass)),
+      college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE CASCADE,
+      college_name VARCHAR(200),
       title VARCHAR(255) NOT NULL,
       description TEXT,
       theme VARCHAR(50) DEFAULT 'dark' NOT NULL,
@@ -159,6 +161,33 @@ export async function ensureDatabaseSchema() {
       created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
       updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     )
+  `);
+
+  await execSql("add presentations.college_id", "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
+  await execSql("add presentations.college_name", "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS college_name VARCHAR(200)");
+  await execSql("fk presentations.college_id", `
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_presentations_college'
+      ) THEN
+        ALTER TABLE presentations 
+        ADD CONSTRAINT fk_presentations_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `);
+
+  // Ensure branches table cascade constraint
+  await execSql("fk branches.college_id", `
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_branches_college'
+      ) THEN
+        ALTER TABLE branches 
+        ADD CONSTRAINT fk_branches_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
   `);
 
   await execSql("create table presentation_sessions", `
@@ -308,10 +337,11 @@ export async function ensureDatabaseSchema() {
     ON CONFLICT (slug) DO NOTHING
   `);
 
-  await execSql("seed standard branches", `
-    INSERT INTO branches (name, code, description, is_active)
-    SELECT d.name, d.code, d.description, TRUE
-    FROM (
+  await execSql("seed standard branches for colleges", `
+    INSERT INTO branches (college_id, name, code, description, is_active)
+    SELECT c.id, d.name, d.code, d.description, TRUE
+    FROM colleges c
+    CROSS JOIN (
       VALUES 
         ('Computer Science & Engineering', 'CSE', 'Core computing, systems, and software engineering.'),
         ('Information Technology', 'IT', 'Software applications, cloud computing, and networking.'),
@@ -321,13 +351,12 @@ export async function ensureDatabaseSchema() {
         ('Electrical & Electronics Engineering', 'EEE', 'Power systems, circuit design, and electronics.'),
         ('Mechanical Engineering', 'MECH', 'Robotics, CAD/CAM, and mechanical systems.'),
         ('Civil Engineering', 'CIVIL', 'Structural engineering and infrastructure development.'),
-        ('Cyber Security & Digital Forensics', 'CS', 'Network security, cryptography, and digital forensics.'),
         ('Computer Applications', 'BCA / MCA', 'Application development and software systems.'),
         ('Management & Business Studies', 'BBA / MBA', 'Business strategy, tech management, and operations.'),
         ('Other / Multidisciplinary', 'OTHER', 'Multidisciplinary, design, sciences, or specialized engineering.')
     ) AS d(name, code, description)
     WHERE NOT EXISTS (
-      SELECT 1 FROM branches WHERE branches.name = d.name AND branches.college_id IS NULL
+      SELECT 1 FROM branches b WHERE b.college_id = c.id AND b.name = d.name
     )
   `);
 
@@ -414,8 +443,20 @@ export async function ensureDatabaseSchema() {
     ON CONFLICT (id) DO NOTHING
   `);
 
-  // Seed Flagship UNISOLE AI Campus Program Presentation Deck
+  // Backfill any existing presentations without college_id
+  await execSql("backfill presentations college", `
+    UPDATE presentations
+    SET 
+      college_id = (SELECT id FROM colleges ORDER BY id ASC LIMIT 1),
+      college_name = (SELECT name FROM colleges ORDER BY id ASC LIMIT 1)
+    WHERE college_id IS NULL
+  `);
+
+  // Seed Flagship UNISOLE AI Campus Program Presentation Deck for Default College
   try {
+    const firstCollegeRes = await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1");
+    const defaultCollege = firstCollegeRes.rows[0];
+
     const presTitle = "UNISOLE AI Campus Program (Animated)";
     const existingPres = await pool.query(
       "SELECT id FROM presentations WHERE title = $1 LIMIT 1",
@@ -423,24 +464,30 @@ export async function ensureDatabaseSchema() {
     );
 
     if (!existingPres.rows || existingPres.rows.length === 0) {
-      await pool.query(
-        `INSERT INTO presentations (id, title, description, theme, slides, is_active)
-         VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, TRUE)
-         ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title`,
-        [
-          presTitle,
-          "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
-          "dark",
-          JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
-        ]
-      );
-      console.log("[DB] Seeded flagship presentation: UNISOLE AI Campus Program (Animated)");
+      if (defaultCollege) {
+        await pool.query(
+          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+           VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, $5, $6, TRUE)
+           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
+          [
+            defaultCollege.id,
+            defaultCollege.name,
+            presTitle,
+            "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
+            "dark",
+            JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
+          ]
+        );
+        console.log(`[DB] Seeded flagship presentation: UNISOLE AI Campus Program for ${defaultCollege.name}`);
+      }
     } else {
-      // Update with latest slides template
-      await pool.query(
-        `UPDATE presentations SET slides = $1 WHERE id = $2`,
-        [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), existingPres.rows[0].id]
-      );
+      // Update with latest slides template and college
+      if (defaultCollege) {
+        await pool.query(
+          `UPDATE presentations SET slides = $1, college_id = COALESCE(college_id, $2), college_name = COALESCE(college_name, $3) WHERE id = $4`,
+          [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), defaultCollege.id, defaultCollege.name, existingPres.rows[0].id]
+        );
+      }
     }
   } catch (err: any) {
     console.warn("[DB] Could not seed flagship presentation deck:", err.message);

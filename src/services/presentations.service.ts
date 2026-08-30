@@ -28,8 +28,8 @@ export const presentationsService = {
     return UNISOLE_AI_CAMPUS_DECK_SLIDES;
   },
 
-  async list(): Promise<Presentation[]> {
-    return presentationsRepository.listPresentations();
+  async list(collegeId?: string): Promise<Presentation[]> {
+    return presentationsRepository.listPresentations(collegeId);
   },
 
   async getById(id: string): Promise<Presentation> {
@@ -42,6 +42,7 @@ export const presentationsService = {
 
   async create(data: {
     title: string;
+    collegeId: string;
     description?: string;
     theme?: string;
     slides?: any[];
@@ -49,6 +50,14 @@ export const presentationsService = {
   }): Promise<Presentation> {
     if (!data.title || !data.title.trim()) {
       throw new ValidationError("Title is required");
+    }
+    if (!data.collegeId || !data.collegeId.trim()) {
+      throw new ValidationError("College is required. Presentations must belong to a college.");
+    }
+
+    const college = await collegesRepository.getById(data.collegeId.trim());
+    if (!college) {
+      throw new NotFoundError("Selected university/college not found");
     }
 
     const defaultSlides =
@@ -58,6 +67,8 @@ export const presentationsService = {
 
     return presentationsRepository.createPresentation({
       title: data.title.trim(),
+      collegeId: college.id,
+      collegeName: college.name,
       description: data.description ?? "",
       theme: data.theme ?? "dark",
       slides: defaultSlides,
@@ -70,6 +81,7 @@ export const presentationsService = {
     id: string,
     data: {
       title?: string;
+      collegeId?: string;
       description?: string;
       theme?: string;
       slides?: any[];
@@ -81,9 +93,19 @@ export const presentationsService = {
       throw new NotFoundError("Presentation not found");
     }
 
+    let collegeName = undefined;
+    if (data.collegeId) {
+      const college = await collegesRepository.getById(data.collegeId.trim());
+      if (college) {
+        collegeName = college.name;
+      }
+    }
+
     const updated = await presentationsRepository.updatePresentation(id, {
       ...data,
       title: data.title !== undefined ? data.title.trim() : undefined,
+      collegeId: data.collegeId ? data.collegeId.trim() : undefined,
+      collegeName,
     });
 
     if (!updated) throw new NotFoundError("Failed to update presentation");
@@ -129,9 +151,10 @@ export const presentationsService = {
     }
 
     let collegeBranches: any[] = [];
-    if (session.collegeId) {
+    const targetCollegeId = session.collegeId || presentation.collegeId;
+    if (targetCollegeId) {
       collegeBranches = await collegesRepository.getCollegeBranches(
-        session.collegeId
+        targetCollegeId
       );
     }
 
@@ -155,9 +178,10 @@ export const presentationsService = {
     );
     if (!presentation) throw new NotFoundError("Presentation not found");
 
-    let collegeName = "Open Roadshow Session";
-    if (data.collegeId) {
-      const college = await collegesRepository.getById(data.collegeId);
+    const resolvedCollegeId = presentation.collegeId || data.collegeId || null;
+    let collegeName = presentation.collegeName || "Open Roadshow Session";
+    if (resolvedCollegeId && !presentation.collegeName) {
+      const college = await collegesRepository.getById(resolvedCollegeId);
       if (college) {
         collegeName = college.name;
       }
@@ -177,7 +201,7 @@ export const presentationsService = {
 
     const session = await presentationsRepository.createSession({
       presentationId,
-      collegeId: data.collegeId ?? null,
+      collegeId: resolvedCollegeId,
       collegeName,
       sessionCode: code,
       status: "LIVE",

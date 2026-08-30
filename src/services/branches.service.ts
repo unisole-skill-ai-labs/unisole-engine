@@ -22,9 +22,12 @@ export const branchesService = {
     if (!name || typeof name !== "string" || !name.trim()) {
       throw new ValidationError("Branch name is required");
     }
+    if (!collegeId || typeof collegeId !== "string" || !collegeId.trim()) {
+      throw new ValidationError("College is required for branch creation");
+    }
 
     return branchesRepository.create({
-      collegeId: collegeId ? String(collegeId).trim() : null,
+      collegeId: String(collegeId).trim(),
       name: name.trim(),
       code: code ? String(code).trim().toUpperCase() : null,
       description: description ? String(description).trim() : null,

@@ -14,7 +14,14 @@ import {
 
 export const presentationsRepository = {
   // ==================== PRESENTATIONS ====================
-  async listPresentations(): Promise<Presentation[]> {
+  async listPresentations(collegeId?: string): Promise<Presentation[]> {
+    if (collegeId) {
+      return db
+        .select()
+        .from(presentations)
+        .where(eq(presentations.collegeId, collegeId))
+        .orderBy(desc(presentations.createdAt));
+    }
     return db
       .select()
       .from(presentations)

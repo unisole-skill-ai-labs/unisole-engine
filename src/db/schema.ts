@@ -840,6 +840,8 @@ export const presentations = pgTable(
       .default(sql`('pres_'::text || nextval('presentations_id_seq'::regclass))`)
       .primaryKey()
       .notNull(),
+    collegeId: varchar("college_id", { length: 50 }),
+    collegeName: varchar("college_name", { length: 200 }),
     title: varchar({ length: 255 }).notNull(),
     description: text(),
     theme: varchar({ length: 50 }).default("dark").notNull(),
@@ -858,6 +860,15 @@ export const presentations = pgTable(
       "btree",
       table.isActive.asc().nullsLast()
     ),
+    index("idx_presentations_college").using(
+      "btree",
+      table.collegeId.asc().nullsLast()
+    ),
+    foreignKey({
+      columns: [table.collegeId],
+      foreignColumns: [colleges.id],
+      name: "fk_presentations_college",
+    }).onDelete("cascade"),
     foreignKey({
       columns: [table.createdById],
       foreignColumns: [users.id],

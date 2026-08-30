@@ -9,7 +9,7 @@ adminPresentationsRouter.get("/", presentationsController.list);
 adminPresentationsRouter.get("/:id", presentationsController.getById);
 adminPresentationsRouter.post(
   "/",
-  validateBody({ required: ["title"] }),
+  validateBody({ required: ["title", "collegeId"] }),
   presentationsController.create
 );
 adminPresentationsRouter.put("/:id", presentationsController.update);
