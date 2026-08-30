@@ -14,8 +14,22 @@ export const branchesRepository = {
       }
       return await db.select().from(branches).orderBy(branches.name);
     } catch (err: any) {
-      console.warn("[branchesRepository.list] Warning:", err.message);
-      return [];
+      console.warn("[branchesRepository.list] Drizzle select failed, running self-healing column sync:", err?.message || err);
+      try {
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
+        
+        const query = collegeId
+          ? `SELECT * FROM branches WHERE college_id = $1 ORDER BY name ASC`
+          : `SELECT * FROM branches ORDER BY name ASC`;
+        const res = collegeId ? await pool.query(query, [collegeId]) : await pool.query(query);
+        return res.rows;
+      } catch (innerErr) {
+        console.warn("[branchesRepository.list] Fallback query notice:", innerErr);
+        return [];
+      }
     }
   },
 
@@ -48,26 +62,53 @@ export const branchesRepository = {
         .orderBy(branches.name);
     } catch (err: any) {
       console.warn("[branchesRepository.listActive] Warning:", err.message);
-      return [];
+      try {
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
+
+        const query = collegeId
+          ? `SELECT * FROM branches WHERE (college_id = $1 OR college_id IS NULL) AND is_active = true ORDER BY name ASC`
+          : `SELECT * FROM branches WHERE is_active = true ORDER BY name ASC`;
+        const res = collegeId ? await pool.query(query, [collegeId]) : await pool.query(query);
+        return res.rows;
+      } catch (innerErr) {
+        return [];
+      }
     }
   },
 
   async listByCollege(collegeId: string): Promise<Branch[]> {
-    return db
-      .select()
-      .from(branches)
-      .where(eq(branches.collegeId, collegeId))
-      .orderBy(branches.name);
+    return this.list(collegeId);
   },
 
   async getById(id: string): Promise<Branch | null> {
-    const rows = await db.select().from(branches).where(eq(branches.id, id)).limit(1);
-    return rows[0] ?? null;
+    try {
+      const rows = await db.select().from(branches).where(eq(branches.id, id)).limit(1);
+      return rows[0] ?? null;
+    } catch (err: any) {
+      try {
+        const res = await pool.query("SELECT * FROM branches WHERE id = $1 LIMIT 1", [id]);
+        return res.rows[0] ?? null;
+      } catch (innerErr) {
+        return null;
+      }
+    }
   },
 
   async getByName(name: string): Promise<Branch | null> {
-    const rows = await db.select().from(branches).where(eq(branches.name, name)).limit(1);
-    return rows[0] ?? null;
+    try {
+      const rows = await db.select().from(branches).where(eq(branches.name, name)).limit(1);
+      return rows[0] ?? null;
+    } catch (err: any) {
+      try {
+        const res = await pool.query("SELECT * FROM branches WHERE name = $1 LIMIT 1", [name]);
+        return res.rows[0] ?? null;
+      } catch (innerErr) {
+        return null;
+      }
+    }
   },
 
   async create(data: NewBranch): Promise<Branch> {
@@ -80,9 +121,11 @@ export const branchesRepository = {
 
       // Step 1: Self-healing schema synchronization
       try {
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
         await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
         await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
         await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
+        await pool.query("ALTER TABLE branches ALTER COLUMN id SET DEFAULT ('brn_' || nextval('branches_id_seq'::regclass))");
       } catch (migErr) {
         console.warn("[branchesRepository.create] Auto-migration notice:", migErr);
       }
@@ -116,16 +159,67 @@ export const branchesRepository = {
   },
 
   async update(id: string, data: Partial<Omit<NewBranch, "id">>): Promise<Branch | null> {
-    const rows = await db
-      .update(branches)
-      .set({ ...data, updatedAt: new Date().toISOString() })
-      .where(eq(branches.id, id))
-      .returning();
-    return rows[0] ?? null;
+    try {
+      const rows = await db
+        .update(branches)
+        .set({ ...data, updatedAt: new Date().toISOString() })
+        .where(eq(branches.id, id))
+        .returning();
+      return rows[0] ?? null;
+    } catch (err: any) {
+      try {
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
+        
+        const sets: string[] = ["updated_at = NOW()"];
+        const values: any[] = [];
+        let i = 1;
+
+        if (data.name !== undefined) {
+          sets.push(`name = $${i++}`);
+          values.push(data.name);
+        }
+        if (data.code !== undefined) {
+          sets.push(`code = $${i++}`);
+          values.push(data.code);
+        }
+        if (data.description !== undefined) {
+          sets.push(`description = $${i++}`);
+          values.push(data.description);
+        }
+        if (data.isActive !== undefined) {
+          sets.push(`is_active = $${i++}`);
+          values.push(data.isActive);
+        }
+        if (data.collegeId !== undefined) {
+          sets.push(`college_id = $${i++}`);
+          values.push(data.collegeId);
+        }
+
+        values.push(id);
+        const res = await pool.query(
+          `UPDATE branches SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`,
+          values
+        );
+        return res.rows[0] ?? null;
+      } catch (innerErr) {
+        throw err;
+      }
+    }
   },
 
   async remove(id: string): Promise<Branch | null> {
-    const rows = await db.delete(branches).where(eq(branches.id, id)).returning();
-    return rows[0] ?? null;
+    try {
+      const rows = await db.delete(branches).where(eq(branches.id, id)).returning();
+      return rows[0] ?? null;
+    } catch (err: any) {
+      try {
+        const res = await pool.query("DELETE FROM branches WHERE id = $1 RETURNING *", [id]);
+        return res.rows[0] ?? null;
+      } catch (innerErr) {
+        throw err;
+      }
+    }
   },
 };

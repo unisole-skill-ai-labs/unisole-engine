@@ -155,10 +155,22 @@ export async function ensureDatabaseSchema() {
     )
   `);
 
+  await execSql("add branches.college_id", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
   await execSql("add branches.code", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
   await execSql("add branches.description", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
   await execSql("add branches.is_active", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
   await execSql("set branches.id default", "ALTER TABLE branches ALTER COLUMN id SET DEFAULT ('brn_' || nextval('branches_id_seq'::regclass))");
+  await execSql("fk branches.college_id", `
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_branches_college'
+      ) THEN
+        ALTER TABLE branches 
+        ADD CONSTRAINT fk_branches_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `);
 
   await execSql("create table presentations", `
     CREATE TABLE IF NOT EXISTS presentations (
