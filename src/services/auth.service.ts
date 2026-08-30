@@ -143,15 +143,19 @@ export const authService = {
     const resolvedCollegeId = (collegeId || "").trim() || null;
     const resolvedSessionCode = (sessionCode || "").trim().toUpperCase() || null;
 
-    // Resolve source attribution: PAMPHLET_QR, NON_PAMPHLET, SESSION_QR
+    // Resolve source attribution: PAMPHLET_QR, SESSION_QR, IAPT, NON_PAMPHLET
     const rawSource = (signupSource || source || "").trim().toUpperCase();
     let effectiveSource = "NON_PAMPHLET";
     if (rawSource === "PAMPHLET_QR" || rawSource === "PAMPHLET") {
       effectiveSource = "PAMPHLET_QR";
     } else if (rawSource === "SESSION_QR" || rawSource.includes("SESSION") || resolvedSessionCode) {
       effectiveSource = "SESSION_QR";
+    } else if (rawSource === "IAPT" || rawSource.includes("IAPT")) {
+      effectiveSource = "IAPT";
     } else if (rawSource === "NON_PAMPHLET" || rawSource === "DIRECT_WEB" || rawSource === "ORGANIC") {
       effectiveSource = "NON_PAMPHLET";
+    } else if (rawSource) {
+      effectiveSource = rawSource;
     }
 
     if (!user) {
