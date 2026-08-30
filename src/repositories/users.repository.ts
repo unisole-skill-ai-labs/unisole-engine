@@ -1,5 +1,5 @@
 import { eq, and, or, ilike, desc } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { users, User, NewUser } from "../db/schema";
 
 export const usersRepository = {
@@ -63,16 +63,51 @@ export const usersRepository = {
   },
 
   async create(data: NewUser): Promise<User> {
+    const id = data.id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
-      const rows = await db.insert(users).values(data).returning();
+      const rows = await db.insert(users).values({ ...data, id }).returning();
       return rows[0];
     } catch (err: any) {
-      if (!data.id) {
-        const fallbackId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const rows = await db.insert(users).values({ ...data, id: fallbackId }).returning();
-        return rows[0];
+      console.warn("[usersRepository.create] Primary insert attempt failed, triggering self-healing migration:", err?.message || err);
+
+      try {
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200)");
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100)");
+      } catch (migErr) {
+        console.warn("[usersRepository.create] Auto-migration notice:", migErr);
       }
-      throw err;
+
+      try {
+        const res = await pool.query(
+          `INSERT INTO users (id, phone, name, college_id, college_name, branch, role, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+           RETURNING *`,
+          [
+            id,
+            data.phone,
+            data.name ?? null,
+            data.collegeId ?? null,
+            data.collegeName ?? null,
+            data.branch ?? null,
+            data.role ?? "STUDENT",
+            data.isActive ?? true,
+          ]
+        );
+        return res.rows[0];
+      } catch (rawErr: any) {
+        try {
+          const res2 = await pool.query(
+            `INSERT INTO users (id, phone, name, role, is_active, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+             RETURNING *`,
+            [id, data.phone, data.name ?? null, data.role ?? "STUDENT", data.isActive ?? true]
+          );
+          return res2.rows[0];
+        } catch (innerErr) {
+          throw rawErr || innerErr;
+        }
+      }
     }
   },
 

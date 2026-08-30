@@ -76,22 +76,42 @@ export const branchesRepository = {
       const rows = await db.insert(branches).values({ ...data, id }).returning();
       return rows[0];
     } catch (err: any) {
-      const errMsg = err?.message || String(err);
-      // Fallback 1: Missing column (e.g. code, description) on older schemas
-      if (errMsg.includes('column "code"') || errMsg.includes('column "description"')) {
+      console.warn("[branchesRepository.create] Primary insert attempt failed, triggering self-healing migration:", err?.message || err);
+
+      // Step 1: Self-healing schema synchronization
+      try {
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
+        await pool.query("ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
+      } catch (migErr) {
+        console.warn("[branchesRepository.create] Auto-migration notice:", migErr);
+      }
+
+      // Step 2: Try raw SQL insert with all columns
+      try {
+        const res = await pool.query(
+          `INSERT INTO branches (id, college_id, name, code, description, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+           RETURNING *`,
+          [id, data.collegeId, data.name, data.code ?? null, data.description ?? null, data.isActive ?? true]
+        );
+        return res.rows[0];
+      } catch (rawErr: any) {
+        console.warn("[branchesRepository.create] Full raw insert failed, attempting legacy column insert:", rawErr?.message || rawErr);
+
+        // Step 3: Fallback insert without code and description for legacy schemas
         try {
-          const res = await pool.query(
+          const res2 = await pool.query(
             `INSERT INTO branches (id, college_id, name, is_active, created_at, updated_at)
              VALUES ($1, $2, $3, $4, NOW(), NOW())
              RETURNING *`,
             [id, data.collegeId, data.name, data.isActive ?? true]
           );
-          return res.rows[0];
+          return res2.rows[0];
         } catch (innerErr) {
-          throw innerErr;
+          throw rawErr || innerErr;
         }
       }
-      throw err;
     }
   },
 
