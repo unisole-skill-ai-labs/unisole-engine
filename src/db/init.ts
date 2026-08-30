@@ -140,6 +140,7 @@ export async function ensureDatabaseSchema() {
   await execSql("add colleges.short_name", "ALTER TABLE colleges ADD COLUMN IF NOT EXISTS short_name VARCHAR(100)");
   await execSql("add colleges.description", "ALTER TABLE colleges ADD COLUMN IF NOT EXISTS description TEXT");
   await execSql("add colleges.is_active", "ALTER TABLE colleges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
+  await execSql("set colleges.id default", "ALTER TABLE colleges ALTER COLUMN id SET DEFAULT ('clg_' || nextval('colleges_id_seq'::regclass))");
 
   await execSql("create table branches", `
     CREATE TABLE IF NOT EXISTS branches (
@@ -157,6 +158,7 @@ export async function ensureDatabaseSchema() {
   await execSql("add branches.code", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
   await execSql("add branches.description", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
   await execSql("add branches.is_active", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
+  await execSql("set branches.id default", "ALTER TABLE branches ALTER COLUMN id SET DEFAULT ('brn_' || nextval('branches_id_seq'::regclass))");
 
   await execSql("create table presentations", `
     CREATE TABLE IF NOT EXISTS presentations (

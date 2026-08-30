@@ -63,8 +63,17 @@ export const usersRepository = {
   },
 
   async create(data: NewUser): Promise<User> {
-    const rows = await db.insert(users).values(data).returning();
-    return rows[0];
+    try {
+      const rows = await db.insert(users).values(data).returning();
+      return rows[0];
+    } catch (err: any) {
+      if (!data.id) {
+        const fallbackId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const rows = await db.insert(users).values({ ...data, id: fallbackId }).returning();
+        return rows[0];
+      }
+      throw err;
+    }
   },
 
   async update(

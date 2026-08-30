@@ -71,8 +71,17 @@ export const branchesRepository = {
   },
 
   async create(data: NewBranch): Promise<Branch> {
-    const rows = await db.insert(branches).values(data).returning();
-    return rows[0];
+    try {
+      const rows = await db.insert(branches).values(data).returning();
+      return rows[0];
+    } catch (err: any) {
+      if (!data.id) {
+        const fallbackId = `brn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const rows = await db.insert(branches).values({ ...data, id: fallbackId }).returning();
+        return rows[0];
+      }
+      throw err;
+    }
   },
 
   async update(id: string, data: Partial<Omit<NewBranch, "id">>): Promise<Branch | null> {

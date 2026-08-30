@@ -29,8 +29,17 @@ export const collegesRepository = {
   },
 
   async create(data: NewCollege): Promise<College> {
-    const rows = await db.insert(colleges).values(data).returning();
-    return rows[0];
+    try {
+      const rows = await db.insert(colleges).values(data).returning();
+      return rows[0];
+    } catch (err: any) {
+      if (!data.id) {
+        const fallbackId = `clg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const rows = await db.insert(colleges).values({ ...data, id: fallbackId }).returning();
+        return rows[0];
+      }
+      throw err;
+    }
   },
 
   async update(id: string, data: Partial<Omit<NewCollege, "id">>): Promise<College | null> {
