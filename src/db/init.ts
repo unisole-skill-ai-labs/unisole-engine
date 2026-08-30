@@ -1,9 +1,4 @@
 import { pool } from "../db.js";
-<<<<<<< HEAD
-=======
-import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
-import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
->>>>>>> 7c4bed5 (feat(presentations): seed Govt. College Theog and Theog College PPT 46-slide presentation deck)
 
 async function execSql(name: string, sql: string, params: any[] = []) {
   try {
@@ -457,96 +452,6 @@ export async function ensureDatabaseSchema() {
        'https://unisole.app/docs/sop/tech-qa', 2)
     ON CONFLICT (id) DO NOTHING
   `);
-  // Ensure all presentations have a valid college_id and college_name
-  await execSql("backfill presentation college references", `
-    UPDATE presentations
-    SET 
-      college_id = (SELECT id FROM colleges ORDER BY id ASC LIMIT 1),
-      college_name = (SELECT name FROM colleges ORDER BY id ASC LIMIT 1)
-    WHERE college_id IS NULL
-  `);
-
-  // Seed Flagship UNISOLE AI Campus Program Presentation Deck
-  try {
-    const firstCollegeRes = await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1");
-    const defaultCollege = firstCollegeRes.rows[0];
-
-    const presTitle = "UNISOLE AI Campus Program (Animated)";
-    const existingPres = await pool.query(
-      "SELECT id FROM presentations WHERE title = $1 LIMIT 1",
-      [presTitle]
-    );
-
-    if (!existingPres.rows || existingPres.rows.length === 0) {
-      if (defaultCollege) {
-        await pool.query(
-          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
-           VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, $5, $6, TRUE)
-           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
-          [
-            defaultCollege.id,
-            defaultCollege.name,
-            presTitle,
-            "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
-            "dark",
-            JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
-          ]
-        );
-        console.log(`[DB] Seeded flagship presentation: UNISOLE AI Campus Program for ${defaultCollege.name}`);
-      }
-    } else {
-      // Update with latest slides template and college
-      if (defaultCollege) {
-        await pool.query(
-          `UPDATE presentations SET slides = $1, college_id = COALESCE(college_id, $2), college_name = COALESCE(college_name, $3) WHERE id = $4`,
-          [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), defaultCollege.id, defaultCollege.name, existingPres.rows[0].id]
-        );
-      }
-    }
-  } catch (err: any) {
-    console.warn("[DB] Could not seed flagship presentation deck:", err.message);
-  }
-
-  // Seed Theog College PPT Presentation Deck
-  try {
-    const theogCollegeRes = await pool.query("SELECT id, name FROM colleges WHERE slug = 'theog-college' OR name ILIKE '%theog%' LIMIT 1");
-    const theogCollege = theogCollegeRes.rows[0] || (await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1")).rows[0];
-
-    const theogPresTitle = "Theog College PPT";
-    const existingTheogPres = await pool.query(
-      "SELECT id FROM presentations WHERE title = $1 OR id = 'pres_theog_college_ppt' LIMIT 1",
-      [theogPresTitle]
-    );
-
-    if (!existingTheogPres.rows || existingTheogPres.rows.length === 0) {
-      if (theogCollege) {
-        await pool.query(
-          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
-           VALUES ('pres_theog_college_ppt', $1, $2, $3, $4, $5, $6, TRUE)
-           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
-          [
-            theogCollege.id,
-            theogCollege.name,
-            theogPresTitle,
-            "46-slide college student career awareness + industrial training presentation for Govt. Degree College Theog with 8 interactive live polls, stream-specific roadmaps, and career capital framework.",
-            "dark",
-            JSON.stringify(THEOG_COLLEGE_PPT_SLIDES),
-          ]
-        );
-        console.log(`[DB] Seeded flagship presentation: Theog College PPT for ${theogCollege.name}`);
-      }
-    } else {
-      if (theogCollege) {
-        await pool.query(
-          `UPDATE presentations SET slides = $1, title = $2, college_id = COALESCE(college_id, $3), college_name = COALESCE(college_name, $4) WHERE id = $5`,
-          [JSON.stringify(THEOG_COLLEGE_PPT_SLIDES), theogPresTitle, theogCollege.id, theogCollege.name, existingTheogPres.rows[0].id]
-        );
-        console.log(`[DB] Synchronized Theog College PPT deck (${THEOG_COLLEGE_PPT_SLIDES.length} slides) for ${theogCollege.name}`);
-      }
-    }
-  } catch (err: any) {
-    console.warn("[DB] Could not seed Theog College PPT deck:", err.message);
-  }
 
   console.log("[DB] Schema synchronization and migrations finished successfully.");
 }

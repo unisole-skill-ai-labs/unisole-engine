@@ -12,7 +12,6 @@ import {
   PresentationLead,
 } from "../db/schema";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
-import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
 
 function generateSessionCode(prefix = "UNI"): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -27,10 +26,6 @@ export const presentationsService = {
   // ==================== PRESENTATION DECKS ====================
   getTemplateSlides(): any[] {
     return UNISOLE_AI_CAMPUS_DECK_SLIDES;
-  },
-
-  getTheogTemplateSlides(): any[] {
-    return THEOG_COLLEGE_PPT_SLIDES;
   },
 
   async list(collegeId?: string): Promise<Presentation[]> {
@@ -65,16 +60,9 @@ export const presentationsService = {
       throw new NotFoundError("Selected university/college not found");
     }
 
-    const isTheog =
-      data.title.toLowerCase().includes("theog") ||
-      college.name.toLowerCase().includes("theog") ||
-      college.slug.toLowerCase().includes("theog");
-
     const defaultSlides =
       data.slides && data.slides.length > 0
         ? data.slides
-        : isTheog
-        ? THEOG_COLLEGE_PPT_SLIDES
         : UNISOLE_AI_CAMPUS_DECK_SLIDES;
 
     return presentationsRepository.createPresentation({
