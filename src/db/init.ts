@@ -183,7 +183,7 @@ export async function ensureDatabaseSchema() {
   await execSql("create table presentations", `
     CREATE TABLE IF NOT EXISTS presentations (
       id VARCHAR(50) PRIMARY KEY DEFAULT ('pres_' || nextval('presentations_id_seq'::regclass)),
-      college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE CASCADE,
+      college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE SET NULL,
       college_name VARCHAR(200),
       title VARCHAR(255) NOT NULL,
       description TEXT,
@@ -200,13 +200,10 @@ export async function ensureDatabaseSchema() {
   await execSql("add presentations.college_name", "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS college_name VARCHAR(200)");
   await execSql("fk presentations.college_id", `
     DO $$ BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'fk_presentations_college'
-      ) THEN
-        ALTER TABLE presentations 
-        ADD CONSTRAINT fk_presentations_college 
-        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
-      END IF;
+      ALTER TABLE presentations DROP CONSTRAINT IF EXISTS fk_presentations_college;
+      ALTER TABLE presentations 
+      ADD CONSTRAINT fk_presentations_college 
+      FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE SET NULL;
     END $$;
   `);
 
@@ -450,6 +447,201 @@ export async function ensureDatabaseSchema() {
        'https://unisole.app/docs/sop/college-onboarding', 5),
 
       ('tmpl_bug_fix', 'Feature Delivery & Bug Resolution', 'dept_tech', 'Engineering QA checklist prior to production deployment.',
+      active_attendees_count INTEGER DEFAULT 0 NOT NULL,
+      started_at TIMESTAMPTZ,
+      ended_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  await execSql("create table presentation_leads", `
+    CREATE TABLE IF NOT EXISTS presentation_leads (
+      id VARCHAR(50) PRIMARY KEY DEFAULT ('lead_' || nextval('presentation_leads_id_seq'::regclass)),
+      session_id VARCHAR(50) NOT NULL REFERENCES presentation_sessions(id) ON DELETE CASCADE,
+      college_id VARCHAR(50) NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
+      user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+      name VARCHAR(150) NOT NULL,
+      phone VARCHAR(20) NOT NULL,
+      email VARCHAR(255),
+      branch VARCHAR(100),
+      year_of_study VARCHAR(50),
+      total_score INTEGER DEFAULT 0 NOT NULL,
+      rank INTEGER,
+      streak INTEGER DEFAULT 0 NOT NULL,
+      responses JSONB DEFAULT '{}'::jsonb NOT NULL,
+      joined_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  await execSql("add presentation_leads.user_id", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS user_id VARCHAR(50)");
+  await execSql("add presentation_leads.email", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
+  await execSql("add presentation_leads.branch", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS branch VARCHAR(100)");
+  await execSql("add presentation_leads.year_of_study", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS year_of_study VARCHAR(50)");
+  await execSql("add presentation_leads.total_score", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS total_score INTEGER DEFAULT 0");
+  await execSql("add presentation_leads.rank", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS rank INTEGER");
+  await execSql("add presentation_leads.streak", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS streak INTEGER DEFAULT 0");
+  await execSql("add presentation_leads.responses", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS responses JSONB DEFAULT '{}'::jsonb");
+  await execSql("add presentation_leads.joined_at", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW()");
+
+  // Ensure cascade constraints for existing sessions and leads
+  await execSql("alter fk_sessions_college", `
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_sessions_college') THEN
+        ALTER TABLE presentation_sessions DROP CONSTRAINT fk_sessions_college;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'presentation_sessions') THEN
+        ALTER TABLE presentation_sessions 
+        ADD CONSTRAINT fk_sessions_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `);
+
+  await execSql("alter fk_leads_college", `
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_leads_college') THEN
+        ALTER TABLE presentation_leads DROP CONSTRAINT fk_leads_college;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'presentation_leads') THEN
+        ALTER TABLE presentation_leads 
+        ADD CONSTRAINT fk_leads_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `);
+
+  await execSql("create table team_departments", `
+    CREATE TABLE IF NOT EXISTS team_departments (
+      id VARCHAR(50) PRIMARY KEY DEFAULT ('dept_' || nextval('team_departments_id_seq'::regclass)),
+      name VARCHAR(150) NOT NULL,
+      code VARCHAR(50) NOT NULL UNIQUE,
+      color VARCHAR(30) DEFAULT '#6366f1' NOT NULL,
+      description TEXT,
+      lead_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  await execSql("create table task_templates", `
+    CREATE TABLE IF NOT EXISTS task_templates (
+      id VARCHAR(50) PRIMARY KEY DEFAULT ('tmpl_' || nextval('task_templates_id_seq'::regclass)),
+      title VARCHAR(255) NOT NULL,
+      department_id VARCHAR(50) REFERENCES team_departments(id) ON DELETE SET NULL,
+      description TEXT,
+      default_checklist JSONB DEFAULT '[]'::jsonb NOT NULL,
+      guidelines_url TEXT,
+      estimated_hours INTEGER DEFAULT 2,
+      created_by_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  await execSql("create table tasks", `
+    CREATE TABLE IF NOT EXISTS tasks (
+      id VARCHAR(50) PRIMARY KEY DEFAULT ('task_' || nextval('tasks_id_seq'::regclass)),
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      status VARCHAR(50) DEFAULT 'TODO' NOT NULL,
+      priority VARCHAR(50) DEFAULT 'MEDIUM' NOT NULL,
+      assignee_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+      reporter_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+      department_id VARCHAR(50) REFERENCES team_departments(id) ON DELETE SET NULL,
+      template_id VARCHAR(50) REFERENCES task_templates(id) ON DELETE SET NULL,
+      due_date TIMESTAMPTZ,
+      estimated_hours INTEGER,
+      submission_proof_url TEXT,
+      submission_notes TEXT,
+      blocked_reason TEXT,
+      related_entity_type VARCHAR(50),
+      related_entity_id VARCHAR(50),
+      related_entity_name VARCHAR(255),
+      completed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  await execSql("create table task_subtasks", `
+    CREATE TABLE IF NOT EXISTS task_subtasks (
+      id VARCHAR(50) PRIMARY KEY DEFAULT ('sub_' || nextval('task_subtasks_id_seq'::regclass)),
+      task_id VARCHAR(50) NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      is_completed BOOLEAN DEFAULT FALSE NOT NULL,
+      order_index INTEGER DEFAULT 0 NOT NULL,
+      completed_by_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+      completed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  await execSql("create table task_comments", `
+    CREATE TABLE IF NOT EXISTS task_comments (
+      id VARCHAR(50) PRIMARY KEY DEFAULT ('tcom_' || nextval('task_comments_id_seq'::regclass)),
+      task_id VARCHAR(50) NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      activity_type task_activity_type DEFAULT 'COMMENT' NOT NULL,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  await execSql("create table daily_eod_logs", `
+    CREATE TABLE IF NOT EXISTS daily_eod_logs (
+      id VARCHAR(50) PRIMARY KEY DEFAULT ('eod_' || nextval('daily_eod_logs_id_seq'::regclass)),
+      user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      log_date DATE DEFAULT CURRENT_DATE NOT NULL,
+      done_today TEXT NOT NULL,
+      plan_tomorrow TEXT NOT NULL,
+      blockers TEXT,
+      hours_spent INTEGER DEFAULT 8 NOT NULL,
+      submitted_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  // ============================================================
+  // FOUNDATIONAL SYSTEM DATA (Safe, Idempotent, Non-destructive)
+  // ============================================================
+
+  // Ensure default system departments exist without overriding custom changes
+  await execSql("seed departments", `
+    INSERT INTO team_departments (id, name, code, color, description)
+    VALUES 
+      ('dept_content', 'Curriculum & Content', 'CONTENT', '#6366f1', 'Course syllabus drafting, video lecture recordings, and quizzes.'),
+      ('dept_outreach', 'College Outreach & BD', 'OUTREACH', '#06b6d4', 'College partnerships, MoUs, campus leads, and dean communications.'),
+      ('dept_tech', 'Tech & Product', 'TECH', '#10b981', 'Admin console, SEO engine, live projector features, and bug fixes.'),
+      ('dept_ops', 'Presentation & Operations', 'OPERATIONS', '#f59e0b', 'Live presentation moderation, hardware projector setup, and lead QA.')
+    ON CONFLICT (code) DO NOTHING
+  `);
+
+  // Ensure an initial Super Admin exists only if no admin accounts exist
+  await execSql("ensure initial super admin", `
+    INSERT INTO users (phone, name, role, designation, is_active)
+    SELECT '+919876543210', 'Admin', 'SUPER_ADMIN', 'Platform Administrator', TRUE
+    WHERE NOT EXISTS (SELECT 1 FROM users WHERE role IN ('SUPER_ADMIN', 'ADMIN') LIMIT 1)
+  `);
+
+  // Seed standard SOP task templates if not already present
+  await execSql("seed sop templates", `
+    INSERT INTO task_templates (id, title, department_id, description, default_checklist, guidelines_url, estimated_hours)
+    VALUES 
+      ('tmpl_presentation_prep', 'College Presentation & Roadshow Prep', 'dept_ops', 'Standard procedure before hosting a live auditorium session.', 
+       '["1. Download approved pitch deck from Canva / Drive", "2. Verify session code & test live QR projector", "3. Configure 3 interactive quiz questions in Live Projector", "4. Run audio & screen mirroring test in auditorium", "5. Assign 2 floor volunteers for student check-ins"]'::jsonb, 
+       'https://unisole.app/docs/sop/presentations', 3),
+
+      ('tmpl_module_qc', 'Course Module & Video QC', 'dept_content', 'Quality assurance checklist before publishing any learning module.',
+       '["1. Verify video audio clarity & 1080p resolution", "2. Confirm lecture notes & cheat-sheet PDF attached", "3. Add minimum 5 knowledge check questions", "4. Validate prerequisite skill tags", "5. Test playback on mobile viewport"]'::jsonb,
+       'https://unisole.app/docs/sop/content-qc', 2),
+
+      ('tmpl_college_onboard', 'College Onboarding & MoU Execution', 'dept_outreach', 'Checklist for onboarding a partner university.',
+       '["1. Obtain signed MoU document from college registrar", "2. Collect official list of branch codes & student intake", "3. Seed college record & campus admin credentials", "4. Schedule kickoff auditorium presentation date", "5. Deliver promotional banners & WhatsApp flyers"]'::jsonb,
+       'https://unisole.app/docs/sop/college-onboarding', 5),
+
+      ('tmpl_bug_fix', 'Feature Delivery & Bug Resolution', 'dept_tech', 'Engineering QA checklist prior to production deployment.',
        '["1. Reproduce issue on local/staging environment", "2. Implement fix with typescript type compliance", "3. Verify dark/light mode and mobile responsiveness", "4. Test with edge cases and network latency", "5. Verify no regression on existing routes"]'::jsonb,
        'https://unisole.app/docs/sop/tech-qa', 2)
     ON CONFLICT (id) DO NOTHING
@@ -488,50 +680,49 @@ export async function ensureDatabaseSchema() {
     ON CONFLICT (college_id, name) DO NOTHING
   `);
 
-  // Ensure all presentations have a valid college_id and college_name
+  // Ensure all presentations have a valid college_id and college_name if available
   await execSql("backfill presentation college references", `
     UPDATE presentations
     SET 
       college_id = (SELECT id FROM colleges ORDER BY id ASC LIMIT 1),
       college_name = (SELECT name FROM colleges ORDER BY id ASC LIMIT 1)
-    WHERE college_id IS NULL
+    WHERE college_id IS NULL AND (SELECT count(*) FROM colleges) > 0
   `);
 
   // Seed Flagship UNISOLE AI Campus Program Presentation Deck
   try {
     const firstCollegeRes = await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1");
-    const defaultCollege = firstCollegeRes.rows[0];
+    const defaultCollege = firstCollegeRes.rows[0] || null;
 
     const presTitle = "UNISOLE AI Campus Program (Animated)";
+    const defaultCollegeId = defaultCollege ? defaultCollege.id : null;
+    const defaultCollegeName = defaultCollege ? defaultCollege.name : "UNISOLE Partner College";
+
     const existingPres = await pool.query(
-      "SELECT id FROM presentations WHERE title = $1 LIMIT 1",
+      "SELECT id FROM presentations WHERE title = $1 OR id = 'pres_ai_campus_flagship' LIMIT 1",
       [presTitle]
     );
 
     if (!existingPres.rows || existingPres.rows.length === 0) {
-      if (defaultCollege) {
-        await pool.query(
-          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
-           VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, $5, $6, TRUE)
-           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
-          [
-            defaultCollege.id,
-            defaultCollege.name,
-            presTitle,
-            "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
-            "dark",
-            JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
-          ]
-        );
-        console.log(`[DB] Seeded flagship presentation: UNISOLE AI Campus Program for ${defaultCollege.name}`);
-      }
+      await pool.query(
+        `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+         VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, $5, $6, TRUE)
+         ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = COALESCE(EXCLUDED.college_id, presentations.college_id), college_name = COALESCE(EXCLUDED.college_name, presentations.college_name)`,
+        [
+          defaultCollegeId,
+          defaultCollegeName,
+          presTitle,
+          "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
+          "dark",
+          JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
+        ]
+      );
+      console.log(`[DB] Seeded flagship presentation: UNISOLE AI Campus Program`);
     } else {
-      if (defaultCollege) {
-        await pool.query(
-          `UPDATE presentations SET slides = $1, college_id = COALESCE(college_id, $2), college_name = COALESCE(college_name, $3) WHERE id = $4`,
-          [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), defaultCollege.id, defaultCollege.name, existingPres.rows[0].id]
-        );
-      }
+      await pool.query(
+        `UPDATE presentations SET slides = $1, title = $2, college_id = COALESCE(college_id, $3), college_name = COALESCE(college_name, $4) WHERE id = $5`,
+        [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), presTitle, defaultCollegeId, defaultCollegeName, existingPres.rows[0].id]
+      );
     }
   } catch (err: any) {
     console.warn("[DB] Could not seed flagship presentation deck:", err.message);
@@ -540,39 +731,38 @@ export async function ensureDatabaseSchema() {
   // Seed Theog College PPT Presentation Deck
   try {
     const theogCollegeRes = await pool.query("SELECT id, name FROM colleges WHERE slug = 'theog-college' OR name ILIKE '%theog%' LIMIT 1");
-    const theogCollege = theogCollegeRes.rows[0] || (await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1")).rows[0];
+    const theogCollege = theogCollegeRes.rows[0] || (await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1")).rows[0] || null;
 
     const theogPresTitle = "Theog College PPT";
+    const theogCollegeId = theogCollege ? theogCollege.id : null;
+    const theogCollegeName = theogCollege ? theogCollege.name : "Govt. Degree College Theog";
+
     const existingTheogPres = await pool.query(
       "SELECT id FROM presentations WHERE title = $1 OR id = 'pres_theog_college_ppt' LIMIT 1",
       [theogPresTitle]
     );
 
     if (!existingTheogPres.rows || existingTheogPres.rows.length === 0) {
-      if (theogCollege) {
-        await pool.query(
-          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
-           VALUES ('pres_theog_college_ppt', $1, $2, $3, $4, $5, $6, TRUE)
-           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
-          [
-            theogCollege.id,
-            theogCollege.name,
-            theogPresTitle,
-            "46-slide college student career awareness + industrial training presentation for Govt. Degree College Theog with 8 interactive live polls, stream-specific roadmaps, and career capital framework.",
-            "dark",
-            JSON.stringify(THEOG_COLLEGE_PPT_SLIDES),
-          ]
-        );
-        console.log(`[DB] Seeded flagship presentation: Theog College PPT for ${theogCollege.name}`);
-      }
+      await pool.query(
+        `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+         VALUES ('pres_theog_college_ppt', $1, $2, $3, $4, $5, $6, TRUE)
+         ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = COALESCE(EXCLUDED.college_id, presentations.college_id), college_name = COALESCE(EXCLUDED.college_name, presentations.college_name)`,
+        [
+          theogCollegeId,
+          theogCollegeName,
+          theogPresTitle,
+          "46-slide college student career awareness + industrial training presentation for Govt. Degree College Theog with 8 interactive live polls, stream-specific roadmaps, and career capital framework.",
+          "dark",
+          JSON.stringify(THEOG_COLLEGE_PPT_SLIDES),
+        ]
+      );
+      console.log(`[DB] Seeded flagship presentation: Theog College PPT`);
     } else {
-      if (theogCollege) {
-        await pool.query(
-          `UPDATE presentations SET slides = $1, title = $2, college_id = COALESCE(college_id, $3), college_name = COALESCE(college_name, $4) WHERE id = $5`,
-          [JSON.stringify(THEOG_COLLEGE_PPT_SLIDES), theogPresTitle, theogCollege.id, theogCollege.name, existingTheogPres.rows[0].id]
-        );
-        console.log(`[DB] Synchronized Theog College PPT deck (${THEOG_COLLEGE_PPT_SLIDES.length} slides) for ${theogCollege.name}`);
-      }
+      await pool.query(
+        `UPDATE presentations SET slides = $1, title = $2, college_id = COALESCE(college_id, $3), college_name = COALESCE(college_name, $4) WHERE id = $5`,
+        [JSON.stringify(THEOG_COLLEGE_PPT_SLIDES), theogPresTitle, theogCollegeId, theogCollegeName, existingTheogPres.rows[0].id]
+      );
+      console.log(`[DB] Synchronized Theog College PPT deck (${THEOG_COLLEGE_PPT_SLIDES.length} slides)`);
     }
   } catch (err: any) {
     console.warn("[DB] Could not seed Theog College PPT deck:", err.message);

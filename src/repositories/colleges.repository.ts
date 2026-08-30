@@ -44,6 +44,18 @@ export const collegesRepository = {
   },
 
   async remove(id: string): Promise<College | null> {
+    // Preserve presentations by unlinking them rather than cascading delete
+    await db
+      .update(presentations)
+      .set({ collegeId: null, collegeName: "General / Independent Deck" })
+      .where(eq(presentations.collegeId, id));
+
+    // Preserve sessions by unlinking them
+    await db
+      .update(presentationSessions)
+      .set({ collegeId: "general", collegeName: "General Session" })
+      .where(eq(presentationSessions.collegeId, id));
+
     // Unlink users associated with this college
     await db
       .update(users)

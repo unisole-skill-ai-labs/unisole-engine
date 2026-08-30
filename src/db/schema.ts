@@ -875,7 +875,7 @@ export const presentations = pgTable(
       columns: [table.collegeId],
       foreignColumns: [colleges.id],
       name: "fk_presentations_college",
-    }).onDelete("cascade"),
+    }).onDelete("set null"),
     foreignKey({
       columns: [table.createdById],
       foreignColumns: [users.id],
