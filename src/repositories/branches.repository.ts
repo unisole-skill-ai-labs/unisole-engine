@@ -1,5 +1,5 @@
 import { eq, and, isNull, or, desc } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { branches, Branch, NewBranch } from "../db/schema";
 
 export const branchesRepository = {
@@ -71,14 +71,25 @@ export const branchesRepository = {
   },
 
   async create(data: NewBranch): Promise<Branch> {
+    const id = data.id || `brn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
-      const rows = await db.insert(branches).values(data).returning();
+      const rows = await db.insert(branches).values({ ...data, id }).returning();
       return rows[0];
     } catch (err: any) {
-      if (!data.id) {
-        const fallbackId = `brn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const rows = await db.insert(branches).values({ ...data, id: fallbackId }).returning();
-        return rows[0];
+      const errMsg = err?.message || String(err);
+      // Fallback 1: Missing column (e.g. code, description) on older schemas
+      if (errMsg.includes('column "code"') || errMsg.includes('column "description"')) {
+        try {
+          const res = await pool.query(
+            `INSERT INTO branches (id, college_id, name, is_active, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, NOW(), NOW())
+             RETURNING *`,
+            [id, data.collegeId, data.name, data.isActive ?? true]
+          );
+          return res.rows[0];
+        } catch (innerErr) {
+          throw innerErr;
+        }
       }
       throw err;
     }
