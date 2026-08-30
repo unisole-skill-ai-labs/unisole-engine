@@ -183,8 +183,8 @@ export const authService = {
         signupCollegeName: resolvedCollegeName,
         metadata: metadata || {},
       });
-    } else {
-      // If existing user provided updated profile fields, update them
+    } else if (user.role === "STUDENT") {
+      // Only student accounts get lead/signup source attribution and branch updates
       const updateData: Partial<User> = {};
       if (name && name.trim()) {
         const formattedName = toTitleCase(name);
@@ -226,6 +226,7 @@ export const authService = {
         user = await usersRepository.update(user.id, updateData);
       }
     }
+    // Non-student accounts (ADMIN, SUPER_ADMIN, MEMBER) are authenticated cleanly without student modifications.
 
     const tokens = generateTokens(user!);
     return { ...tokens, user };

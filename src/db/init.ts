@@ -121,6 +121,13 @@ export async function ensureDatabaseSchema() {
   await execSql("add users.college_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
   await execSql("add users.college_name", "ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200)");
   await execSql("add users.branch", "ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100)");
+  await execSql("add users.signup_source", "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_source VARCHAR(50) DEFAULT 'NON_PAMPHLET'");
+  await execSql("add users.signup_session_code", "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_session_code VARCHAR(50)");
+  await execSql("add users.signup_college_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_college_id VARCHAR(50)");
+  await execSql("add users.signup_college_name", "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_college_name VARCHAR(200)");
+  await execSql("add users.metadata", "ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb");
+  await execSql("index users.signup_source", "CREATE INDEX IF NOT EXISTS idx_users_signup_source ON users (signup_source)");
+  await execSql("index users.signup_session", "CREATE INDEX IF NOT EXISTS idx_users_signup_session ON users (signup_session_code)");
   await execSql("add otp_verifications.otp", "ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS otp VARCHAR(20)");
   await execSql("alter otp_verifications.otp_hash", "ALTER TABLE otp_verifications ALTER COLUMN otp_hash DROP NOT NULL");
 
