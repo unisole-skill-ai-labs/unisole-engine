@@ -213,6 +213,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
           },
           myScore: currentScore,
           myRank: getStudentRank(sessionState, leadId),
+          leaderboard: getLeaderboard(sessionState).slice(0, 10),
         });
       }
     );
@@ -268,6 +269,30 @@ export function setupPresentationSocket(io: SocketIOServer) {
           buildStep: sessionState.buildStep,
           quizState: sessionState.quizState,
         });
+      }
+    );
+
+    // ==================== PRESENTER: RELOAD / UPDATE SLIDES ====================
+    socket.on(
+      "admin:reload_slides",
+      async ({ sessionCode }: { sessionCode: string }) => {
+        if (!sessionCode) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
+
+        const presentation = await presentationsRepository.getPresentationById(
+          sessionState.presentationId
+        );
+        if (presentation?.slides) {
+          sessionState.slides = (presentation.slides as any[]) || [];
+          io.to(room).emit("slides_reloaded", {
+            slides: sessionState.slides,
+            currentSlideIndex: sessionState.currentSlideIndex,
+            buildStep: sessionState.buildStep ?? 0,
+          });
+        }
       }
     );
 
