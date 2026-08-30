@@ -5,24 +5,36 @@ import { NotFoundError, ValidationError, ConflictError } from "../errors";
 export const collegesService = {
   async list(): Promise<any[]> {
     const list = await collegesRepository.list();
-    const allBranches = await collegesRepository.getAllBranches();
-    const allStudents = await collegesRepository.getAllStudents();
+    let allBranches: any[] = [];
+    let allStudents: any[] = [];
+
+    try {
+      allBranches = await collegesRepository.getAllBranches();
+    } catch (err) {
+      console.warn("[CollegesService] branches fetch warning in list():", err);
+    }
+
+    try {
+      allStudents = await collegesRepository.getAllStudents();
+    } catch (err) {
+      console.warn("[CollegesService] students fetch warning in list():", err);
+    }
 
     const branchesCountMap = new Map<string, number>();
-    for (const b of allBranches) {
-      if (b.collegeId) {
+    for (const b of (allBranches || [])) {
+      if (b && b.collegeId) {
         branchesCountMap.set(b.collegeId, (branchesCountMap.get(b.collegeId) || 0) + 1);
       }
     }
 
     const studentsCountMap = new Map<string, number>();
-    for (const s of allStudents) {
-      if (s.collegeId) {
+    for (const s of (allStudents || [])) {
+      if (s && s.collegeId) {
         studentsCountMap.set(s.collegeId, (studentsCountMap.get(s.collegeId) || 0) + 1);
       }
     }
 
-    return list.map((c) => ({
+    return (list || []).map((c) => ({
       ...c,
       branchesCount: branchesCountMap.get(c.id) || 0,
       studentsCount: studentsCountMap.get(c.id) || 0,
@@ -41,15 +53,25 @@ export const collegesService = {
     }
     if (!college) throw new NotFoundError("College not found");
 
-    const branches = await collegesRepository.getCollegeBranches(college.id);
-    const students = await collegesRepository.getCollegeStudents(college.id, college.name);
+    let branches: any[] = [];
+    let students: any[] = [];
+    try {
+      branches = await collegesRepository.getCollegeBranches(college.id);
+    } catch (err) {
+      console.warn("[CollegesService] getCollegeBranches warning:", err);
+    }
+    try {
+      students = await collegesRepository.getCollegeStudents(college.id, college.name);
+    } catch (err) {
+      console.warn("[CollegesService] getCollegeStudents warning:", err);
+    }
 
     return {
       ...college,
-      branches,
-      students,
-      branchesCount: branches.length,
-      studentsCount: students.length,
+      branches: branches || [],
+      students: students || [],
+      branchesCount: (branches || []).length,
+      studentsCount: (students || []).length,
     };
   },
 
@@ -229,21 +251,30 @@ export const collegesService = {
   },
 
   async getLeadDiversificationReport() {
-    const [
-      allColleges,
-      allSessions,
-      allLeads,
-      allBranches,
-      allEnrollments,
-      allStudents,
-    ] = await Promise.all([
-      collegesRepository.list(),
-      collegesRepository.getAllSessions(),
-      collegesRepository.getAllLeads(),
-      collegesRepository.getAllBranches(),
-      collegesRepository.getAllEnrollments(),
-      collegesRepository.getAllStudents(),
-    ]);
+    const allColleges = await collegesRepository.list().catch((e) => {
+      console.warn("[CollegesService] list() catch in report:", e);
+      return [];
+    });
+    const allSessions = await collegesRepository.getAllSessions().catch((e) => {
+      console.warn("[CollegesService] getAllSessions() catch in report:", e);
+      return [];
+    });
+    const allLeads = await collegesRepository.getAllLeads().catch((e) => {
+      console.warn("[CollegesService] getAllLeads() catch in report:", e);
+      return [];
+    });
+    const allBranches = await collegesRepository.getAllBranches().catch((e) => {
+      console.warn("[CollegesService] getAllBranches() catch in report:", e);
+      return [];
+    });
+    const allEnrollments = await collegesRepository.getAllEnrollments().catch((e) => {
+      console.warn("[CollegesService] getAllEnrollments() catch in report:", e);
+      return [];
+    });
+    const allStudents = await collegesRepository.getAllStudents().catch((e) => {
+      console.warn("[CollegesService] getAllStudents() catch in report:", e);
+      return [];
+    });
 
     // Map sessions to colleges
     const sessionMap = new Map<string, (typeof allSessions)[0]>();

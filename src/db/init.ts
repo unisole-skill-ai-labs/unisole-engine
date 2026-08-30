@@ -118,6 +118,9 @@ export async function ensureDatabaseSchema() {
   // Ensure Columns Exist on Users & OTP tables even if tables already existed
   await execSql("add users.department_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id VARCHAR(50)");
   await execSql("add users.designation", "ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(150)");
+  await execSql("add users.college_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
+  await execSql("add users.college_name", "ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200)");
+  await execSql("add users.branch", "ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100)");
   await execSql("add otp_verifications.otp", "ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS otp VARCHAR(20)");
   await execSql("alter otp_verifications.otp_hash", "ALTER TABLE otp_verifications ALTER COLUMN otp_hash DROP NOT NULL");
 
@@ -134,6 +137,10 @@ export async function ensureDatabaseSchema() {
     )
   `);
 
+  await execSql("add colleges.short_name", "ALTER TABLE colleges ADD COLUMN IF NOT EXISTS short_name VARCHAR(100)");
+  await execSql("add colleges.description", "ALTER TABLE colleges ADD COLUMN IF NOT EXISTS description TEXT");
+  await execSql("add colleges.is_active", "ALTER TABLE colleges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
+
   await execSql("create table branches", `
     CREATE TABLE IF NOT EXISTS branches (
       id VARCHAR(50) PRIMARY KEY DEFAULT ('brn_' || nextval('branches_id_seq'::regclass)),
@@ -146,6 +153,10 @@ export async function ensureDatabaseSchema() {
       updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     )
   `);
+
+  await execSql("add branches.code", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS code VARCHAR(100)");
+  await execSql("add branches.description", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT");
+  await execSql("add branches.is_active", "ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL");
 
   await execSql("create table presentations", `
     CREATE TABLE IF NOT EXISTS presentations (
@@ -248,6 +259,16 @@ export async function ensureDatabaseSchema() {
       joined_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     )
   `);
+
+  await execSql("add presentation_leads.user_id", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS user_id VARCHAR(50)");
+  await execSql("add presentation_leads.email", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
+  await execSql("add presentation_leads.branch", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS branch VARCHAR(100)");
+  await execSql("add presentation_leads.year_of_study", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS year_of_study VARCHAR(50)");
+  await execSql("add presentation_leads.total_score", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS total_score INTEGER DEFAULT 0");
+  await execSql("add presentation_leads.rank", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS rank INTEGER");
+  await execSql("add presentation_leads.streak", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS streak INTEGER DEFAULT 0");
+  await execSql("add presentation_leads.responses", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS responses JSONB DEFAULT '{}'::jsonb");
+  await execSql("add presentation_leads.joined_at", "ALTER TABLE presentation_leads ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW()");
 
   // Ensure cascade constraints for existing sessions and leads
   await execSql("alter fk_sessions_college", `
