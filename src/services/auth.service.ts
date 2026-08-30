@@ -92,9 +92,8 @@ export const authService = {
     };
   },
 
-  async verifyOtp(body: {
+  async login(body: {
     phone?: string;
-    otp?: string;
     name?: string;
     college?: string;
     collegeName?: string;
@@ -108,7 +107,6 @@ export const authService = {
   }) {
     const {
       phone,
-      otp,
       name,
       college,
       collegeName,
@@ -120,21 +118,13 @@ export const authService = {
       sessionId,
       metadata,
     } = body;
-    if (!phone) {
+    if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
       throw new ValidationError("Mobile number is required");
-    }
-    if (!otp) {
-      throw new ValidationError("OTP is required");
     }
 
     const normalizedPhone = normalizePhone(phone);
     if (!normalizedPhone) {
       throw new ValidationError("Please provide a valid 10-digit mobile number");
-    }
-
-    const isValid = await otpService.verifyOtp(normalizedPhone, String(otp));
-    if (!isValid) {
-      throw new ValidationError("Invalid or expired verification code");
     }
 
     // Look up user by normalized phone (+91...) or raw 10-digit phone
@@ -230,6 +220,24 @@ export const authService = {
 
     const tokens = generateTokens(user!);
     return { ...tokens, user };
+  },
+
+  async verifyOtp(body: {
+    phone?: string;
+    otp?: string;
+    name?: string;
+    college?: string;
+    collegeName?: string;
+    collegeId?: string;
+    branch?: string;
+    signupSource?: string;
+    source?: string;
+    sessionCode?: string;
+    sessionId?: string;
+    metadata?: Record<string, any>;
+  }) {
+    // Seamlessly forward to login without requiring or checking OTP
+    return this.login(body);
   },
 
   async refreshToken(body: { refreshToken?: string }) {
