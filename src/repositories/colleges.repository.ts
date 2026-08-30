@@ -143,4 +143,70 @@ export const collegesRepository = {
       .where(inArray(enrollments.userId, userIds))
       .orderBy(desc(enrollments.enrolledAt));
   },
+
+  // Cross-College Diversification Helpers
+  async getAllSessions() {
+    return db
+      .select({
+        id: presentationSessions.id,
+        presentationId: presentationSessions.presentationId,
+        presentationTitle: presentations.title,
+        collegeId: presentationSessions.collegeId,
+        collegeName: presentationSessions.collegeName,
+        sessionCode: presentationSessions.sessionCode,
+        status: presentationSessions.status,
+        activeAttendeesCount: presentationSessions.activeAttendeesCount,
+        startedAt: presentationSessions.startedAt,
+        endedAt: presentationSessions.endedAt,
+        createdAt: presentationSessions.createdAt,
+      })
+      .from(presentationSessions)
+      .leftJoin(presentations, eq(presentationSessions.presentationId, presentations.id))
+      .orderBy(desc(presentationSessions.createdAt));
+  },
+
+  async getAllLeads() {
+    return db
+      .select()
+      .from(presentationLeads)
+      .orderBy(desc(presentationLeads.joinedAt));
+  },
+
+  async getAllBranches() {
+    return db
+      .select()
+      .from(branches)
+      .orderBy(branches.name);
+  },
+
+  async getAllEnrollments() {
+    return db
+      .select({
+        id: enrollments.id,
+        userId: enrollments.userId,
+        pathwayId: enrollments.pathwayId,
+        pathwayTitle: pathways.title,
+        status: enrollments.status,
+        enrolledAt: enrollments.enrolledAt,
+      })
+      .from(enrollments)
+      .leftJoin(pathways, eq(enrollments.pathwayId, pathways.id))
+      .orderBy(desc(enrollments.enrolledAt));
+  },
+
+  async getAllStudents() {
+    return db
+      .select({
+        id: users.id,
+        phone: users.phone,
+        name: users.name,
+        role: users.role,
+        collegeId: users.collegeId,
+        collegeName: users.collegeName,
+        branch: users.branch,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .orderBy(desc(users.createdAt));
+  },
 };

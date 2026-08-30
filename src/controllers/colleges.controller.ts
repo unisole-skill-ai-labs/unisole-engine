@@ -25,4 +25,7 @@ export const collegesController = {
   getAnalytics: asyncHandler(async (req: Request, res: Response) => {
     res.json(await collegesService.getCollegeAnalytics(req.params.id));
   }),
+  getLeadDiversification: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await collegesService.getLeadDiversificationReport());
+  }),
 };

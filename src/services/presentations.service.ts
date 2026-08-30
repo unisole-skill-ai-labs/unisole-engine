@@ -113,6 +113,7 @@ export const presentationsService = {
   async getSessionByCode(sessionCode: string): Promise<{
     session: PresentationSession;
     presentation: Presentation;
+    collegeBranches: any[];
   }> {
     const cleanCode = sessionCode.trim().toUpperCase();
     const session = await presentationsRepository.getSessionByCode(cleanCode);
@@ -127,7 +128,14 @@ export const presentationsService = {
       throw new NotFoundError("Associated presentation not found");
     }
 
-    return { session, presentation };
+    let collegeBranches: any[] = [];
+    if (session.collegeId) {
+      collegeBranches = await collegesRepository.getCollegeBranches(
+        session.collegeId
+      );
+    }
+
+    return { session, presentation, collegeBranches };
   },
 
   async launchSession(
@@ -233,6 +241,7 @@ export const presentationsService = {
       email?: string;
       branch?: string;
       yearOfStudy?: string;
+      userId?: string;
     }
   ): Promise<{
     lead: PresentationLead;
@@ -254,16 +263,35 @@ export const presentationsService = {
     }
 
     const formattedName = toTitleCase(body.name);
+    const resolvedBranch = body.branch ? body.branch.trim() : null;
+    const resolvedYear = body.yearOfStudy ? body.yearOfStudy.trim() : null;
 
     // Find or create student user
     let user = await usersRepository.getByPhone(normalizedPhone);
+    if (!user && body.userId) {
+      user = await usersRepository.getById(body.userId);
+    }
+
     if (!user) {
       user = await usersRepository.create({
         phone: normalizedPhone,
         name: formattedName,
         role: "STUDENT",
+        collegeId: session.collegeId ?? null,
+        collegeName: session.collegeName ?? null,
+        branch: resolvedBranch,
         isActive: true,
       });
+    } else {
+      const updates: any = {};
+      if (!user.collegeId && session.collegeId) updates.collegeId = session.collegeId;
+      if (!user.collegeName && session.collegeName) updates.collegeName = session.collegeName;
+      if (resolvedBranch && (!user.branch || user.branch !== resolvedBranch)) {
+        updates.branch = resolvedBranch;
+      }
+      if (Object.keys(updates).length > 0) {
+        user = await usersRepository.update(user.id, updates);
+      }
     }
 
     // Check if lead already joined this session
@@ -276,16 +304,22 @@ export const presentationsService = {
       lead = await presentationsRepository.createLead({
         sessionId: session.id,
         collegeId: session.collegeId ?? null,
-        userId: user.id,
+        userId: user?.id ?? null,
         name: formattedName,
         phone: normalizedPhone,
         email: body.email ? body.email.trim().toLowerCase() : null,
-        branch: body.branch ? body.branch.trim() : null,
-        yearOfStudy: body.yearOfStudy ? body.yearOfStudy.trim() : null,
+        branch: resolvedBranch,
+        yearOfStudy: resolvedYear,
         totalScore: 0,
         streak: 0,
         responses: {},
       });
+    } else if (resolvedBranch && !lead.branch) {
+      const updated = await presentationsRepository.updateLead(lead.id, {
+        branch: resolvedBranch,
+        yearOfStudy: resolvedYear || lead.yearOfStudy,
+      });
+      if (updated) lead = updated;
     }
 
     return {
