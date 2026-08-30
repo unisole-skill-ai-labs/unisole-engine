@@ -40,7 +40,7 @@ export const branchesService = {
     if (!existing) throw new NotFoundError("Branch not found");
 
     const data: Partial<NewBranch> = {};
-    if (body.collegeId !== undefined) data.collegeId = body.collegeId ? String(body.collegeId).trim() : null;
+    if (body.collegeId !== undefined && body.collegeId) data.collegeId = String(body.collegeId).trim();
     if (body.name !== undefined) data.name = String(body.name).trim();
     if (body.code !== undefined) data.code = body.code ? String(body.code).trim().toUpperCase() : null;
     if (body.description !== undefined) data.description = body.description ? String(body.description).trim() : null;

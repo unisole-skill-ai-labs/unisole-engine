@@ -352,7 +352,7 @@ export const branches = pgTable(
       .default(sql`('brn_'::text || nextval('branches_id_seq'::regclass))`)
       .primaryKey()
       .notNull(),
-    collegeId: varchar("college_id", { length: 50 }),
+    collegeId: varchar("college_id", { length: 50 }).notNull(),
     name: varchar({ length: 200 }).notNull(),
     code: varchar({ length: 100 }),
     description: text(),
@@ -891,7 +891,7 @@ export const presentationSessions = pgTable(
       .primaryKey()
       .notNull(),
     presentationId: varchar("presentation_id", { length: 50 }).notNull(),
-    collegeId: varchar("college_id", { length: 50 }),
+    collegeId: varchar("college_id", { length: 50 }).notNull(),
     collegeName: varchar("college_name", { length: 200 }),
     sessionCode: varchar("session_code", { length: 20 }).notNull(),
     status: sessionStatus().default("DRAFT").notNull(),
@@ -940,7 +940,7 @@ export const presentationSessions = pgTable(
       columns: [table.collegeId],
       foreignColumns: [colleges.id],
       name: "fk_sessions_college",
-    }).onDelete("set null"),
+    }).onDelete("cascade"),
   ]
 );
 
@@ -958,7 +958,7 @@ export const presentationLeads = pgTable(
       .primaryKey()
       .notNull(),
     sessionId: varchar("session_id", { length: 50 }).notNull(),
-    collegeId: varchar("college_id", { length: 50 }),
+    collegeId: varchar("college_id", { length: 50 }).notNull(),
     userId: varchar("user_id", { length: 50 }),
     name: varchar({ length: 150 }).notNull(),
     phone: varchar({ length: 20 }).notNull(),
@@ -995,7 +995,7 @@ export const presentationLeads = pgTable(
       columns: [table.collegeId],
       foreignColumns: [colleges.id],
       name: "fk_leads_college",
-    }).onDelete("set null"),
+    }).onDelete("cascade"),
     foreignKey({
       columns: [table.userId],
       foreignColumns: [users.id],

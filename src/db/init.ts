@@ -212,7 +212,7 @@ export async function ensureDatabaseSchema() {
     CREATE TABLE IF NOT EXISTS presentation_sessions (
       id VARCHAR(50) PRIMARY KEY DEFAULT ('sess_' || nextval('presentation_sessions_id_seq'::regclass)),
       presentation_id VARCHAR(50) NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
-      college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE SET NULL,
+      college_id VARCHAR(50) NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
       college_name VARCHAR(200),
       session_code VARCHAR(20) NOT NULL UNIQUE,
       status session_status DEFAULT 'DRAFT' NOT NULL,
@@ -234,7 +234,7 @@ export async function ensureDatabaseSchema() {
     CREATE TABLE IF NOT EXISTS presentation_leads (
       id VARCHAR(50) PRIMARY KEY DEFAULT ('lead_' || nextval('presentation_leads_id_seq'::regclass)),
       session_id VARCHAR(50) NOT NULL REFERENCES presentation_sessions(id) ON DELETE CASCADE,
-      college_id VARCHAR(50) REFERENCES colleges(id) ON DELETE SET NULL,
+      college_id VARCHAR(50) NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
       user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
       name VARCHAR(150) NOT NULL,
       phone VARCHAR(20) NOT NULL,
@@ -247,6 +247,33 @@ export async function ensureDatabaseSchema() {
       responses JSONB DEFAULT '{}'::jsonb NOT NULL,
       joined_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     )
+  `);
+
+  // Ensure cascade constraints for existing sessions and leads
+  await execSql("alter fk_sessions_college", `
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_sessions_college') THEN
+        ALTER TABLE presentation_sessions DROP CONSTRAINT fk_sessions_college;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'presentation_sessions') THEN
+        ALTER TABLE presentation_sessions 
+        ADD CONSTRAINT fk_sessions_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `);
+
+  await execSql("alter fk_leads_college", `
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_leads_college') THEN
+        ALTER TABLE presentation_leads DROP CONSTRAINT fk_leads_college;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'presentation_leads') THEN
+        ALTER TABLE presentation_leads 
+        ADD CONSTRAINT fk_leads_college 
+        FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
   `);
 
   await execSql("create table team_departments", `

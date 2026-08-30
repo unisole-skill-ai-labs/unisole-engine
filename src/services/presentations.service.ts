@@ -178,14 +178,15 @@ export const presentationsService = {
     );
     if (!presentation) throw new NotFoundError("Presentation not found");
 
-    const resolvedCollegeId = presentation.collegeId || data.collegeId || null;
-    let collegeName = presentation.collegeName || "Open Roadshow Session";
-    if (resolvedCollegeId && !presentation.collegeName) {
-      const college = await collegesRepository.getById(resolvedCollegeId);
-      if (college) {
-        collegeName = college.name;
-      }
+    const resolvedCollegeId = presentation.collegeId || data.collegeId;
+    if (!resolvedCollegeId) {
+      throw new ValidationError("College is required. Presentation sessions must belong to a college.");
     }
+    const college = await collegesRepository.getById(resolvedCollegeId);
+    if (!college) {
+      throw new NotFoundError("Associated university/college not found");
+    }
+    const collegeName = college.name;
 
     // Determine code
     let code = data.customCode
@@ -327,7 +328,7 @@ export const presentationsService = {
     if (!lead) {
       lead = await presentationsRepository.createLead({
         sessionId: session.id,
-        collegeId: session.collegeId ?? null,
+        collegeId: session.collegeId,
         userId: user?.id ?? null,
         name: formattedName,
         phone: normalizedPhone,
