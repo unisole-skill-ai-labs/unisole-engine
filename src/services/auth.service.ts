@@ -100,8 +100,26 @@ export const authService = {
     collegeName?: string;
     collegeId?: string;
     branch?: string;
+    signupSource?: string;
+    source?: string;
+    sessionCode?: string;
+    sessionId?: string;
+    metadata?: Record<string, any>;
   }) {
-    const { phone, otp, name, college, collegeName, collegeId, branch } = body;
+    const {
+      phone,
+      otp,
+      name,
+      college,
+      collegeName,
+      collegeId,
+      branch,
+      signupSource,
+      source,
+      sessionCode,
+      sessionId,
+      metadata,
+    } = body;
     if (!phone) {
       throw new ValidationError("Mobile number is required");
     }
@@ -133,6 +151,18 @@ export const authService = {
     const resolvedCollegeName = (collegeName || college || "").trim() || null;
     const resolvedBranch = (branch || "").trim() || null;
     const resolvedCollegeId = (collegeId || "").trim() || null;
+    const resolvedSessionCode = (sessionCode || "").trim().toUpperCase() || null;
+
+    // Resolve source attribution: PAMPHLET_QR, NON_PAMPHLET, SESSION_QR
+    const rawSource = (signupSource || source || "").trim().toUpperCase();
+    let effectiveSource = "NON_PAMPHLET";
+    if (rawSource === "PAMPHLET_QR" || rawSource === "PAMPHLET") {
+      effectiveSource = "PAMPHLET_QR";
+    } else if (rawSource === "SESSION_QR" || rawSource.includes("SESSION") || resolvedSessionCode) {
+      effectiveSource = "SESSION_QR";
+    } else if (rawSource === "NON_PAMPHLET" || rawSource === "DIRECT_WEB" || rawSource === "ORGANIC") {
+      effectiveSource = "NON_PAMPHLET";
+    }
 
     if (!user) {
       // User doesn't exist -> Create new user with role 'STUDENT'
@@ -147,6 +177,11 @@ export const authService = {
         branch: resolvedBranch,
         role: "STUDENT",
         isActive: true,
+        signupSource: effectiveSource,
+        signupSessionCode: resolvedSessionCode,
+        signupCollegeId: resolvedCollegeId,
+        signupCollegeName: resolvedCollegeName,
+        metadata: metadata || {},
       });
     } else {
       // If existing user provided updated profile fields, update them
@@ -169,6 +204,22 @@ export const authService = {
       }
       if (resolvedBranch && (!user.branch || user.branch !== resolvedBranch)) {
         updateData.branch = resolvedBranch;
+      }
+      if (resolvedSessionCode && !user.signupSessionCode) {
+        updateData.signupSessionCode = resolvedSessionCode;
+      }
+      if (resolvedCollegeId && !user.signupCollegeId) {
+        updateData.signupCollegeId = resolvedCollegeId;
+      }
+      if (resolvedCollegeName && !user.signupCollegeName) {
+        updateData.signupCollegeName = resolvedCollegeName;
+      }
+      // If user had default NON_PAMPHLET or none, and joined via specific source like PAMPHLET_QR or SESSION_QR
+      if (
+        (!user.signupSource || user.signupSource === "NON_PAMPHLET") &&
+        effectiveSource !== "NON_PAMPHLET"
+      ) {
+        updateData.signupSource = effectiveSource;
       }
 
       if (Object.keys(updateData).length > 0) {

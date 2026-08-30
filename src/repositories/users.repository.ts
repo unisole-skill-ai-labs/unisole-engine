@@ -7,6 +7,8 @@ export const usersRepository = {
     collegeId?: string;
     branch?: string;
     role?: string;
+    signupSource?: string;
+    signupSessionCode?: string;
     search?: string;
   }): Promise<User[]> {
     const conditions = [];
@@ -25,6 +27,12 @@ export const usersRepository = {
     if (filters?.role) {
       conditions.push(eq(users.role, filters.role as any));
     }
+    if (filters?.signupSource) {
+      conditions.push(eq(users.signupSource, filters.signupSource));
+    }
+    if (filters?.signupSessionCode) {
+      conditions.push(eq(users.signupSessionCode, filters.signupSessionCode));
+    }
     if (filters?.search) {
       const q = `%${filters.search}%`;
       conditions.push(
@@ -32,7 +40,9 @@ export const usersRepository = {
           ilike(users.name, q),
           ilike(users.phone, q),
           ilike(users.branch, q),
-          ilike(users.collegeName, q)
+          ilike(users.collegeName, q),
+          ilike(users.signupSource, q),
+          ilike(users.signupSessionCode, q)
         )
       );
     }
@@ -74,14 +84,19 @@ export const usersRepository = {
         await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
         await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS college_name VARCHAR(200)");
         await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS branch VARCHAR(100)");
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_source VARCHAR(50) DEFAULT 'NON_PAMPHLET'");
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_session_code VARCHAR(50)");
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_college_id VARCHAR(50)");
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_college_name VARCHAR(200)");
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb");
       } catch (migErr) {
         console.warn("[usersRepository.create] Auto-migration notice:", migErr);
       }
 
       try {
         const res = await pool.query(
-          `INSERT INTO users (id, phone, name, college_id, college_name, branch, role, is_active, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+          `INSERT INTO users (id, phone, name, college_id, college_name, branch, role, is_active, signup_source, signup_session_code, signup_college_id, signup_college_name, metadata, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
            RETURNING *`,
           [
             id,
@@ -92,6 +107,11 @@ export const usersRepository = {
             data.branch ?? null,
             data.role ?? "STUDENT",
             data.isActive ?? true,
+            data.signupSource ?? "NON_PAMPHLET",
+            data.signupSessionCode ?? null,
+            data.signupCollegeId ?? null,
+            data.signupCollegeName ?? null,
+            JSON.stringify(data.metadata ?? {}),
           ]
         );
         return res.rows[0];

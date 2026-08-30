@@ -306,11 +306,27 @@ export const presentationsService = {
         collegeName: session.collegeName ?? null,
         branch: resolvedBranch,
         isActive: true,
+        signupSource: "SESSION_QR",
+        signupSessionCode: session.sessionCode,
+        signupCollegeId: session.collegeId ?? null,
+        signupCollegeName: session.collegeName ?? null,
       });
     } else {
       const updates: any = {};
       if (!user.collegeId && session.collegeId) updates.collegeId = session.collegeId;
       if (!user.collegeName && session.collegeName) updates.collegeName = session.collegeName;
+      if (!user.signupSource || user.signupSource === "NON_PAMPHLET") {
+        updates.signupSource = "SESSION_QR";
+      }
+      if (!user.signupSessionCode && session.sessionCode) {
+        updates.signupSessionCode = session.sessionCode;
+      }
+      if (!user.signupCollegeId && session.collegeId) {
+        updates.signupCollegeId = session.collegeId;
+      }
+      if (!user.signupCollegeName && session.collegeName) {
+        updates.signupCollegeName = session.collegeName;
+      }
       if (resolvedBranch && (!user.branch || user.branch !== resolvedBranch)) {
         updates.branch = resolvedBranch;
       }

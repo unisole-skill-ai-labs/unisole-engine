@@ -8,6 +8,8 @@ export const usersService = {
     collegeId?: string;
     branch?: string;
     role?: string;
+    signupSource?: string;
+    signupSessionCode?: string;
     search?: string;
   }): Promise<User[]> {
     return usersRepository.list(filters);
@@ -44,6 +46,10 @@ export const usersService = {
     const collegeId = body.collegeId ? String(body.collegeId).trim() : null;
     const collegeName = body.collegeName ? String(body.collegeName).trim() : null;
     const branch = body.branch ? String(body.branch).trim() : null;
+    const signupSource = (body.signupSource as string) || "NON_PAMPHLET";
+    const signupSessionCode = body.signupSessionCode ? String(body.signupSessionCode).trim() : null;
+    const signupCollegeId = body.signupCollegeId ? String(body.signupCollegeId).trim() : collegeId;
+    const signupCollegeName = body.signupCollegeName ? String(body.signupCollegeName).trim() : collegeName;
 
     return usersRepository.create({
       phone,
@@ -53,6 +59,10 @@ export const usersService = {
       collegeName,
       branch,
       isActive,
+      signupSource,
+      signupSessionCode,
+      signupCollegeId,
+      signupCollegeName,
     });
   },
 
@@ -76,6 +86,10 @@ export const usersService = {
     if (body.collegeId !== undefined) data.collegeId = body.collegeId ? String(body.collegeId).trim() : null;
     if (body.collegeName !== undefined) data.collegeName = body.collegeName ? String(body.collegeName).trim() : null;
     if (body.branch !== undefined) data.branch = body.branch ? String(body.branch).trim() : null;
+    if (body.signupSource !== undefined) data.signupSource = String(body.signupSource);
+    if (body.signupSessionCode !== undefined) data.signupSessionCode = body.signupSessionCode ? String(body.signupSessionCode).trim() : null;
+    if (body.signupCollegeId !== undefined) data.signupCollegeId = body.signupCollegeId ? String(body.signupCollegeId).trim() : null;
+    if (body.signupCollegeName !== undefined) data.signupCollegeName = body.signupCollegeName ? String(body.signupCollegeName).trim() : null;
 
     if (Object.keys(data).length === 0) throw new ValidationError("No valid fields provided");
 

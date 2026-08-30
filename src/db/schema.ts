@@ -265,6 +265,11 @@ export const users = pgTable(
     designation: varchar({ length: 150 }),
     role: userRole().default("STUDENT").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    signupSource: varchar("signup_source", { length: 50 }).default("NON_PAMPHLET").notNull(),
+    signupSessionCode: varchar("signup_session_code", { length: 50 }),
+    signupCollegeId: varchar("signup_college_id", { length: 50 }),
+    signupCollegeName: varchar("signup_college_name", { length: 200 }),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
@@ -275,6 +280,8 @@ export const users = pgTable(
   (table) => [
     index("idx_users_is_active").using("btree", table.isActive.asc().nullsLast()),
     index("idx_users_role").using("btree", table.role.asc().nullsLast()),
+    index("idx_users_signup_source").using("btree", table.signupSource.asc().nullsLast()),
+    index("idx_users_signup_session").using("btree", table.signupSessionCode.asc().nullsLast()),
     unique("uq_users_phone").on(table.phone),
   ]
 );
