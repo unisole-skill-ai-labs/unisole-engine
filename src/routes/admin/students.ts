@@ -8,4 +8,5 @@ adminStudentsRouter.get("/", usersController.list);
 adminStudentsRouter.post("/", validateBody({ required: ["phone"] }), usersController.create);
 adminStudentsRouter.get("/:id", usersController.getById);
 adminStudentsRouter.put("/:id", usersController.update);
+adminStudentsRouter.delete("/:id", usersController.delete);
 adminStudentsRouter.post("/:id/deactivate", usersController.deactivate);

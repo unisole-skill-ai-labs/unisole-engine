@@ -3,25 +3,58 @@ import { College, NewCollege } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 
 export const collegesService = {
-  async list(): Promise<College[]> {
-    return collegesRepository.list();
+  async list(): Promise<any[]> {
+    const list = await collegesRepository.list();
+    const allBranches = await collegesRepository.getAllBranches();
+    const allStudents = await collegesRepository.getAllStudents();
+
+    const branchesCountMap = new Map<string, number>();
+    for (const b of allBranches) {
+      if (b.collegeId) {
+        branchesCountMap.set(b.collegeId, (branchesCountMap.get(b.collegeId) || 0) + 1);
+      }
+    }
+
+    const studentsCountMap = new Map<string, number>();
+    for (const s of allStudents) {
+      if (s.collegeId) {
+        studentsCountMap.set(s.collegeId, (studentsCountMap.get(s.collegeId) || 0) + 1);
+      }
+    }
+
+    return list.map((c) => ({
+      ...c,
+      branchesCount: branchesCountMap.get(c.id) || 0,
+      studentsCount: studentsCountMap.get(c.id) || 0,
+    }));
   },
 
-  async listActive(): Promise<College[]> {
-    const all = await collegesRepository.list();
+  async listActive(): Promise<any[]> {
+    const all = await this.list();
     return all.filter((c) => c.isActive);
   },
 
-  async getById(id: string): Promise<College> {
-    const college = await collegesRepository.getById(id);
+  async getById(id: string): Promise<any> {
+    let college = await collegesRepository.getById(id);
+    if (!college) {
+      college = await collegesRepository.getBySlug(id);
+    }
     if (!college) throw new NotFoundError("College not found");
-    return college;
+
+    const branches = await collegesRepository.getCollegeBranches(college.id);
+    const students = await collegesRepository.getCollegeStudents(college.id, college.name);
+
+    return {
+      ...college,
+      branches,
+      students,
+      branchesCount: branches.length,
+      studentsCount: students.length,
+    };
   },
 
-  async getBySlug(slug: string): Promise<College> {
-    const college = await collegesRepository.getBySlug(slug);
-    if (!college) throw new NotFoundError("College not found");
-    return college;
+  async getBySlug(slug: string): Promise<any> {
+    return this.getById(slug);
   },
 
   async create(body: Record<string, unknown>): Promise<College> {

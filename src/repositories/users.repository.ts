@@ -1,10 +1,51 @@
-import { eq } from "drizzle-orm";
+import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { db } from "../db";
 import { users, User, NewUser } from "../db/schema";
 
 export const usersRepository = {
-  async list(): Promise<User[]> {
-    return db.select().from(users);
+  async list(filters?: {
+    collegeId?: string;
+    branch?: string;
+    role?: string;
+    search?: string;
+  }): Promise<User[]> {
+    const conditions = [];
+
+    if (filters?.collegeId) {
+      conditions.push(eq(users.collegeId, filters.collegeId));
+    }
+    if (filters?.branch) {
+      conditions.push(
+        or(
+          eq(users.branch, filters.branch),
+          ilike(users.branch, `%${filters.branch}%`)
+        )
+      );
+    }
+    if (filters?.role) {
+      conditions.push(eq(users.role, filters.role as any));
+    }
+    if (filters?.search) {
+      const q = `%${filters.search}%`;
+      conditions.push(
+        or(
+          ilike(users.name, q),
+          ilike(users.phone, q),
+          ilike(users.branch, q),
+          ilike(users.collegeName, q)
+        )
+      );
+    }
+
+    if (conditions.length > 0) {
+      return db
+        .select()
+        .from(users)
+        .where(and(...conditions))
+        .orderBy(desc(users.createdAt));
+    }
+
+    return db.select().from(users).orderBy(desc(users.createdAt));
   },
 
   async getById(id: string): Promise<User | null> {

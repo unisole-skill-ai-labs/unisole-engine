@@ -1,14 +1,39 @@
 import { branchesRepository } from "../repositories/branches.repository";
+import { collegesRepository } from "../repositories/colleges.repository";
 import { Branch, NewBranch } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 
 export const branchesService = {
-  async list(collegeId?: string): Promise<Branch[]> {
-    return branchesRepository.list(collegeId);
+  async list(collegeId?: string): Promise<any[]> {
+    const list = await branchesRepository.list(collegeId);
+    const allStudents = await collegesRepository.getAllStudents();
+
+    return list.map((b) => {
+      const bNameLower = b.name.toLowerCase();
+      const bCodeLower = (b.code || "").toLowerCase();
+      const count = allStudents.filter((s) => {
+        if (collegeId && s.collegeId && s.collegeId !== collegeId) return false;
+        if (!collegeId && b.collegeId && s.collegeId && s.collegeId !== b.collegeId) return false;
+        const studentBranch = (s.branch || "").toLowerCase();
+        if (!studentBranch) return false;
+        return (
+          studentBranch === bNameLower ||
+          studentBranch.includes(bNameLower) ||
+          bNameLower.includes(studentBranch) ||
+          (bCodeLower && studentBranch.includes(bCodeLower))
+        );
+      }).length;
+
+      return {
+        ...b,
+        studentsCount: count,
+      };
+    });
   },
 
-  async listActive(collegeId?: string): Promise<Branch[]> {
-    return branchesRepository.listActive(collegeId);
+  async listActive(collegeId?: string): Promise<any[]> {
+    const all = await this.list(collegeId);
+    return all.filter((b) => b.isActive);
   },
 
   async getById(id: string): Promise<Branch> {
