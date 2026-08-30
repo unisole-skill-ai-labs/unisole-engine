@@ -1,4 +1,6 @@
 import { pool } from "../db.js";
+import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
+import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
 
 async function execSql(name: string, sql: string, params: any[] = []) {
   try {
@@ -452,6 +454,129 @@ export async function ensureDatabaseSchema() {
        'https://unisole.app/docs/sop/tech-qa', 2)
     ON CONFLICT (id) DO NOTHING
   `);
+
+  // ============================================================
+  // SEED INITIAL COLLEGES & DEPARTMENTS & TEAM MEMBERS
+  // ============================================================
+  await execSql("seed colleges", `
+    INSERT INTO colleges (name, slug, short_name, description)
+    VALUES 
+      ('Govt. Degree College Theog', 'theog-college', 'GC Theog', 'Government Degree College Theog, Shimla, Himachal Pradesh.'),
+      ('Indian Institute of Technology Delhi', 'iit-delhi', 'IIT Delhi', 'Premier engineering and research institution located in New Delhi.'),
+      ('Netaji Subhas University of Technology', 'nsut-delhi', 'NSUT', 'Top state university known for computing, electronics, and technical innovation.'),
+      ('Delhi Technological University', 'dtu-delhi', 'DTU', 'Pioneering technical university with expansive engineering branches.'),
+      ('Indraprastha Institute of Information Technology Delhi', 'iiit-delhi', 'IIIT Delhi', 'Excellence in computer science, AI, and information technology.'),
+      ('Birla Institute of Technology and Science Pilani', 'bits-pilani', 'BITS Pilani', 'Nationally renowned private technical institute known for meritocracy.')
+    ON CONFLICT (slug) DO NOTHING
+  `);
+
+  await execSql("seed standard branches for colleges", `
+    INSERT INTO branches (college_id, name, code, description, is_active)
+    SELECT c.id, d.name, d.code, d.description, TRUE
+    FROM colleges c
+    CROSS JOIN (
+      VALUES 
+        ('Computer Science & Engineering', 'CSE', 'Core computing, systems, and software engineering.'),
+        ('Information Technology', 'IT', 'Software applications, cloud computing, and networking.'),
+        ('Artificial Intelligence & Machine Learning', 'AIML', 'Deep learning, NLP, computer vision, and AI systems.'),
+        ('Electronics & Communication Engineering', 'ECE', 'Embedded systems, microcontrollers, and wireless communications.'),
+        ('Mechanical Engineering', 'ME', 'Thermodynamics, robotics, and industrial fabrication.'),
+        ('Electrical Engineering', 'EE', 'Power systems, smart grids, and renewable energy.'),
+        ('Commerce & Business Administration', 'BBA', 'Finance, analytics, marketing, and business systems.'),
+        ('Science & Computational Physics', 'BSC', 'Physical modeling, quantitative physics, and computing.')
+    ) AS d(name, code, description)
+    ON CONFLICT (college_id, name) DO NOTHING
+  `);
+
+  // Ensure all presentations have a valid college_id and college_name
+  await execSql("backfill presentation college references", `
+    UPDATE presentations
+    SET 
+      college_id = (SELECT id FROM colleges ORDER BY id ASC LIMIT 1),
+      college_name = (SELECT name FROM colleges ORDER BY id ASC LIMIT 1)
+    WHERE college_id IS NULL
+  `);
+
+  // Seed Flagship UNISOLE AI Campus Program Presentation Deck
+  try {
+    const firstCollegeRes = await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1");
+    const defaultCollege = firstCollegeRes.rows[0];
+
+    const presTitle = "UNISOLE AI Campus Program (Animated)";
+    const existingPres = await pool.query(
+      "SELECT id FROM presentations WHERE title = $1 LIMIT 1",
+      [presTitle]
+    );
+
+    if (!existingPres.rows || existingPres.rows.length === 0) {
+      if (defaultCollege) {
+        await pool.query(
+          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+           VALUES ('pres_ai_campus_flagship', $1, $2, $3, $4, $5, $6, TRUE)
+           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
+          [
+            defaultCollege.id,
+            defaultCollege.name,
+            presTitle,
+            "Interactive 28-slide animated roadshow presentation for college students across Himachal Pradesh with real-time live pulse polls and fast-finger quizzes.",
+            "dark",
+            JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES),
+          ]
+        );
+        console.log(`[DB] Seeded flagship presentation: UNISOLE AI Campus Program for ${defaultCollege.name}`);
+      }
+    } else {
+      if (defaultCollege) {
+        await pool.query(
+          `UPDATE presentations SET slides = $1, college_id = COALESCE(college_id, $2), college_name = COALESCE(college_name, $3) WHERE id = $4`,
+          [JSON.stringify(UNISOLE_AI_CAMPUS_DECK_SLIDES), defaultCollege.id, defaultCollege.name, existingPres.rows[0].id]
+        );
+      }
+    }
+  } catch (err: any) {
+    console.warn("[DB] Could not seed flagship presentation deck:", err.message);
+  }
+
+  // Seed Theog College PPT Presentation Deck
+  try {
+    const theogCollegeRes = await pool.query("SELECT id, name FROM colleges WHERE slug = 'theog-college' OR name ILIKE '%theog%' LIMIT 1");
+    const theogCollege = theogCollegeRes.rows[0] || (await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1")).rows[0];
+
+    const theogPresTitle = "Theog College PPT";
+    const existingTheogPres = await pool.query(
+      "SELECT id FROM presentations WHERE title = $1 OR id = 'pres_theog_college_ppt' LIMIT 1",
+      [theogPresTitle]
+    );
+
+    if (!existingTheogPres.rows || existingTheogPres.rows.length === 0) {
+      if (theogCollege) {
+        await pool.query(
+          `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+           VALUES ('pres_theog_college_ppt', $1, $2, $3, $4, $5, $6, TRUE)
+           ON CONFLICT (id) DO UPDATE SET slides = EXCLUDED.slides, title = EXCLUDED.title, college_id = EXCLUDED.college_id, college_name = EXCLUDED.college_name`,
+          [
+            theogCollege.id,
+            theogCollege.name,
+            theogPresTitle,
+            "46-slide college student career awareness + industrial training presentation for Govt. Degree College Theog with 8 interactive live polls, stream-specific roadmaps, and career capital framework.",
+            "dark",
+            JSON.stringify(THEOG_COLLEGE_PPT_SLIDES),
+          ]
+        );
+        console.log(`[DB] Seeded flagship presentation: Theog College PPT for ${theogCollege.name}`);
+      }
+    } else {
+      if (theogCollege) {
+        await pool.query(
+          `UPDATE presentations SET slides = $1, title = $2, college_id = COALESCE(college_id, $3), college_name = COALESCE(college_name, $4) WHERE id = $5`,
+          [JSON.stringify(THEOG_COLLEGE_PPT_SLIDES), theogPresTitle, theogCollege.id, theogCollege.name, existingTheogPres.rows[0].id]
+        );
+        console.log(`[DB] Synchronized Theog College PPT deck (${THEOG_COLLEGE_PPT_SLIDES.length} slides) for ${theogCollege.name}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn("[DB] Could not seed Theog College PPT deck:", err.message);
+  }
 
   console.log("[DB] Schema synchronization and migrations finished successfully.");
 }
