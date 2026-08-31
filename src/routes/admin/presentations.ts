@@ -32,3 +32,7 @@ adminPresentationsRouter.get(
   "/sessions/:id/analytics",
   presentationsController.getSessionAnalytics
 );
+adminPresentationsRouter.delete(
+  "/sessions/:id",
+  presentationsController.removeSession
+);

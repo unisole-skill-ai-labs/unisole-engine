@@ -21,10 +21,17 @@ authRouter.post(
   authController.checkUser
 );
 
+// Staff / Admin Username & Password Authentication
+authRouter.post(
+  "/admin-login",
+  authLimiter,
+  authController.adminLogin
+);
+
+// Generic Login / Student Login
 authRouter.post(
   "/login",
   authLimiter,
-  validateBody({ required: ["phone"] }),
   authController.login
 );
 

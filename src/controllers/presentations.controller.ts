@@ -104,6 +104,15 @@ export const presentationsController = {
     }
   },
 
+  async removeSession(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await presentationsService.removeSession(req.params.id);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async getSessionLeads(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await presentationsService.listSessionLeads(req.params.id);

@@ -123,6 +123,9 @@ export const presentationsRepository = {
   },
 
   async removeSession(id: string): Promise<PresentationSession | null> {
+    await db
+      .delete(presentationLeads)
+      .where(eq(presentationLeads.sessionId, id));
     const rows = await db
       .delete(presentationSessions)
       .where(eq(presentationSessions.id, id))

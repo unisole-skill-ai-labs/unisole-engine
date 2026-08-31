@@ -14,6 +14,7 @@ import {
   NewDailyEodLog,
 } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
+import { usersRepository } from "../repositories/users.repository";
 
 export const teamService = {
   // ==================== TEAM DIRECTORY & MEMBERS ====================
@@ -22,8 +23,8 @@ export const teamService = {
       `SELECT 
         u.id,
         u.name,
+        u.username,
         u.phone,
-        u.email,
         u.role,
         u.designation,
         u.department_id as "departmentId",
@@ -39,7 +40,7 @@ export const teamService = {
       LEFT JOIN team_departments d ON u.department_id = d.id
       LEFT JOIN tasks t ON t.assignee_id = u.id
       WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER')
-        AND ($1::text IS NULL OR u.name ILIKE $1 OR u.phone ILIKE $1)
+        AND ($1::text IS NULL OR u.name ILIKE $1 OR u.username ILIKE $1 OR u.phone ILIKE $1)
       GROUP BY u.id, d.name, d.color
       ORDER BY 
         CASE WHEN u.role = 'SUPER_ADMIN' THEN 1 WHEN u.role = 'ADMIN' THEN 2 ELSE 3 END,
@@ -51,53 +52,65 @@ export const teamService = {
   },
 
   async createMember(data: {
-    phone: string;
     name: string;
+    username: string;
+    password?: string;
+    phone?: string;
     role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
     departmentId?: string;
     designation?: string;
+    isActive?: boolean;
   }): Promise<any> {
-    if (!data.phone || !data.name) {
-      throw new ValidationError("Phone number and name are required");
+    if (!data.name || !data.name.trim()) {
+      throw new ValidationError("Full name is required");
+    }
+    if (!data.username || !data.username.trim()) {
+      throw new ValidationError("Username is required");
     }
 
-    const cleanPhone = data.phone.replace(/\D/g, "").slice(-10);
-    if (cleanPhone.length !== 10) {
-      throw new ValidationError("Please provide a valid 10-digit mobile number");
+    const cleanUsername = data.username.trim().toLowerCase();
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE LOWER(username) = $1 LIMIT 1",
+      [cleanUsername]
+    );
+    if (existingUser.rows && existingUser.rows.length > 0) {
+      throw new ConflictError(`Username "${cleanUsername}" is already in use`);
     }
 
-    const existing = await db.select().from(users).where(eq(users.phone, cleanPhone)).limit(1);
-    if (existing.length > 0) {
-      // Update existing user to team role
-      await db
-        .update(users)
-        .set({
-          name: data.name.trim(),
-          role: (data.role as any) || "MEMBER",
-          departmentId: data.departmentId || null,
-          designation: data.designation || null,
-          isActive: true,
-        })
-        .where(eq(users.phone, cleanPhone));
-    } else {
-      await db.insert(users).values({
-        phone: cleanPhone,
-        name: data.name.trim(),
-        role: (data.role as any) || "MEMBER",
-        departmentId: data.departmentId || null,
-        designation: data.designation || null,
-        isActive: true,
-      });
+    const cleanPassword = (data.password || "1234").trim();
+    let cleanPhone = data.phone ? data.phone.replace(/\D/g, "").slice(-10) : "";
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      cleanPhone = "0000000000";
     }
+
+    const newId = `usr_staff_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    await pool.query(
+      `INSERT INTO users (id, username, password, phone, name, role, department_id, designation, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        newId,
+        cleanUsername,
+        cleanPassword,
+        cleanPhone,
+        data.name.trim(),
+        (data.role as any) || "MEMBER",
+        data.departmentId || null,
+        data.designation ? data.designation.trim() : null,
+        data.isActive !== false,
+      ]
+    );
 
     const members = await this.listMembers();
-    return members.find((m) => m.phone === cleanPhone);
+    return members.find((m) => m.id === newId) || { id: newId, username: cleanUsername, name: data.name };
   },
 
   async updateMember(
     userId: string,
     data: {
       name?: string;
+      username?: string;
+      password?: string;
+      phone?: string;
       role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
       departmentId?: string;
       designation?: string;
@@ -107,14 +120,35 @@ export const teamService = {
     const userRes = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (userRes.length === 0) throw new NotFoundError("User not found");
 
+    if (data.username && data.username.trim()) {
+      const cleanUsername = data.username.trim().toLowerCase();
+      const existingUser = await pool.query(
+        "SELECT id FROM users WHERE LOWER(username) = $1 AND id != $2 LIMIT 1",
+        [cleanUsername, userId]
+      );
+      if (existingUser.rows && existingUser.rows.length > 0) {
+        throw new ConflictError(`Username "${cleanUsername}" is already in use`);
+      }
+    }
+
     const updatePayload: any = {};
     if (data.name !== undefined) updatePayload.name = data.name.trim();
+    if (data.username !== undefined) updatePayload.username = data.username.trim().toLowerCase();
+    if (data.password !== undefined && data.password.trim()) {
+      updatePayload.password = data.password.trim();
+    }
+    if (data.phone !== undefined) {
+      const p = data.phone.replace(/\D/g, "").slice(-10);
+      updatePayload.phone = p.length === 10 ? p : "0000000000";
+    }
     if (data.role !== undefined) updatePayload.role = data.role;
     if (data.departmentId !== undefined) updatePayload.departmentId = data.departmentId || null;
     if (data.designation !== undefined) updatePayload.designation = data.designation;
     if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
-    await db.update(users).set(updatePayload).where(eq(users.id, userId));
+    if (Object.keys(updatePayload).length > 0) {
+      await db.update(users).set(updatePayload).where(eq(users.id, userId));
+    }
 
     const updated = await this.listMembers();
     return updated.find((m) => m.id === userId);
@@ -124,8 +158,13 @@ export const teamService = {
     const userRes = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (userRes.length === 0) throw new NotFoundError("User not found");
 
-    // Deactivate user rather than hard-deleting foreign keys
-    await db.update(users).set({ isActive: false, role: "STUDENT" }).where(eq(users.id, userId));
+    const user = userRes[0];
+    if (user.role === "SUPER_ADMIN" && user.username === "girish") {
+      throw new ValidationError("The primary Super Admin account cannot be deleted.");
+    }
+
+    // Transactionally cascade delete user
+    await usersRepository.remove(userId);
     return true;
   },
 

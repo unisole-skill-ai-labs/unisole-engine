@@ -257,6 +257,8 @@ export const users = pgTable(
       .primaryKey()
       .notNull(),
     phone: varchar({ length: 20 }).notNull(),
+    username: varchar({ length: 100 }),
+    password: varchar({ length: 255 }),
     name: varchar({ length: 150 }),
     collegeId: varchar("college_id", { length: 50 }),
     collegeName: varchar("college_name", { length: 200 }),
@@ -280,6 +282,7 @@ export const users = pgTable(
   (table) => [
     index("idx_users_is_active").using("btree", table.isActive.asc().nullsLast()),
     index("idx_users_role").using("btree", table.role.asc().nullsLast()),
+    index("idx_users_username").using("btree", table.username.asc().nullsLast()),
     index("idx_users_signup_source").using("btree", table.signupSource.asc().nullsLast()),
     index("idx_users_signup_session").using("btree", table.signupSessionCode.asc().nullsLast()),
     unique("uq_users_phone").on(table.phone),

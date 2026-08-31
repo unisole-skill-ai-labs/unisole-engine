@@ -1,5 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import { db } from "../db";
 import { users, User } from "../db/schema";
 import { ValidationError, NotFoundError, UnauthorizedError } from "../errors";
@@ -12,6 +13,7 @@ function generateTokens(user: {
   id: string;
   phone: string;
   role: string;
+  username?: string | null;
   name?: string | null;
   collegeName?: string | null;
   branch?: string | null;
@@ -19,12 +21,13 @@ function generateTokens(user: {
   const payload = {
     id: user.id,
     phone: user.phone,
+    username: user.username || null,
     role: user.role,
     name: user.name,
     collegeName: user.collegeName,
     branch: user.branch,
   };
-  const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
+  const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
   const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, {
     expiresIn: "30d",
   });
@@ -36,6 +39,71 @@ function generateTokens(user: {
 }
 
 export const authService = {
+  async adminLogin(body: { username?: string; password?: string; phone?: string }) {
+    const { username, password, phone } = body;
+    const loginIdentifier = (username || phone || "").trim();
+    if (!loginIdentifier) {
+      throw new ValidationError("Username is required");
+    }
+    if (!password || typeof password !== "string" || password.length === 0) {
+      throw new ValidationError("Password is required");
+    }
+
+    const cleanLower = loginIdentifier.toLowerCase();
+    const rows = await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          sql`LOWER(${users.username}) = ${cleanLower}`,
+          eq(users.phone, loginIdentifier),
+          eq(users.phone, `+91${loginIdentifier.slice(-10)}`),
+          eq(users.id, loginIdentifier)
+        )
+      )
+      .limit(1);
+
+    const user = rows[0];
+    if (!user) {
+      throw new UnauthorizedError("Invalid username or password");
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedError("Account has been deactivated. Please contact Super Administrator.");
+    }
+
+    if (!["SUPER_ADMIN", "ADMIN", "MEMBER"].includes(user.role)) {
+      throw new UnauthorizedError("Access denied. Internal staff privileges required.");
+    }
+
+    let isMatch = false;
+    if (user.password) {
+      if (user.password === password) {
+        isMatch = true;
+      } else {
+        try {
+          isMatch = await bcrypt.compare(password, user.password);
+        } catch {
+          isMatch = user.password === password;
+        }
+      }
+    } else {
+      // Fallback for initial demo super admin
+      if (user.role === "SUPER_ADMIN" && password === "1234") {
+        isMatch = true;
+        await usersRepository.update(user.id, { password: "1234" });
+      }
+    }
+
+    if (!isMatch) {
+      throw new UnauthorizedError("Invalid username or password");
+    }
+
+    const tokens = generateTokens(user);
+    const { password: _p, ...safeUser } = user;
+    return { ...tokens, user: safeUser };
+  },
+
   async checkUser(body: { phone?: string }) {
     const { phone } = body;
     if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
@@ -94,6 +162,8 @@ export const authService = {
 
   async login(body: {
     phone?: string;
+    username?: string;
+    password?: string;
     name?: string;
     college?: string;
     collegeName?: string;
@@ -105,6 +175,10 @@ export const authService = {
     sessionId?: string;
     metadata?: Record<string, any>;
   }) {
+    if (body.username || (body.password && !body.phone)) {
+      return this.adminLogin(body);
+    }
+
     const {
       phone,
       name,

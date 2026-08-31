@@ -264,6 +264,15 @@ export const presentationsService = {
     return updated;
   },
 
+  async removeSession(sessionId: string): Promise<{ success: boolean; id: string }> {
+    const session = await presentationsRepository.getSessionById(sessionId);
+    if (!session) throw new NotFoundError("Session not found");
+
+    const deleted = await presentationsRepository.removeSession(sessionId);
+    if (!deleted) throw new NotFoundError("Failed to delete session");
+    return { success: true, id: sessionId };
+  },
+
   // ==================== FAST-PASS LEAD ONBOARDING ====================
   async joinSessionExpress(
     sessionCode: string,

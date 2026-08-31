@@ -117,6 +117,8 @@ export async function ensureDatabaseSchema() {
   `);
 
   // Ensure Columns Exist on Users & OTP tables even if tables already existed
+  await execSql("add users.username", "ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)");
+  await execSql("add users.password", "ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255)");
   await execSql("add users.department_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id VARCHAR(50)");
   await execSql("add users.designation", "ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(150)");
   await execSql("add users.college_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id VARCHAR(50)");
@@ -127,6 +129,9 @@ export async function ensureDatabaseSchema() {
   await execSql("add users.signup_college_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_college_id VARCHAR(50)");
   await execSql("add users.signup_college_name", "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_college_name VARCHAR(200)");
   await execSql("add users.metadata", "ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb");
+  await execSql("drop strict phone uq", "ALTER TABLE users DROP CONSTRAINT IF EXISTS uq_users_phone");
+  await execSql("index users.student_phone", "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_student_phone ON users (phone) WHERE phone != '0000000000' AND role = 'STUDENT'");
+  await execSql("index users.username", "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (LOWER(username)) WHERE username IS NOT NULL");
   await execSql("index users.signup_source", "CREATE INDEX IF NOT EXISTS idx_users_signup_source ON users (signup_source)");
   await execSql("index users.signup_session", "CREATE INDEX IF NOT EXISTS idx_users_signup_session ON users (signup_session_code)");
   await execSql("add otp_verifications.otp", "ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS otp VARCHAR(20)");
@@ -618,11 +623,25 @@ export async function ensureDatabaseSchema() {
     ON CONFLICT (code) DO NOTHING
   `);
 
-  // Ensure an initial Super Admin exists only if no admin accounts exist
-  await execSql("ensure initial super admin", `
-    INSERT INTO users (phone, name, role, designation, is_active)
-    SELECT '+919876543210', 'Admin', 'SUPER_ADMIN', 'Platform Administrator', TRUE
-    WHERE NOT EXISTS (SELECT 1 FROM users WHERE role IN ('SUPER_ADMIN', 'ADMIN') LIMIT 1)
+  // Ensure Girish Super Admin exists with username 'girish', password '1234', and phone '0000000000'
+  await execSql("ensure girish super admin", `
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM users WHERE LOWER(username) = 'girish') THEN
+        IF EXISTS (SELECT 1 FROM users WHERE role = 'SUPER_ADMIN' AND username IS NULL) THEN
+          UPDATE users 
+          SET username = 'girish', password = '1234', name = 'Girish', phone = '0000000000', designation = 'Super Administrator', is_active = TRUE
+          WHERE id = (SELECT id FROM users WHERE role = 'SUPER_ADMIN' ORDER BY created_at ASC LIMIT 1);
+        ELSE
+          INSERT INTO users (username, password, phone, name, role, designation, is_active)
+          VALUES ('girish', '1234', '0000000000', 'Girish', 'SUPER_ADMIN', 'Super Administrator', TRUE);
+        END IF;
+      ELSE
+        UPDATE users
+        SET password = '1234', role = 'SUPER_ADMIN', name = 'Girish', is_active = TRUE
+        WHERE LOWER(username) = 'girish';
+      END IF;
+    END $$;
   `);
 
   // Seed standard SOP task templates if not already present
