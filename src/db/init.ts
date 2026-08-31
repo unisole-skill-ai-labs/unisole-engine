@@ -653,7 +653,7 @@ export async function ensureDatabaseSchema() {
   await execSql("seed colleges", `
     INSERT INTO colleges (name, slug, short_name, description)
     VALUES 
-      ('Govt. Degree College Theog', 'theog-college', 'GC Theog', 'Government Degree College Theog, Shimla, Himachal Pradesh.'),
+      ('Government Degree College Theog', 'gdc-theog', 'GDC Theog', 'Affiliated with Himachal Pradesh University, Shimla, offering undergraduate programs in Arts, Commerce, Science, Computer Applications, and Business Administration.'),
       ('Indian Institute of Technology Delhi', 'iit-delhi', 'IIT Delhi', 'Premier engineering and research institution located in New Delhi.'),
       ('Netaji Subhas University of Technology', 'nsut-delhi', 'NSUT', 'Top state university known for computing, electronics, and technical innovation.'),
       ('Delhi Technological University', 'dtu-delhi', 'DTU', 'Pioneering technical university with expansive engineering branches.'),
@@ -728,13 +728,14 @@ export async function ensureDatabaseSchema() {
     console.warn("[DB] Could not seed flagship presentation deck:", err.message);
   }
 
-  // 1. Ensure Government Degree College Theog and its branches exist
+  // 1. Ensure Government Degree College Theog (gdc-theog) exists with all 7 branches & merge legacy theog-college
   let theogCollegeId: string | null = null;
   let theogCollegeName = "Government Degree College Theog";
   try {
+    // 1.1 Upsert canonical GDC Theog college with slug 'gdc-theog'
     const theogClgRes = await pool.query(
       `INSERT INTO colleges (name, short_name, slug, description, is_active)
-       VALUES ('Government Degree College Theog', 'GDC Theog', 'theog-college', 'Affiliated with Himachal Pradesh University, Shimla, offering undergraduate programs in Arts, Commerce, Science, Computer Applications, and Business Administration.', TRUE)
+       VALUES ('Government Degree College Theog', 'GDC Theog', 'gdc-theog', 'Affiliated with Himachal Pradesh University, Shimla, offering undergraduate programs in Arts, Commerce, Science, Computer Applications, and Business Administration.', TRUE)
        ON CONFLICT (slug) DO UPDATE 
        SET name = EXCLUDED.name, short_name = EXCLUDED.short_name, description = EXCLUDED.description, is_active = TRUE
        RETURNING id, name`
@@ -745,14 +746,15 @@ export async function ensureDatabaseSchema() {
     }
 
     if (theogCollegeId) {
+      // 1.2 Sync all 7 official academic branches to gdc-theog
       const theogBranches = [
-        { name: "BA", code: "BA", desc: "Bachelor of Arts" },
-        { name: "BBA", code: "BBA", desc: "Bachelor of Business Administration" },
-        { name: "BCOM", code: "BCOM", desc: "Bachelor of Commerce" },
-        { name: "BCA", code: "BCA", desc: "Bachelor of Computer Applications" },
-        { name: "BSC Non-Med", code: "BSC_NM", desc: "Bachelor of Science (Non-Medical)" },
-        { name: "BSC Med", code: "BSC_MED", desc: "Bachelor of Science (Medical)" },
-        { name: "Others", code: "OTHERS", desc: "Other / Multidisciplinary" },
+        { name: "BA", code: "BA", desc: "Bachelor of Arts with multidisciplinary electives." },
+        { name: "BBA", code: "BBA", desc: "Bachelor of Business Administration." },
+        { name: "BCOM", code: "BCOM", desc: "Bachelor of Commerce." },
+        { name: "BCA", code: "BCA", desc: "Bachelor of Computer Applications." },
+        { name: "BSC Non-Med", code: "BSC_NM", desc: "Bachelor of Science (Non-Medical)." },
+        { name: "BSC Med", code: "BSC_MED", desc: "Bachelor of Science (Medical)." },
+        { name: "Others", code: "OTHERS", desc: "Other / Multidisciplinary streams." },
       ];
 
       for (const br of theogBranches) {
@@ -772,7 +774,25 @@ export async function ensureDatabaseSchema() {
           );
         }
       }
-      console.log(`[DB] Synchronized 7 official academic branches for ${theogCollegeName}`);
+
+      // 1.3 Migrate any legacy references from 'theog-college' to 'gdc-theog' and delete 'theog-college'
+      const legacyTheog = await pool.query("SELECT id FROM colleges WHERE slug = 'theog-college' AND id != $1 LIMIT 1", [theogCollegeId]);
+      if (legacyTheog.rows && legacyTheog.rows.length > 0) {
+        const legacyId = legacyTheog.rows[0].id;
+        console.log(`[DB] Found legacy college 'theog-college' (${legacyId}). Migrating references to 'gdc-theog' (${theogCollegeId})...`);
+
+        // Re-point presentations, sessions, users
+        await pool.query("UPDATE presentations SET college_id = $1, college_name = $2 WHERE college_id = $3", [theogCollegeId, theogCollegeName, legacyId]);
+        await pool.query("UPDATE presentation_sessions SET college_id = $1, college_name = $2 WHERE college_id = $3", [theogCollegeId, theogCollegeName, legacyId]);
+        await pool.query("UPDATE users SET college_id = $1, college_name = $2 WHERE college_id = $3", [theogCollegeId, theogCollegeName, legacyId]);
+        
+        // Delete legacy branches and legacy college
+        await pool.query("DELETE FROM branches WHERE college_id = $1", [legacyId]);
+        await pool.query("DELETE FROM colleges WHERE id = $1", [legacyId]);
+        console.log(`[DB] Successfully removed duplicate 'theog-college' entry.`);
+      }
+
+      console.log(`[DB] Synchronized 7 official academic branches for ${theogCollegeName} (gdc-theog)`);
     }
   } catch (err: any) {
     console.warn("[DB] Could not sync Government Degree College Theog branches:", err.message);

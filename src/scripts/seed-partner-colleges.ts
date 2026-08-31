@@ -22,7 +22,7 @@ const DUMMY_COLLEGES: DummyCollege[] = [
   {
     name: "Government Degree College Theog",
     shortName: "GDC Theog",
-    slug: "theog-college",
+    slug: "gdc-theog",
     description: "Affiliated with Himachal Pradesh University, Shimla, offering undergraduate programs in Arts, Commerce, Science, Computer Applications, and Business Administration.",
     branches: [
       {
