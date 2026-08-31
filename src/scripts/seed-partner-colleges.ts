@@ -20,6 +20,56 @@ interface DummyCollege {
 
 const DUMMY_COLLEGES: DummyCollege[] = [
   {
+    name: "Government Degree College Theog",
+    shortName: "GDC Theog",
+    slug: "theog-college",
+    description: "Affiliated with Himachal Pradesh University, Shimla, offering undergraduate programs in Arts, Commerce, Science, Computer Applications, and Business Administration.",
+    branches: [
+      {
+        name: "BA",
+        code: "BA",
+        description: "Bachelor of Arts with multidisciplinary electives and skill development.",
+        students: [],
+      },
+      {
+        name: "BBA",
+        code: "BBA",
+        description: "Bachelor of Business Administration focusing on management and entrepreneurship.",
+        students: [],
+      },
+      {
+        name: "BCOM",
+        code: "BCOM",
+        description: "Bachelor of Commerce covering accounting, taxation, and financial markets.",
+        students: [],
+      },
+      {
+        name: "BCA",
+        code: "BCA",
+        description: "Bachelor of Computer Applications with modern software development and web technologies.",
+        students: [],
+      },
+      {
+        name: "BSC Non-Med",
+        code: "BSC_NM",
+        description: "Bachelor of Science (Non-Medical) in Physics, Chemistry, and Mathematics.",
+        students: [],
+      },
+      {
+        name: "BSC Med",
+        code: "BSC_MED",
+        description: "Bachelor of Science (Medical) in Zoology, Botany, and Chemistry.",
+        students: [],
+      },
+      {
+        name: "Others",
+        code: "OTHERS",
+        description: "Other / Multidisciplinary and vocational certificate streams.",
+        students: [],
+      },
+    ],
+  },
+  {
     name: "Delhi Technological University",
     shortName: "DTU",
     slug: "delhi-technological-university",

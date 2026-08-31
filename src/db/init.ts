@@ -728,14 +728,59 @@ export async function ensureDatabaseSchema() {
     console.warn("[DB] Could not seed flagship presentation deck:", err.message);
   }
 
-  // Seed Theog College PPT Presentation Deck
+  // 1. Ensure Government Degree College Theog and its branches exist
+  let theogCollegeId: string | null = null;
+  let theogCollegeName = "Government Degree College Theog";
   try {
-    const theogCollegeRes = await pool.query("SELECT id, name FROM colleges WHERE slug = 'theog-college' OR name ILIKE '%theog%' LIMIT 1");
-    const theogCollege = theogCollegeRes.rows[0] || (await pool.query("SELECT id, name FROM colleges ORDER BY id ASC LIMIT 1")).rows[0] || null;
+    const theogClgRes = await pool.query(
+      `INSERT INTO colleges (name, short_name, slug, description, is_active)
+       VALUES ('Government Degree College Theog', 'GDC Theog', 'theog-college', 'Affiliated with Himachal Pradesh University, Shimla, offering undergraduate programs in Arts, Commerce, Science, Computer Applications, and Business Administration.', TRUE)
+       ON CONFLICT (slug) DO UPDATE 
+       SET name = EXCLUDED.name, short_name = EXCLUDED.short_name, description = EXCLUDED.description, is_active = TRUE
+       RETURNING id, name`
+    );
+    if (theogClgRes.rows && theogClgRes.rows[0]) {
+      theogCollegeId = theogClgRes.rows[0].id;
+      theogCollegeName = theogClgRes.rows[0].name;
+    }
 
+    if (theogCollegeId) {
+      const theogBranches = [
+        { name: "BA", code: "BA", desc: "Bachelor of Arts" },
+        { name: "BBA", code: "BBA", desc: "Bachelor of Business Administration" },
+        { name: "BCOM", code: "BCOM", desc: "Bachelor of Commerce" },
+        { name: "BCA", code: "BCA", desc: "Bachelor of Computer Applications" },
+        { name: "BSC Non-Med", code: "BSC_NM", desc: "Bachelor of Science (Non-Medical)" },
+        { name: "BSC Med", code: "BSC_MED", desc: "Bachelor of Science (Medical)" },
+        { name: "Others", code: "OTHERS", desc: "Other / Multidisciplinary" },
+      ];
+
+      for (const br of theogBranches) {
+        const brCheck = await pool.query(
+          "SELECT id FROM branches WHERE college_id = $1 AND (name = $2 OR code = $3) LIMIT 1",
+          [theogCollegeId, br.name, br.code]
+        );
+        if (brCheck.rows && brCheck.rows[0]) {
+          await pool.query(
+            "UPDATE branches SET name = $1, code = $2, description = $3, is_active = TRUE WHERE id = $4",
+            [br.name, br.code, br.desc, brCheck.rows[0].id]
+          );
+        } else {
+          await pool.query(
+            "INSERT INTO branches (college_id, name, code, description, is_active) VALUES ($1, $2, $3, $4, TRUE)",
+            [theogCollegeId, br.name, br.code, br.desc]
+          );
+        }
+      }
+      console.log(`[DB] Synchronized 7 official academic branches for ${theogCollegeName}`);
+    }
+  } catch (err: any) {
+    console.warn("[DB] Could not sync Government Degree College Theog branches:", err.message);
+  }
+
+  // 2. Seed Theog College PPT Presentation Deck
+  try {
     const theogPresTitle = "Theog College PPT";
-    const theogCollegeId = theogCollege ? theogCollege.id : null;
-    const theogCollegeName = theogCollege ? theogCollege.name : "Govt. Degree College Theog";
 
     const existingTheogPres = await pool.query(
       "SELECT id FROM presentations WHERE title = $1 OR id = 'pres_theog_college_ppt' LIMIT 1",
