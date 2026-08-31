@@ -775,7 +775,13 @@ export async function ensureDatabaseSchema() {
         }
       }
 
-      // 1.3 Migrate any legacy references from 'theog-college' to 'gdc-theog' and delete 'theog-college'
+      // 1.3 Clean up any verbose/redundant branches, keeping ONLY the 7 official branch codes
+      await pool.query(
+        "DELETE FROM branches WHERE college_id = $1 AND name NOT IN ('BA', 'BBA', 'BCOM', 'BCA', 'BSC Non-Med', 'BSC Med', 'Others')",
+        [theogCollegeId]
+      );
+
+      // 1.4 Migrate any legacy references from 'theog-college' to 'gdc-theog' and delete 'theog-college'
       const legacyTheog = await pool.query("SELECT id FROM colleges WHERE slug = 'theog-college' AND id != $1 LIMIT 1", [theogCollegeId]);
       if (legacyTheog.rows && legacyTheog.rows.length > 0) {
         const legacyId = legacyTheog.rows[0].id;
