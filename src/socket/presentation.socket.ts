@@ -44,6 +44,16 @@ interface SessionState {
       }
     >;
   };
+  instantPoll?: {
+    pollId: string;
+    question: string;
+    options: string[];
+    startedAt: number;
+    timeLimit: number;
+    counts: Record<number, number>; // { 0: yesCount, 1: noCount }
+    responses: Map<string, number>; // leadId -> optionIndex
+    isActive: boolean;
+  } | null;
 }
 
 const activeSessions = new Map<string, SessionState>();
@@ -115,6 +125,7 @@ export async function getOrCreateSessionState(
         pollCounts: {},
         quizAnswers: new Map(),
       },
+      instantPoll: null,
     };
     activeSessions.set(code, sessionState);
   }
@@ -133,6 +144,22 @@ export function setupPresentationSocket(io: SocketIOServer) {
           socket.leave(roomName);
         }
       }
+    };
+
+    // Helper to format instantPoll payload for socket delivery
+    const getInstantPollPayload = (sessionState: SessionState, leadId?: string) => {
+      if (!sessionState.instantPoll) return null;
+      return {
+        pollId: sessionState.instantPoll.pollId,
+        question: sessionState.instantPoll.question,
+        options: sessionState.instantPoll.options,
+        startedAt: sessionState.instantPoll.startedAt,
+        timeLimit: sessionState.instantPoll.timeLimit,
+        counts: sessionState.instantPoll.counts,
+        totalVotes: sessionState.instantPoll.responses.size,
+        isActive: sessionState.instantPoll.isActive,
+        myVote: leadId ? sessionState.instantPoll.responses.get(leadId) ?? null : null,
+      };
     };
 
     // ==================== ADMIN / PRESENTER JOIN ====================
@@ -172,6 +199,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
               sessionState.quizState.quizAnswers.entries()
             ),
           },
+          instantPoll: getInstantPollPayload(sessionState),
           leaderboard: getLeaderboard(sessionState),
         });
       }
@@ -269,6 +297,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
             myResponse: myAnswer ?? null,
             totalSubmissions: sessionState.quizState.quizAnswers.size,
           },
+          instantPoll: getInstantPollPayload(sessionState, leadId),
           myScore: currentScore,
           myRank: getStudentRank(sessionState, leadId),
           leaderboard: getLeaderboard(sessionState).slice(0, 10),
@@ -400,6 +429,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
             pollCounts: {},
             quizAnswers: new Map(),
           };
+          sessionState.instantPoll = null;
 
           // Persist slide change
           presentationsRepository.updateSession(sessionState.sessionId, {
@@ -414,6 +444,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
           slideIndex,
           buildStep: sessionState.buildStep,
           quizState: sessionState.quizState,
+          instantPoll: null,
         });
       }
     );
@@ -643,6 +674,130 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const top10 = getLeaderboard(sessionState).slice(0, 10);
         io.to(room).emit("leaderboard_shown", {
           leaderboard: top10,
+        });
+      }
+    );
+
+    // ==================== PRESENTER: START INSTANT PULSE POLL (YES / NO) ====================
+    socket.on(
+      "admin:start_instant_poll",
+      async ({
+        sessionCode,
+        question,
+        timeLimit,
+        options,
+      }: {
+        sessionCode: string;
+        question?: string;
+        timeLimit?: number;
+        options?: string[];
+      }) => {
+        if (!sessionCode) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
+
+        const duration = timeLimit && timeLimit > 0 ? timeLimit : 20;
+        const now = Date.now();
+        const pollId = `poll_${now}_${Math.random().toString(36).substring(2, 6)}`;
+        const pollOptions = options && options.length >= 2 ? options : ["YES", "NO"];
+        const prompt = question && question.trim() ? question.trim() : "Quick Pulse Check: Yes or No?";
+
+        sessionState.instantPoll = {
+          pollId,
+          question: prompt,
+          options: pollOptions,
+          startedAt: now,
+          timeLimit: duration,
+          counts: { 0: 0, 1: 0 },
+          responses: new Map(),
+          isActive: true,
+        };
+
+        io.to(room).emit("instant_poll_started", {
+          pollId,
+          question: prompt,
+          options: pollOptions,
+          timeLimit: duration,
+          startedAt: now,
+          counts: { 0: 0, 1: 0 },
+          totalVotes: 0,
+        });
+      }
+    );
+
+    // ==================== AUDIENCE: SUBMIT INSTANT POLL RESPONSE ====================
+    socket.on(
+      "audience:submit_instant_poll",
+      async ({
+        sessionCode,
+        leadId,
+        pollId,
+        optionIndex,
+      }: {
+        sessionCode: string;
+        leadId: string;
+        pollId: string;
+        optionIndex: number;
+      }) => {
+        if (!sessionCode || !leadId) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (
+          !sessionState ||
+          !sessionState.instantPoll ||
+          !sessionState.instantPoll.isActive ||
+          sessionState.instantPoll.pollId !== pollId
+        ) {
+          return;
+        }
+
+        // Prevent duplicate vote by the same student for this instant poll
+        if (sessionState.instantPoll.responses.has(leadId)) {
+          return;
+        }
+
+        const validIndex = optionIndex === 1 ? 1 : 0;
+        sessionState.instantPoll.responses.set(leadId, validIndex);
+        sessionState.instantPoll.counts[validIndex] =
+          (sessionState.instantPoll.counts[validIndex] || 0) + 1;
+
+        const totalVotes = sessionState.instantPoll.responses.size;
+        const counts = sessionState.instantPoll.counts;
+
+        // Confirm to user
+        socket.emit("instant_poll_confirmed", {
+          pollId,
+          optionIndex: validIndex,
+        });
+
+        // Broadcast real-time live poll tally to everyone (admin & audience)
+        io.to(room).emit("instant_poll_update", {
+          pollId,
+          counts,
+          totalVotes,
+        });
+      }
+    );
+
+    // ==================== PRESENTER: CLOSE / FINISH INSTANT POLL ====================
+    socket.on(
+      "admin:close_instant_poll",
+      async ({ sessionCode }: { sessionCode: string }) => {
+        if (!sessionCode) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState || !sessionState.instantPoll) return;
+
+        sessionState.instantPoll.isActive = false;
+
+        io.to(room).emit("instant_poll_ended", {
+          pollId: sessionState.instantPoll.pollId,
+          counts: sessionState.instantPoll.counts,
+          totalVotes: sessionState.instantPoll.responses.size,
         });
       }
     );
