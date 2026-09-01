@@ -1,0 +1,97 @@
+name: Build & Deploy Staging Backend to EC2
+
+on:
+    push:
+        branches:
+            - staging
+    workflow_dispatch:
+
+env:
+    REGISTRY: docker.io
+    IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/unisole-engine-staging
+
+jobs:
+    build-and-push:
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build and Push Docker image (Staging Backend)
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  push: true
+                  tags: |
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+                  cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+                  cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+    deploy-to-ec2:
+        needs: build-and-push
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Deploy Staging to EC2
+              env:
+                  AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+                  AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+                  AWS_EC2_KEY: ${{ secrets.AWS_EC2_KEY }}
+                  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+                  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "$AWS_EC2_KEY" > ~/.ssh/id_rsa
+                  chmod 600 ~/.ssh/id_rsa
+                  ssh-keyscan -H $AWS_EC2_HOST >> ~/.ssh/known_hosts
+
+                  ssh -i ~/.ssh/id_rsa $AWS_EC2_USER@$AWS_EC2_HOST << 'EOF'
+                    mkdir -p /opt/unisole-staging
+                    cd /opt/unisole-staging
+
+                    # Clone or fetch staging code
+                    if [ ! -d ".git" ]; then
+                      git clone -b staging https://github.com/unisole-skill-ai-labs/unisole-engine.git .
+                    else
+                      git fetch origin staging
+                      git checkout staging
+                      git pull origin staging
+                    fi
+
+                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                    
+                    # Start Staging Containers
+                    docker compose -f docker-compose.staging.yml pull || true
+                    docker compose -f docker-compose.staging.yml up -d --build
+
+                    # Execute Migrations and System Seed
+                    echo "[Deploy] Executing Staging Database Migrations..."
+                    docker compose -f docker-compose.staging.yml exec -T api-staging npm run db:migrate
+                    
+                    echo "[Deploy] Executing System Seeding..."
+                    docker compose -f docker-compose.staging.yml exec -T api-staging npm run db:seed:system
+
+                    echo "[Deploy] Staging deployment logs:"
+                    docker compose -f docker-compose.staging.yml logs --tail=30 api-staging
+                  EOF
+
+            - name: Notify Deployment Success
+              run: echo "✅ Staging Backend API deployment to EC2 completed successfully"
