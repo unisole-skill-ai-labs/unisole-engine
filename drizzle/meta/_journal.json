@@ -15,6 +15,13 @@
       "when": 1788107145859,
       "tag": "0001_curved_mach_iv",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788272065433,
+      "tag": "0002_zippy_mephistopheles",
+      "breakpoints": true
     }
   ]
 }
