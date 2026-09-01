@@ -57,7 +57,10 @@ interface SessionState {
 }
 
 const activeSessions = new Map<string, SessionState>();
-const reactionCooldowns = new Map<string, number>();
+const reactionLimits = new Map<
+  string,
+  { lastSent: number; penaltyUntil: number; strikes: number }
+>();
 
 export function getBranchDistribution(sessionState: SessionState) {
   const counts: Record<string, number> = {};
@@ -865,12 +868,33 @@ export function setupPresentationSocket(io: SocketIOServer) {
       }) => {
         if (!sessionCode) return;
         const now = Date.now();
-        const lastSent = reactionCooldowns.get(socket.id) || 0;
-        // Rate limit: max 1 reaction every 1.5 seconds per user
-        if (now - lastSent < 1500) {
+        const userLimit = reactionLimits.get(socket.id) || {
+          lastSent: 0,
+          penaltyUntil: 0,
+          strikes: 0,
+        };
+
+        // If currently under penalty/cooldown, escalate penalty to 10 seconds!
+        if (now < userLimit.penaltyUntil) {
+          userLimit.strikes += 1;
+          userLimit.penaltyUntil = now + 10000; // 10s penalty for spamming during cooldown
+          reactionLimits.set(socket.id, userLimit);
           return;
         }
-        reactionCooldowns.set(socket.id, now);
+
+        // Standard cooldown check: 5000ms
+        if (now - userLimit.lastSent < 5000) {
+          userLimit.strikes += 1;
+          userLimit.penaltyUntil = now + 10000; // 10s penalty on repeat spam
+          reactionLimits.set(socket.id, userLimit);
+          return;
+        }
+
+        // Successfully pass rate limit: lock for standard 5s
+        userLimit.lastSent = now;
+        userLimit.penaltyUntil = now + 5000;
+        userLimit.strikes = 0;
+        reactionLimits.set(socket.id, userLimit);
 
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
