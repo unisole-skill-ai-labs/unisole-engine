@@ -1,32 +1,46 @@
+# ============================================================
+# Staging Compose: Backend API + Database only
+# Frontends (Admin, LMS, SEO) are deployed on Vercel separately
+# ============================================================
+
 services:
   # Staging PostgreSQL Database (Port 5434)
   db-staging:
     image: postgres:16-alpine
-    restart: unless-stopped
+    restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: unisole_staging
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-unisole_staging}
     volumes:
       - pgdata_staging:/var/lib/postgresql/data
     ports:
       - "5434:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d unisole_staging"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-unisole_staging}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
       - unisole-staging-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Staging Backend API (Port 3001)
   api-staging:
     build:
       context: .
-    restart: unless-stopped
+    restart: always
     environment:
       PORT: 3001
-      DATABASE_URL: postgres://postgres:postgres@db-staging:5432/unisole_staging
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db-staging:5432/${DB_NAME:-unisole_staging}
       JWT_SECRET: ${JWT_SECRET:-unisole-staging-secret-key-2026}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-unisole-staging-refresh-secret-key-2026}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_test_secret_staging}
@@ -39,52 +53,16 @@ services:
         condition: service_healthy
     networks:
       - unisole-staging-network
-
-  # Staging Admin Dashboard (Port 5183)
-  admin-staging:
-    build:
-      context: ../unisole-admin
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3001}
-    restart: unless-stopped
-    ports:
-      - "5183:80"
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3001}
-    depends_on:
-      - api-staging
-    networks:
-      - unisole-staging-network
-
-  # Staging Main LMS Application (Port 5184)
-  lms-staging:
-    build:
-      context: ../unisole-lms
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3001}
-    restart: unless-stopped
-    ports:
-      - "5184:80"
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3001}
-    depends_on:
-      - api-staging
-    networks:
-      - unisole-staging-network
-
-  # Staging SEO Website (Port 5185)
-  seo-staging:
-    build:
-      context: ../unisole-seo
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3001}
-    restart: unless-stopped
-    ports:
-      - "5185:80"
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3001}
-    networks:
-      - unisole-staging-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   pgdata_staging:
