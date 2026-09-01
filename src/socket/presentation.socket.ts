@@ -702,7 +702,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const now = Date.now();
         const pollId = `poll_${now}_${Math.random().toString(36).substring(2, 6)}`;
         const pollOptions = options && options.length >= 2 ? options : ["YES", "NO"];
-        const prompt = question && question.trim() ? question.trim() : "Quick Pulse Check: Yes or No?";
+        const prompt = question && question.trim() ? question.trim() : "YES or NO?";
 
         sessionState.instantPoll = {
           pollId,
@@ -724,6 +724,27 @@ export function setupPresentationSocket(io: SocketIOServer) {
           counts: { 0: 0, 1: 0 },
           totalVotes: 0,
         });
+
+        // Auto-end poll after duration expires
+        setTimeout(() => {
+          if (
+            sessionState.instantPoll &&
+            sessionState.instantPoll.pollId === pollId &&
+            sessionState.instantPoll.isActive
+          ) {
+            sessionState.instantPoll.isActive = false;
+            io.to(room).emit("instant_poll_ended", {
+              pollId,
+              counts: sessionState.instantPoll.counts,
+              totalVotes: sessionState.instantPoll.responses.size,
+            });
+            setTimeout(() => {
+              if (sessionState.instantPoll?.pollId === pollId) {
+                sessionState.instantPoll = null;
+              }
+            }, 2500);
+          }
+        }, duration * 1000);
       }
     );
 
