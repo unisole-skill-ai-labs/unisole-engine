@@ -787,6 +787,30 @@ export function setupPresentationSocket(io: SocketIOServer) {
 
         const totalVotes = sessionState.instantPoll.responses.size;
         const counts = sessionState.instantPoll.counts;
+        const now = Date.now();
+        const startedAt = sessionState.instantPoll.startedAt || now;
+        const elapsedMs = Math.max(0, now - startedAt);
+
+        const pollResponseData = {
+          type: "INSTANT_POLL",
+          pollId,
+          question: sessionState.instantPoll.question,
+          optionIndex: validIndex,
+          choice: validIndex === 0 ? "YES" : "NO",
+          responseTimeMs: elapsedMs,
+          votedAt: new Date().toISOString(),
+        };
+
+        // Persist to database lead responses
+        presentationsRepository.getLeadById(leadId).then((lead) => {
+          if (lead) {
+            const currentResponses = (lead.responses as any) || {};
+            currentResponses[pollId] = pollResponseData;
+            presentationsRepository.updateLead(leadId, {
+              responses: currentResponses,
+            });
+          }
+        });
 
         // Confirm to user
         socket.emit("instant_poll_confirmed", {

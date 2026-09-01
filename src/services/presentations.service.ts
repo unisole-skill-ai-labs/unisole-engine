@@ -418,21 +418,31 @@ export const presentationsService = {
       );
     }
 
-    // 2. Branch breakdown
+    // 2. Branch & Year breakdown
     const branchCounts: Record<string, number> = {};
+    const yearCounts: Record<string, number> = {};
     leads.forEach((l) => {
       const b = (l.branch || "Other").trim();
       branchCounts[b] = (branchCounts[b] || 0) + 1;
+      const y = (l.yearOfStudy || "Not Specified").trim();
+      yearCounts[y] = (yearCounts[y] || 0) + 1;
     });
 
-    // 3. Quiz & Survey Analysis per slide
+    // 3. Quiz & Survey Analysis per slide + Comprehensive Slide Breakdown
     const slides = (presentation?.slides as any[]) || [];
     const questionAnalytics: any[] = [];
     const surveyAnalytics: any[] = [];
+    const slideAnalytics: any[] = [];
 
     slides.forEach((slide, idx) => {
       const slideId = slide.id || `slide-${idx}`;
-      const slideType = (slide.type || "").toUpperCase();
+      const slideType = (slide.type || "CONTENT").toUpperCase();
+      const title = slide.title || `Slide ${idx + 1}`;
+      const subtitle = slide.subtitle || "";
+
+      let isInteractive = false;
+      let slideQuizData: any = null;
+      let slideSurveyData: any = null;
 
       // Check if Quiz slide
       if (
@@ -440,6 +450,7 @@ export const presentationsService = {
         slide.quizQuestion ||
         slide.correctOptionIndex !== undefined
       ) {
+        isInteractive = true;
         const options = slide.options || slide.quizOptions || [];
         const correctIndex = slide.correctOptionIndex ?? 0;
         const optionStats = options.map((opt: any, optIdx: number) => ({
@@ -451,6 +462,7 @@ export const presentationsService = {
           votes: 0,
           percentage: 0,
           isCorrect: optIdx === correctIndex,
+          voters: [] as { name: string; branch: string; phone: string }[],
         }));
 
         let totalAnswers = 0;
@@ -464,12 +476,17 @@ export const presentationsService = {
             const chosen = Number(resp.optionIndex);
             if (optionStats[chosen]) {
               optionStats[chosen].votes++;
+              optionStats[chosen].voters.push({
+                name: l.name,
+                branch: l.branch || "General",
+                phone: l.phone,
+              });
             }
             if (chosen === correctIndex) {
               correctCount++;
             }
-            if (resp.timeTakenMs) {
-              totalTimeMs += Number(resp.timeTakenMs);
+            if (resp.responseTimeMs || resp.timeTakenMs) {
+              totalTimeMs += Number(resp.responseTimeMs || resp.timeTakenMs);
             }
           }
         });
@@ -480,10 +497,10 @@ export const presentationsService = {
           });
         }
 
-        questionAnalytics.push({
+        slideQuizData = {
           slideIndex: idx,
           slideId,
-          title: slide.title || `Quiz ${questionAnalytics.length + 1}`,
+          title,
           question:
             slide.quizQuestion ||
             slide.title ||
@@ -498,7 +515,8 @@ export const presentationsService = {
             totalAnswers > 0 ? Math.round((correctCount / totalAnswers) * 100) : 0,
           averageTimeMs:
             totalAnswers > 0 ? Math.round(totalTimeMs / totalAnswers) : 0,
-        });
+        };
+        questionAnalytics.push(slideQuizData);
       }
 
       // Check if Poll / Survey slide
@@ -509,6 +527,7 @@ export const presentationsService = {
         slide.pollOptions ||
         (slide.options && slide.correctOptionIndex === undefined)
       ) {
+        isInteractive = true;
         const options = slide.pollOptions || slide.options || [];
         const optionStats = options.map((opt: any, optIdx: number) => ({
           index: optIdx,
@@ -519,6 +538,7 @@ export const presentationsService = {
           votes: 0,
           percentage: 0,
           branchBreakdown: {} as Record<string, number>,
+          voters: [] as { name: string; branch: string; phone: string }[],
         }));
 
         let totalVotes = 0;
@@ -533,6 +553,11 @@ export const presentationsService = {
               const b = (l.branch || "Other").trim();
               optionStats[chosen].branchBreakdown[b] =
                 (optionStats[chosen].branchBreakdown[b] || 0) + 1;
+              optionStats[chosen].voters.push({
+                name: l.name,
+                branch: l.branch || "General",
+                phone: l.phone,
+              });
             }
           }
         });
@@ -543,18 +568,92 @@ export const presentationsService = {
           });
         }
 
-        surveyAnalytics.push({
+        slideSurveyData = {
           slideIndex: idx,
           slideId,
-          title: slide.title || `Survey ${surveyAnalytics.length + 1}`,
-          subtitle: slide.subtitle || "",
+          title,
+          subtitle,
           options: optionStats,
           totalVotes,
-        });
+        };
+        surveyAnalytics.push(slideSurveyData);
       }
+
+      // Add to comprehensive Slide Analytics
+      slideAnalytics.push({
+        slideIndex: idx,
+        slideId,
+        title,
+        subtitle,
+        type: slideType,
+        isInteractive,
+        quiz: slideQuizData,
+        survey: slideSurveyData,
+      });
     });
 
-    // 4. Overall Scores & Participation
+    // 4. Extract Instant Pulse Polls (YES / NO) from Leads Responses
+    const instantPollsMap = new Map<string, {
+      pollId: string;
+      question: string;
+      yesVotes: number;
+      noVotes: number;
+      totalVotes: number;
+      yesVoters: { name: string; branch: string; phone: string }[];
+      noVoters: { name: string; branch: string; phone: string }[];
+    }>();
+
+    leads.forEach((l) => {
+      const respObj = (l.responses as any) || {};
+      Object.entries(respObj).forEach(([key, val]: [string, any]) => {
+        if (
+          val &&
+          (val.type === "INSTANT_POLL" || key.startsWith("poll_"))
+        ) {
+          const pId = val.pollId || key;
+          if (!instantPollsMap.has(pId)) {
+            instantPollsMap.set(pId, {
+              pollId: pId,
+              question: val.question || "YES or NO?",
+              yesVotes: 0,
+              noVotes: 0,
+              totalVotes: 0,
+              yesVoters: [],
+              noVoters: [],
+            });
+          }
+          const pollEntry = instantPollsMap.get(pId)!;
+          pollEntry.totalVotes++;
+          if (val.optionIndex === 0 || val.choice === "YES") {
+            pollEntry.yesVotes++;
+            pollEntry.yesVoters.push({
+              name: l.name,
+              branch: l.branch || "General",
+              phone: l.phone,
+            });
+          } else {
+            pollEntry.noVotes++;
+            pollEntry.noVoters.push({
+              name: l.name,
+              branch: l.branch || "General",
+              phone: l.phone,
+            });
+          }
+        }
+      });
+    });
+
+    const instantPollAnalytics = Array.from(instantPollsMap.values()).map((p) => {
+      const yesPct = p.totalVotes > 0 ? Math.round((p.yesVotes / p.totalVotes) * 100) : 0;
+      const noPct = p.totalVotes > 0 ? Math.round((p.noVotes / p.totalVotes) * 100) : 0;
+      return {
+        ...p,
+        yesPercentage: yesPct,
+        noPercentage: noPct,
+      };
+    });
+
+    // 5. Overall Scores & Participation
     const totalLeads = leads.length;
     const scores = leads.map((l) => l.totalScore || 0);
     const avgScore =
@@ -592,23 +691,52 @@ export const presentationsService = {
         highestScore: maxScore,
         totalQuizzes: questionAnalytics.length,
         totalSurveys: surveyAnalytics.length,
+        totalInstantPolls: instantPollAnalytics.length,
         branchDistribution: branchCounts,
+        yearDistribution: yearCounts,
       },
       questions: questionAnalytics,
       surveys: surveyAnalytics,
-      leads: leads.map((l, index) => ({
-        id: l.id,
-        name: l.name,
-        phone: l.phone,
-        email: l.email,
-        branch: l.branch || "Not Specified",
-        yearOfStudy: l.yearOfStudy || "Not Specified",
-        totalScore: l.totalScore || 0,
-        rank: index + 1,
-        streak: l.streak || 0,
-        joinedAt: l.joinedAt,
-        responsesCount: Object.keys((l.responses as any) || {}).length,
-      })),
+      slides: slideAnalytics,
+      instantPolls: instantPollAnalytics,
+      leads: leads.map((l, index) => {
+        const respMap = (l.responses as any) || {};
+        let correctCount = 0;
+        let quizzesAnswered = 0;
+
+        questionAnalytics.forEach((q) => {
+          const r = respMap[q.slideId];
+          if (r && r.optionIndex !== undefined) {
+            quizzesAnswered++;
+            if (r.optionIndex === q.correctOptionIndex) {
+              correctCount++;
+            }
+          }
+        });
+
+        const leadAccuracy =
+          quizzesAnswered > 0
+            ? Math.round((correctCount / quizzesAnswered) * 100)
+            : 0;
+
+        return {
+          id: l.id,
+          name: l.name,
+          phone: l.phone,
+          email: l.email,
+          branch: l.branch || "Not Specified",
+          yearOfStudy: l.yearOfStudy || "Not Specified",
+          totalScore: l.totalScore || 0,
+          rank: index + 1,
+          streak: l.streak || 0,
+          joinedAt: l.joinedAt,
+          responses: respMap,
+          responsesCount: Object.keys(respMap).length,
+          quizzesAnswered,
+          correctQuizzes: correctCount,
+          accuracyRate: leadAccuracy,
+        };
+      }),
     };
   },
 };
