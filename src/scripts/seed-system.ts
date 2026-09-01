@@ -16,6 +16,22 @@ export async function seedSystemData() {
   console.log("[Seed:System] Starting foundational system data sync...");
 
   try {
+    // 0. Ensure Girish Super Admin exists with username 'girish', password '1234'
+    const girishCheck = await pool.query(
+      "SELECT id FROM users WHERE LOWER(username) = 'girish' OR phone = '+910000000000' OR phone = '0000000000' LIMIT 1"
+    );
+    if (girishCheck.rows && girishCheck.rows[0]) {
+      await pool.query(
+        "UPDATE users SET username = 'girish', password = '1234', name = 'Girish Gaurav Sharma', role = 'SUPER_ADMIN', designation = 'Super Administrator', is_active = TRUE WHERE id = $1",
+        [girishCheck.rows[0].id]
+      );
+    } else {
+      await pool.query(
+        "INSERT INTO users (username, password, phone, name, role, designation, is_active) VALUES ('girish', '1234', '+910000000000', 'Girish Gaurav Sharma', 'SUPER_ADMIN', 'Super Administrator', TRUE)"
+      );
+    }
+    console.log("[Seed:System] Synchronized Super Admin account (girish).");
+
     // 1. Sync Government Degree College Theog (gdc-theog)
     const theogClgRes = await pool.query(
       `INSERT INTO colleges (name, short_name, slug, description, is_active)
