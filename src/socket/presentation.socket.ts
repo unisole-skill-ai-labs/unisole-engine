@@ -14,16 +14,31 @@ interface Attendee {
   joinedAt?: string;
 }
 
-interface SessionState {
+export interface DoubtItem {
+  id: string;
+  leadId: string;
+  studentName: string;
+  phone: string;
+  branch: string;
+  text: string;
+  createdAt: number;
+  isSpotlighted: boolean;
+  isAnswered: boolean;
+}
+
+export interface SessionState {
   sessionId: string;
   sessionCode: string;
   presentationId: string;
   slides: any[];
   currentSlideIndex: number;
-  buildStep?: number;
+  buildStep: number;
   isPresentationStarted: boolean;
   attendees: Map<string, Attendee>; // leadId -> Attendee
   socketToLead: Map<string, string>; // socketId -> leadId
+  isChatEnabled: boolean;
+  doubts: DoubtItem[];
+  spotlightedDoubtId: string | null;
   quizState: {
     isQuizActive: boolean;
     isAnswerRevealed: boolean;
@@ -117,6 +132,9 @@ export async function getOrCreateSessionState(
       isPresentationStarted: isStarted,
       attendees: new Map(),
       socketToLead: new Map(),
+      isChatEnabled: false,
+      doubts: [],
+      spotlightedDoubtId: null,
       quizState: {
         isQuizActive: session?.isQuizActive ?? false,
         isAnswerRevealed: session?.isAnswerRevealed ?? false,
@@ -205,6 +223,9 @@ export function setupPresentationSocket(io: SocketIOServer) {
           },
           instantPoll: getInstantPollPayload(sessionState),
           leaderboard: getLeaderboard(sessionState),
+          isChatEnabled: sessionState.isChatEnabled || false,
+          doubts: sessionState.doubts || [],
+          spotlightedDoubtId: sessionState.spotlightedDoubtId || null,
         });
       }
     );
@@ -305,6 +326,9 @@ export function setupPresentationSocket(io: SocketIOServer) {
           myScore: currentScore,
           myRank: getStudentRank(sessionState, leadId),
           leaderboard: getLeaderboard(sessionState).slice(0, 10),
+          isChatEnabled: sessionState.isChatEnabled || false,
+          doubts: sessionState.doubts || [],
+          spotlightedDoubtId: sessionState.spotlightedDoubtId || null,
         });
       }
     );
@@ -954,6 +978,173 @@ export function setupPresentationSocket(io: SocketIOServer) {
             branchStats,
           });
         }
+      }
+    );
+
+    // ==================== PRESENTER: TOGGLE LIVE CHAT / DOUBTS ====================
+    socket.on(
+      "admin:toggle_chat",
+      async ({
+        sessionCode,
+        isChatEnabled,
+      }: {
+        sessionCode: string;
+        isChatEnabled: boolean;
+      }) => {
+        if (!sessionCode) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
+
+        sessionState.isChatEnabled = Boolean(isChatEnabled);
+
+        io.to(room).emit("chat_status_updated", {
+          isChatEnabled: sessionState.isChatEnabled,
+          doubts: sessionState.doubts || [],
+          spotlightedDoubtId: sessionState.spotlightedDoubtId,
+        });
+      }
+    );
+
+    // ==================== AUDIENCE: SUBMIT LIVE DOUBT ====================
+    socket.on(
+      "audience:send_doubt",
+      async ({
+        sessionCode,
+        leadId,
+        text,
+      }: {
+        sessionCode: string;
+        leadId: string;
+        text: string;
+      }) => {
+        if (!sessionCode || !leadId || !text || !text.trim()) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState || !sessionState.isChatEnabled) return;
+
+        const attendee = sessionState.attendees.get(leadId);
+        const studentName = attendee?.name || "Student";
+        const phone = attendee?.phone || "";
+        const branch = attendee?.branch || "General";
+
+        const doubtItem: DoubtItem = {
+          id: `doubt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          leadId,
+          studentName,
+          phone,
+          branch,
+          text: text.trim().substring(0, 300),
+          createdAt: Date.now(),
+          isSpotlighted: false,
+          isAnswered: false,
+        };
+
+        if (!sessionState.doubts) sessionState.doubts = [];
+        sessionState.doubts.unshift(doubtItem); // newest first
+
+        // Broadcast doubt to session room
+        io.to(room).emit("doubt_received", {
+          doubt: doubtItem,
+          doubts: sessionState.doubts,
+        });
+      }
+    );
+
+    // ==================== PRESENTER: SPOTLIGHT DOUBT ON STAGE ====================
+    socket.on(
+      "admin:spotlight_doubt",
+      async ({
+        sessionCode,
+        doubtId,
+      }: {
+        sessionCode: string;
+        doubtId: string | null;
+      }) => {
+        if (!sessionCode) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState) return;
+
+        sessionState.spotlightedDoubtId = doubtId;
+        if (sessionState.doubts) {
+          sessionState.doubts.forEach((d) => {
+            d.isSpotlighted = d.id === doubtId;
+          });
+        }
+
+        const spotlightedDoubt =
+          sessionState.doubts?.find((d) => d.id === doubtId) || null;
+
+        io.to(room).emit("doubt_spotlighted", {
+          spotlightedDoubtId: doubtId,
+          doubt: spotlightedDoubt,
+        });
+      }
+    );
+
+    // ==================== PRESENTER: RESOLVE / ANSWER DOUBT ====================
+    socket.on(
+      "admin:resolve_doubt",
+      async ({
+        sessionCode,
+        doubtId,
+        isAnswered,
+      }: {
+        sessionCode: string;
+        doubtId: string;
+        isAnswered: boolean;
+      }) => {
+        if (!sessionCode || !doubtId) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState || !sessionState.doubts) return;
+
+        const target = sessionState.doubts.find((d) => d.id === doubtId);
+        if (target) {
+          target.isAnswered = Boolean(isAnswered);
+        }
+
+        io.to(room).emit("doubt_updated", {
+          doubtId,
+          isAnswered: Boolean(isAnswered),
+          doubts: sessionState.doubts,
+        });
+      }
+    );
+
+    // ==================== PRESENTER: DELETE DOUBT ====================
+    socket.on(
+      "admin:delete_doubt",
+      async ({
+        sessionCode,
+        doubtId,
+      }: {
+        sessionCode: string;
+        doubtId: string;
+      }) => {
+        if (!sessionCode || !doubtId) return;
+        const code = sessionCode.toUpperCase();
+        const room = `session:${code}`;
+        const sessionState = await getOrCreateSessionState(code);
+        if (!sessionState || !sessionState.doubts) return;
+
+        sessionState.doubts = sessionState.doubts.filter(
+          (d) => d.id !== doubtId
+        );
+        if (sessionState.spotlightedDoubtId === doubtId) {
+          sessionState.spotlightedDoubtId = null;
+        }
+
+        io.to(room).emit("doubt_deleted", {
+          doubtId,
+          doubts: sessionState.doubts,
+          spotlightedDoubtId: sessionState.spotlightedDoubtId,
+        });
       }
     );
 
