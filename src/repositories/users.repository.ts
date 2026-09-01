@@ -73,8 +73,7 @@ export const usersRepository = {
   },
 
   async create(data: NewUser): Promise<User> {
-    const id = data.id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const rows = await db.insert(users).values({ ...data, id }).returning();
+    const rows = await db.insert(users).values(data).returning();
     return rows[0];
   },
 
