@@ -561,9 +561,10 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const timeLimitMs = sessionState.quizState.timeLimit * 1000;
 
         let pointsEarned = 0;
-        const isAnswerCorrect = Boolean(isCorrect);
+        const isQuiz = slideType === "QUIZ" || (isCorrect !== undefined && typeof isCorrect === "boolean");
+        const isAnswerCorrect = isQuiz ? Boolean(isCorrect) : undefined;
 
-        if (slideType === "QUIZ" && isAnswerCorrect) {
+        if (isQuiz && isAnswerCorrect) {
           // Kahoot style formula: max 1000 points, min 300 points for correct answer within time limit
           const speedFactor = Math.max(0, (timeLimitMs - elapsedMs) / timeLimitMs);
           pointsEarned = Math.round(500 + speedFactor * 500);
@@ -574,12 +575,16 @@ export function setupPresentationSocket(io: SocketIOServer) {
           (sessionState.quizState.pollCounts[optionIndex] || 0) + 1;
 
         // Record student submission
-        const responseData = {
+        const responseData: any = {
+          slideId,
+          slideType,
           optionIndex,
-          isCorrect: isAnswerCorrect,
           responseTimeMs: elapsedMs,
           pointsEarned,
         };
+        if (isQuiz) {
+          responseData.isCorrect = isAnswerCorrect;
+        }
         sessionState.quizState.quizAnswers.set(leadId, responseData);
 
         // Update Attendee cumulative stats

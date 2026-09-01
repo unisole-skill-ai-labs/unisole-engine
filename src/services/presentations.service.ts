@@ -669,6 +669,15 @@ export const presentationsService = {
         ? Math.round((activeParticipants / totalLeads) * 100)
         : 0;
 
+    // Build fast lookup map for slides
+    const slideLookup = new Map<string, any>();
+    slides.forEach((s, idx) => {
+      const sId = s.id || `slide-${idx}`;
+      slideLookup.set(sId, { ...s, slideIndex: idx });
+      slideLookup.set(`slide-${idx}`, { ...s, slideIndex: idx });
+      if (s.id) slideLookup.set(s.id, { ...s, slideIndex: idx });
+    });
+
     return {
       session: {
         id: session.id,
@@ -719,6 +728,82 @@ export const presentationsService = {
             ? Math.round((correctCount / quizzesAnswered) * 100)
             : 0;
 
+        // Build enriched chronological responses list for this student
+        const enrichedResponses: any[] = [];
+        Object.entries(respMap).forEach(([key, val]: [string, any]) => {
+          if (!val) return;
+          const isInstantPoll = val.type === "INSTANT_POLL" || key.startsWith("poll_");
+
+          if (isInstantPoll) {
+            enrichedResponses.push({
+              key,
+              type: "INSTANT_POLL",
+              title: val.question || "YES or NO?",
+              chosenOption: val.choice || (val.optionIndex === 0 ? "YES 👍" : "NO 👎"),
+              choice: val.choice || (val.optionIndex === 0 ? "YES" : "NO"),
+              responseTimeMs: val.responseTimeMs,
+              isCorrect: undefined,
+            });
+          } else {
+            const slideInfo = slideLookup.get(key) || slideLookup.get(val.slideId);
+            const rawType = (slideInfo?.type || val.slideType || "POLL").toUpperCase();
+            const isQuiz =
+              rawType.includes("QUIZ") ||
+              slideInfo?.correctOptionIndex !== undefined ||
+              (val.isCorrect !== undefined && typeof val.isCorrect === "boolean");
+            const options =
+              slideInfo?.options ||
+              slideInfo?.pollOptions ||
+              slideInfo?.quizOptions ||
+              [];
+
+            let chosenOptionText = "";
+            if (val.optionIndex !== undefined && options[val.optionIndex]) {
+              const opt = options[val.optionIndex];
+              chosenOptionText =
+                typeof opt === "string"
+                  ? opt
+                  : opt?.text || opt?.label || `Option ${val.optionIndex + 1}`;
+            } else if (val.choice) {
+              chosenOptionText = val.choice;
+            } else if (val.optionIndex !== undefined) {
+              chosenOptionText = `Option ${val.optionIndex + 1}`;
+            }
+
+            let isAnswerCorrect: boolean | undefined = undefined;
+            let correctOptionText = "";
+            if (isQuiz) {
+              const correctIdx = slideInfo?.correctOptionIndex ?? 0;
+              isAnswerCorrect =
+                val.isCorrect !== undefined
+                  ? val.isCorrect
+                  : val.optionIndex === correctIdx;
+              const corrOpt = options[correctIdx];
+              correctOptionText =
+                typeof corrOpt === "string"
+                  ? corrOpt
+                  : corrOpt?.text || corrOpt?.label || `Option ${correctIdx + 1}`;
+            }
+
+            enrichedResponses.push({
+              key,
+              slideIndex: slideInfo?.slideIndex,
+              type: isQuiz ? "QUIZ" : "POLL",
+              title:
+                slideInfo?.quizQuestion ||
+                slideInfo?.title ||
+                val.question ||
+                `Slide Interaction`,
+              chosenOption: chosenOptionText || "Selected Option",
+              optionIndex: val.optionIndex,
+              isCorrect: isQuiz ? isAnswerCorrect : undefined,
+              correctOption: isQuiz ? correctOptionText : undefined,
+              pointsEarned: val.pointsEarned || 0,
+              responseTimeMs: val.responseTimeMs,
+            });
+          }
+        });
+
         return {
           id: l.id,
           name: l.name,
@@ -731,6 +816,7 @@ export const presentationsService = {
           streak: l.streak || 0,
           joinedAt: l.joinedAt,
           responses: respMap,
+          enrichedResponses,
           responsesCount: Object.keys(respMap).length,
           quizzesAnswered,
           correctQuizzes: correctCount,
