@@ -57,6 +57,7 @@ interface SessionState {
 }
 
 const activeSessions = new Map<string, SessionState>();
+const reactionCooldowns = new Map<string, number>();
 
 export function getBranchDistribution(sessionState: SessionState) {
   const counts: Record<string, number> = {};
@@ -863,11 +864,22 @@ export function setupPresentationSocket(io: SocketIOServer) {
         emoji: string;
       }) => {
         if (!sessionCode) return;
+        const now = Date.now();
+        const lastSent = reactionCooldowns.get(socket.id) || 0;
+        // Rate limit: max 1 reaction every 1.5 seconds per user
+        if (now - lastSent < 1500) {
+          return;
+        }
+        reactionCooldowns.set(socket.id, now);
+
         const code = sessionCode.toUpperCase();
         const room = `session:${code}`;
+        const allowedEmojis = ["🔥", "👏", "🚀", "❤️", "💡", "👍", "🎉"];
+        const cleanEmoji = allowedEmojis.includes(emoji) ? emoji : "🔥";
+
         io.to(room).emit("reaction_pulse", {
-          emoji: emoji || "🔥",
-          id: Math.random().toString(36).substring(2, 9),
+          emoji: cleanEmoji,
+          id: `${now}_${Math.random().toString(36).substring(2, 7)}`,
         });
       }
     );
