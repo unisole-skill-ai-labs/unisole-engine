@@ -12,7 +12,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-unisole}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./edtech_schema_and_seed.sql:/docker-entrypoint-initdb.d/01_schema_and_seed.sql:ro
       - ./backups:/backups
     ports:
       - "5432:5432" # Internal only, not exposed to internet
