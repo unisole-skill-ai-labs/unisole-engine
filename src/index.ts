@@ -11,9 +11,9 @@ import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
-import { initializeDatabase } from "./db/init";
-
-dotenv.config();
+import { pool, db } from "./db";
+import path from "path";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 const app = express();
 const server = http.createServer(app);
