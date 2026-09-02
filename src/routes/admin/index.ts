@@ -12,6 +12,7 @@ import { adminEnrollmentsRouter } from "./enrollments";
 import { adminPaymentsRouter } from "./payments";
 import { adminPresentationsRouter } from "./presentations";
 import { adminTasksRouter } from "./tasks";
+import { adminProjectsRouter, adminSubProjectsRouter } from "./projects";
 import { adminTeamRouter } from "./team";
 import { adminTemplatesRouter } from "./templates";
 import { adminDailyLogsRouter } from "./daily-logs";
@@ -20,6 +21,10 @@ export const adminRouter: Router = Router();
 
 // Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER)
 adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER"]));
+
+// WorkSole Projects & Hierarchy Management
+adminRouter.use("/projects", adminProjectsRouter);
+adminRouter.use("/sub-projects", adminSubProjectsRouter);
 
 // Team & Task Management
 adminRouter.use("/tasks", adminTasksRouter);

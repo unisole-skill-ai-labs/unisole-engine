@@ -9,6 +9,8 @@ export const tasksController = {
       assigneeId: req.query.assigneeId as string,
       status: req.query.status as string,
       departmentId: req.query.departmentId as string,
+      projectId: req.query.projectId as string,
+      subProjectId: req.query.subProjectId as string,
       priority: req.query.priority as string,
       search: req.query.search as string,
       view: req.query.view as any,
