@@ -57,7 +57,19 @@ app.use(notFound);
 app.use(errorHandler);
 
 async function bootstrap() {
-  await initializeDatabase();
+  try {
+    const res = await pool.query("SELECT 1 as connected");
+    if (res.rows?.[0]?.connected) {
+      console.log("[BOOTSTRAP] PostgreSQL Database connection established successfully.");
+    }
+
+    // Run Drizzle ORM official migrations
+    const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+    await migrate(db, { migrationsFolder });
+    console.log("[BOOTSTRAP] Drizzle migrations applied successfully.");
+  } catch (err) {
+    console.error("[BOOTSTRAP] Database bootstrap error:", err);
+  }
 
   const PORT = Number(process.env.PORT ?? 3000);
   server.listen(PORT, () => {
