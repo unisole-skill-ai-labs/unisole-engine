@@ -75,10 +75,14 @@ export const presentationsController = {
 
   async launchSession(req: Request, res: Response, next: NextFunction) {
     try {
+      const origin = (req.headers.origin || req.headers.referer || "") as string;
+      const isStaging = origin.includes("stg") || process.env.NODE_ENV === "staging";
       const clientBaseUrl =
+        req.body?.clientBaseUrl ||
+        (req.headers["x-client-url"] as string) ||
         process.env.SEO_URL ||
         process.env.CLIENT_URL ||
-        "https://unisole.org";
+        (isStaging ? "https://stg.unisole.org" : "https://unisole.org");
       const data = await presentationsService.launchSession(
         req.params.id,
         {
