@@ -20,28 +20,31 @@ export async function seedSystemData() {
     // 0. Ensure Girish Super Admin exists with secure hashed credentials
     const adminPasswordRaw =
       process.env.SUPERADMIN_PASSWORD ||
-      process.env.SUPERADMIN_INITIAL_PASSWORD ||
-      "1234";
-    const hashedPassword = await bcrypt.hash(adminPasswordRaw, 10);
+      process.env.SUPERADMIN_INITIAL_PASSWORD;
 
     const girishCheck = await pool.query(
       "SELECT id, password FROM users WHERE LOWER(username) = 'girish' OR phone = '+910000000000' OR phone = '0000000000' LIMIT 1"
     );
-    if (girishCheck.rows && girishCheck.rows[0]) {
-      const existingPw = girishCheck.rows[0].password;
-      // If no password or explicit env override provided, update password
-      const pwToSet = process.env.SUPERADMIN_PASSWORD || !existingPw ? hashedPassword : existingPw;
-      await pool.query(
-        "UPDATE users SET username = 'girish', password = $1, name = 'Girish Gaurav Sharma', role = 'SUPER_ADMIN', designation = 'Super Administrator', is_active = TRUE WHERE id = $2",
-        [pwToSet, girishCheck.rows[0].id]
-      );
+
+    if (adminPasswordRaw) {
+      const hashedPassword = await bcrypt.hash(adminPasswordRaw, 10);
+      if (girishCheck.rows && girishCheck.rows[0]) {
+        await pool.query(
+          "UPDATE users SET username = 'girish', password = $1, name = 'Girish Gaurav Sharma', role = 'SUPER_ADMIN', designation = 'Super Administrator', is_active = TRUE WHERE id = $2",
+          [hashedPassword, girishCheck.rows[0].id]
+        );
+      } else {
+        await pool.query(
+          "INSERT INTO users (username, password, phone, name, role, designation, is_active) VALUES ('girish', $1, '+910000000000', 'Girish Gaurav Sharma', 'SUPER_ADMIN', 'Super Administrator', TRUE)",
+          [hashedPassword]
+        );
+      }
+      console.log("[Seed:System] Synchronized Super Admin account (girish) with secure hashed credentials.");
+    } else if (girishCheck.rows && girishCheck.rows[0]) {
+      console.log("[Seed:System] Synchronized Super Admin profile (existing password preserved).");
     } else {
-      await pool.query(
-        "INSERT INTO users (username, password, phone, name, role, designation, is_active) VALUES ('girish', $1, '+910000000000', 'Girish Gaurav Sharma', 'SUPER_ADMIN', 'Super Administrator', TRUE)",
-        [hashedPassword]
-      );
+      console.warn("[Seed:System] ⚠️ SUPERADMIN_PASSWORD environment variable not set. Please set SUPERADMIN_PASSWORD in .env.");
     }
-    console.log("[Seed:System] Synchronized Super Admin account (girish).");
 
     // 1. Sync Government Degree College Theog (gdc-theog)
     const theogClgRes = await pool.query(

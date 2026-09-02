@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { db, pool } from "../db";
 import { eq, desc, asc, and, ilike } from "drizzle-orm";
 import {
@@ -77,7 +78,12 @@ export const teamService = {
       throw new ConflictError(`Username "${cleanUsername}" is already in use`);
     }
 
-    const cleanPassword = (data.password || "1234").trim();
+    if (!data.password || data.password.trim().length === 0) {
+      throw new ValidationError("Password is required for creating a team member");
+    }
+    const cleanPassword = data.password.trim();
+    const hashedPassword = await bcrypt.hash(cleanPassword, 10);
+
     let cleanPhone = data.phone ? data.phone.replace(/\D/g, "").slice(-10) : "";
     if (!cleanPhone || cleanPhone.length !== 10) {
       cleanPhone = "0000000000";
@@ -90,7 +96,7 @@ export const teamService = {
       [
         newId,
         cleanUsername,
-        cleanPassword,
+        hashedPassword,
         cleanPhone,
         data.name.trim(),
         (data.role as any) || "MEMBER",
