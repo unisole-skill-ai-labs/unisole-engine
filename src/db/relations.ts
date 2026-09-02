@@ -18,6 +18,8 @@ import {
   presentationSessions,
   presentationLeads,
   teamDepartments,
+  projects,
+  subProjects,
   tasks,
   taskSubtasks,
   taskTemplates,
@@ -30,6 +32,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   payments: many(payments),
   assignedTasks: many(tasks, { relationName: "taskAssignee" }),
   reportedTasks: many(tasks, { relationName: "taskReporter" }),
+  ledProjects: many(projects, { relationName: "projectLead" }),
+  createdProjects: many(projects, { relationName: "projectCreator" }),
+  ledSubProjects: many(subProjects, { relationName: "subProjectLead" }),
   taskComments: many(taskComments),
   dailyEodLogs: many(dailyEodLogs),
 }));
@@ -186,8 +191,41 @@ export const teamDepartmentsRelations = relations(teamDepartments, ({ one, many 
     fields: [teamDepartments.leadId],
     references: [users.id],
   }),
+  projects: many(projects),
   tasks: many(tasks),
   templates: many(taskTemplates),
+}));
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  department: one(teamDepartments, {
+    fields: [projects.departmentId],
+    references: [teamDepartments.id],
+  }),
+  lead: one(users, {
+    fields: [projects.leadId],
+    references: [users.id],
+    relationName: "projectLead",
+  }),
+  createdBy: one(users, {
+    fields: [projects.createdById],
+    references: [users.id],
+    relationName: "projectCreator",
+  }),
+  subProjects: many(subProjects),
+  tasks: many(tasks),
+}));
+
+export const subProjectsRelations = relations(subProjects, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [subProjects.projectId],
+    references: [projects.id],
+  }),
+  lead: one(users, {
+    fields: [subProjects.leadId],
+    references: [users.id],
+    relationName: "subProjectLead",
+  }),
+  tasks: many(tasks),
 }));
 
 export const taskTemplatesRelations = relations(taskTemplates, ({ one, many }) => ({
@@ -203,6 +241,14 @@ export const taskTemplatesRelations = relations(taskTemplates, ({ one, many }) =
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
+  }),
+  subProject: one(subProjects, {
+    fields: [tasks.subProjectId],
+    references: [subProjects.id],
+  }),
   assignee: one(users, {
     fields: [tasks.assigneeId],
     references: [users.id],

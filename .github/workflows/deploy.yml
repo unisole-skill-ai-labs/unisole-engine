@@ -65,7 +65,9 @@ jobs:
 
                   ssh -i ~/.ssh/id_rsa $AWS_EC2_USER@$AWS_EC2_HOST << 'EOF'
                     cd /opt/unisole
-                    git pull origin production
+                    git fetch origin production
+                    git checkout -B production origin/production
+                    git reset --hard origin/production
                     echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
                     docker-compose -f docker-compose.prod.yml down
                     docker-compose -f docker-compose.prod.yml pull

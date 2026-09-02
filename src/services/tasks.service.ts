@@ -6,6 +6,8 @@ import {
   taskComments,
   taskTemplates,
   teamDepartments,
+  projects,
+  subProjects,
   users,
   Task,
   TaskSubtask,
@@ -20,6 +22,8 @@ export interface TaskFilterQuery {
   assigneeId?: string;
   status?: string;
   departmentId?: string;
+  projectId?: string;
+  subProjectId?: string;
   priority?: string;
   search?: string;
   view?: "my_focus" | "all" | "review";
@@ -37,6 +41,11 @@ export const tasksService = {
         description: tasks.description,
         status: tasks.status,
         priority: tasks.priority,
+        projectId: tasks.projectId,
+        projectName: projects.name,
+        projectCode: projects.code,
+        subProjectId: tasks.subProjectId,
+        subProjectName: subProjects.name,
         assigneeId: tasks.assigneeId,
         assigneeName: users.name,
         assigneePhone: users.phone,
@@ -62,6 +71,8 @@ export const tasksService = {
       .from(tasks)
       .leftJoin(users, eq(tasks.assigneeId, users.id))
       .leftJoin(teamDepartments, eq(tasks.departmentId, teamDepartments.id))
+      .leftJoin(projects, eq(tasks.projectId, projects.id))
+      .leftJoin(subProjects, eq(tasks.subProjectId, subProjects.id))
       .$dynamic();
 
     const conditions = [];
@@ -79,6 +90,14 @@ export const tasksService = {
 
     if (filter.departmentId) {
       conditions.push(eq(tasks.departmentId, filter.departmentId));
+    }
+
+    if (filter.projectId) {
+      conditions.push(eq(tasks.projectId, filter.projectId));
+    }
+
+    if (filter.subProjectId) {
+      conditions.push(eq(tasks.subProjectId, filter.subProjectId));
     }
 
     if (filter.priority) {
@@ -144,6 +163,11 @@ export const tasksService = {
         description: tasks.description,
         status: tasks.status,
         priority: tasks.priority,
+        projectId: tasks.projectId,
+        projectName: projects.name,
+        projectCode: projects.code,
+        subProjectId: tasks.subProjectId,
+        subProjectName: subProjects.name,
         assigneeId: tasks.assigneeId,
         assigneeName: users.name,
         assigneePhone: users.phone,
@@ -169,6 +193,8 @@ export const tasksService = {
       .from(tasks)
       .leftJoin(users, eq(tasks.assigneeId, users.id))
       .leftJoin(teamDepartments, eq(tasks.departmentId, teamDepartments.id))
+      .leftJoin(projects, eq(tasks.projectId, projects.id))
+      .leftJoin(subProjects, eq(tasks.subProjectId, subProjects.id))
       .where(eq(tasks.id, id))
       .limit(1);
 
@@ -216,6 +242,8 @@ export const tasksService = {
       title: string;
       description?: string;
       priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+      projectId?: string;
+      subProjectId?: string;
       assigneeId?: string;
       departmentId?: string;
       templateId?: string;
@@ -259,6 +287,8 @@ export const tasksService = {
         description: data.description || null,
         priority: data.priority || "MEDIUM",
         status: "TODO",
+        projectId: data.projectId || null,
+        subProjectId: data.subProjectId || null,
         assigneeId: data.assigneeId || null,
         reporterId: reporterId || null,
         departmentId: data.departmentId || null,
