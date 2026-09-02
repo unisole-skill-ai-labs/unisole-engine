@@ -11,9 +11,7 @@ import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
-import path from "path";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { db, pool } from "./db";
+import { initializeDatabase } from "./db/init";
 
 dotenv.config();
 
@@ -59,19 +57,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 async function bootstrap() {
-  try {
-    const res = await pool.query("SELECT 1 as connected");
-    if (res.rows?.[0]?.connected) {
-      console.log("[BOOTSTRAP] PostgreSQL Database connection established successfully.");
-    }
-
-    // Run Drizzle ORM official migrations
-    const migrationsFolder = path.resolve(process.cwd(), "drizzle");
-    await migrate(db, { migrationsFolder });
-    console.log("[BOOTSTRAP] Drizzle migrations applied successfully.");
-  } catch (err) {
-    console.error("[BOOTSTRAP] Database bootstrap notice:", err);
-  }
+  await initializeDatabase();
 
   const PORT = Number(process.env.PORT ?? 3000);
   server.listen(PORT, () => {
