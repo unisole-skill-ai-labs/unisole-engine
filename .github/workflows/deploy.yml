@@ -70,6 +70,9 @@ jobs:
                     docker-compose -f docker-compose.prod.yml down
                     docker-compose -f docker-compose.prod.yml pull
                     docker-compose -f docker-compose.prod.yml up -d
+                    sleep 5
+                    docker-compose -f docker-compose.prod.yml exec -T api npm run db:migrate || true
+                    docker-compose -f docker-compose.prod.yml exec -T api npm run db:seed:system || true
                     docker-compose -f docker-compose.prod.yml logs --tail=50
                   EOF
 

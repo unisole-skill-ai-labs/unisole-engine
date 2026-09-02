@@ -40,9 +40,15 @@ jobs:
                       git pull origin staging
                     fi
 
+                    # Ensure .env exists
+                    if [ ! -f ".env" ] && [ -f ".env.staging" ]; then
+                      echo "[Deploy] Copying .env.staging to .env..."
+                      cp .env.staging .env
+                    fi
+
                     # Start Staging Containers
                     echo "[Deploy] Starting Staging Docker containers..."
-                    docker compose -f docker-compose.staging.yml up -d --build
+                    docker compose --env-file .env -f docker-compose.staging.yml up -d --build
 
                     # Wait for PostgreSQL container to become ready
                     echo "[Deploy] Waiting for Staging PostgreSQL to initialize..."
@@ -50,13 +56,13 @@ jobs:
 
                     # Execute Migrations and System Seed
                     echo "[Deploy] Executing Staging Database Migrations..."
-                    docker compose -f docker-compose.staging.yml exec -T api-staging npm run db:migrate || true
+                    docker compose --env-file .env -f docker-compose.staging.yml exec -T api-staging npm run db:migrate || true
                     
                     echo "[Deploy] Executing System Seeding..."
-                    docker compose -f docker-compose.staging.yml exec -T api-staging npm run db:seed:system || true
+                    docker compose --env-file .env -f docker-compose.staging.yml exec -T api-staging npm run db:seed:system || true
 
                     echo "[Deploy] Staging deployment successful! Recent logs:"
-                    docker compose -f docker-compose.staging.yml logs --tail=20 api-staging
+                    docker compose --env-file .env -f docker-compose.staging.yml logs --tail=20 api-staging
                   EOF
 
             - name: Notify Deployment Success
