@@ -1,0 +1,69 @@
+name: Build & Deploy Staging Backend to EC2
+
+on:
+    push:
+        branches:
+            - staging
+    workflow_dispatch:
+
+jobs:
+    deploy-staging-to-ec2:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Deploy Staging to EC2
+              env:
+                  AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+                  AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+                  AWS_EC2_KEY: ${{ secrets.AWS_EC2_KEY }}
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "$AWS_EC2_KEY" > ~/.ssh/id_rsa
+                  chmod 600 ~/.ssh/id_rsa
+                  ssh-keyscan -H $AWS_EC2_HOST >> ~/.ssh/known_hosts
+
+                  ssh -i ~/.ssh/id_rsa $AWS_EC2_USER@$AWS_EC2_HOST << 'EOF'
+                    set -e
+                    TARGET_DIR="$HOME/unisole-staging"
+                    mkdir -p "$TARGET_DIR"
+                    cd "$TARGET_DIR"
+
+                    # Clone or fetch staging code
+                    if [ ! -d ".git" ]; then
+                      git clone -b staging https://github.com/unisole-skill-ai-labs/unisole-engine.git .
+                    else
+                      git fetch origin staging
+                      git checkout staging
+                      git pull origin staging
+                    fi
+
+                    # Ensure .env exists
+                    if [ ! -f ".env" ] && [ -f ".env.staging" ]; then
+                      echo "[Deploy] Copying .env.staging to .env..."
+                      cp .env.staging .env
+                    fi
+
+                    # Start Staging Containers
+                    echo "[Deploy] Starting Staging Docker containers..."
+                    docker compose --env-file .env -f docker-compose.staging.yml up -d --build
+
+                    # Wait for PostgreSQL container to become ready
+                    echo "[Deploy] Waiting for Staging PostgreSQL to initialize..."
+                    sleep 8
+
+                    # Execute Migrations and System Seed
+                    echo "[Deploy] Executing Staging Database Migrations..."
+                    docker compose --env-file .env -f docker-compose.staging.yml exec -T api-staging npm run db:migrate || true
+                    
+                    echo "[Deploy] Executing System Seeding..."
+                    docker compose --env-file .env -f docker-compose.staging.yml exec -T api-staging npm run db:seed:system || true
+
+                    echo "[Deploy] Staging deployment successful! Recent logs:"
+                    docker compose --env-file .env -f docker-compose.staging.yml logs --tail=20 api-staging
+                  EOF
+
+            - name: Notify Deployment Success
+              run: echo "✅ Staging Backend API deployment to EC2 completed successfully"

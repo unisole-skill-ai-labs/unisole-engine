@@ -29,8 +29,7 @@ export const collegesRepository = {
   },
 
   async create(data: NewCollege): Promise<College> {
-    const id = data.id || `clg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const rows = await db.insert(colleges).values({ ...data, id }).returning();
+    const rows = await db.insert(colleges).values(data).returning();
     return rows[0];
   },
 

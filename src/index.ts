@@ -11,7 +11,7 @@ import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
-import { ensureDatabaseSchema } from "./db/init";
+import { pool } from "./db";
 
 dotenv.config();
 
@@ -58,11 +58,12 @@ app.use(errorHandler);
 
 async function bootstrap() {
   try {
-    console.log("[BOOTSTRAP] Verifying database connectivity and schema migrations...");
-    await ensureDatabaseSchema();
-    console.log("[BOOTSTRAP] Database verified successfully.");
+    const res = await pool.query("SELECT 1 as connected");
+    if (res.rows?.[0]?.connected) {
+      console.log("[BOOTSTRAP] PostgreSQL Database connection established successfully.");
+    }
   } catch (err) {
-    console.error("[BOOTSTRAP] Database initialization notice:", err);
+    console.error("[BOOTSTRAP] Database connectivity notice:", err);
   }
 
   const PORT = Number(process.env.PORT ?? 3000);

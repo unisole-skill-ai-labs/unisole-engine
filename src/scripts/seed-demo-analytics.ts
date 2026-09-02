@@ -1,8 +1,13 @@
 import { pool } from "../db";
 
 async function seedRichDemoData() {
+  if (process.env.NODE_ENV === "production" && !process.env.ALLOW_PROD_DEMO_SEED) {
+    console.error("⛔ FATAL: Attempted to run mock demo seed script in PRODUCTION! Aborting.");
+    process.exit(1);
+  }
+
   try {
-    console.log("[Seed] Populating full rich demonstration data for universities...");
+    console.log("[Seed:Demo] Populating rich demonstration data for universities...");
 
     // Get Colleges
     const collegesRes = await pool.query("SELECT id, name, slug FROM colleges");

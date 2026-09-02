@@ -9,7 +9,6 @@ services:
       POSTGRES_DB: unisole
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./edtech_schema_and_seed.sql:/docker-entrypoint-initdb.d/01_schema_and_seed.sql:ro
     ports:
       - "5433:5432"
     healthcheck:

@@ -44,8 +44,7 @@ export const branchesRepository = {
   },
 
   async create(data: NewBranch): Promise<Branch> {
-    const id = data.id || `brn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const rows = await db.insert(branches).values({ ...data, id }).returning();
+    const rows = await db.insert(branches).values(data).returning();
     return rows[0];
   },
 
