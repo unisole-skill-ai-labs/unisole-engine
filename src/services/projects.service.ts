@@ -284,8 +284,8 @@ export const projectsService = {
         createdById: data.createdById || null,
         status: data.status || "ACTIVE",
         priority: data.priority || "MEDIUM",
-        startDate: data.startDate || null,
-        targetEndDate: data.targetEndDate || null,
+        startDate: data.startDate && String(data.startDate).trim() ? new Date(data.startDate).toISOString() : null,
+        targetEndDate: data.targetEndDate && String(data.targetEndDate).trim() ? new Date(data.targetEndDate).toISOString() : null,
         color: data.color || "#6366f1",
         icon: data.icon || "folder",
       })
