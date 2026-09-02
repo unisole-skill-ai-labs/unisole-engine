@@ -9,8 +9,8 @@ services:
     image: postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-unisole_staging}
     volumes:
       - pgdata_staging:/var/lib/postgresql/data
@@ -20,7 +20,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-unisole_staging}",
+          "pg_isready -U ${DB_USER} -d ${DB_NAME:-unisole_staging}",
         ]
       interval: 5s
       timeout: 5s
@@ -40,11 +40,11 @@ services:
     restart: always
     environment:
       PORT: 3001
-      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db-staging:5432/${DB_NAME:-unisole_staging}
-      JWT_SECRET: ${JWT_SECRET:-unisole-staging-secret-key-2026}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-unisole-staging-refresh-secret-key-2026}
-      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_test_secret_staging}
-      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-unisole_webhook_staging_2026}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@db-staging:5432/${DB_NAME:-unisole_staging}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
       NODE_ENV: staging
     ports:
       - "3001:3001"

@@ -78,20 +78,17 @@ export const authService = {
 
     let isMatch = false;
     if (user.password) {
-      if (user.password === password) {
-        isMatch = true;
-      } else {
-        try {
-          isMatch = await bcrypt.compare(password, user.password);
-        } catch {
-          isMatch = user.password === password;
-        }
+      try {
+        isMatch = await bcrypt.compare(password, user.password);
+      } catch {
+        isMatch = false;
       }
-    } else {
-      // Fallback for initial demo super admin
-      if (user.role === "SUPER_ADMIN" && password === "1234") {
+
+      // Legacy plaintext migration fallback (auto-upgrade to bcrypt hash on successful login)
+      if (!isMatch && user.password === password) {
         isMatch = true;
-        await usersRepository.update(user.id, { password: "1234" });
+        const newHash = await bcrypt.hash(password, 10);
+        await usersRepository.update(user.id, { password: newHash });
       }
     }
 

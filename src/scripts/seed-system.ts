@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { pool } from "../db";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck";
@@ -16,18 +17,28 @@ export async function seedSystemData() {
   console.log("[Seed:System] Starting foundational system data sync...");
 
   try {
-    // 0. Ensure Girish Super Admin exists with username 'girish', password '1234'
+    // 0. Ensure Girish Super Admin exists with secure hashed credentials
+    const adminPasswordRaw =
+      process.env.SUPERADMIN_PASSWORD ||
+      process.env.SUPERADMIN_INITIAL_PASSWORD ||
+      "1234";
+    const hashedPassword = await bcrypt.hash(adminPasswordRaw, 10);
+
     const girishCheck = await pool.query(
-      "SELECT id FROM users WHERE LOWER(username) = 'girish' OR phone = '+910000000000' OR phone = '0000000000' LIMIT 1"
+      "SELECT id, password FROM users WHERE LOWER(username) = 'girish' OR phone = '+910000000000' OR phone = '0000000000' LIMIT 1"
     );
     if (girishCheck.rows && girishCheck.rows[0]) {
+      const existingPw = girishCheck.rows[0].password;
+      // If no password or explicit env override provided, update password
+      const pwToSet = process.env.SUPERADMIN_PASSWORD || !existingPw ? hashedPassword : existingPw;
       await pool.query(
-        "UPDATE users SET username = 'girish', password = '1234', name = 'Girish Gaurav Sharma', role = 'SUPER_ADMIN', designation = 'Super Administrator', is_active = TRUE WHERE id = $1",
-        [girishCheck.rows[0].id]
+        "UPDATE users SET username = 'girish', password = $1, name = 'Girish Gaurav Sharma', role = 'SUPER_ADMIN', designation = 'Super Administrator', is_active = TRUE WHERE id = $2",
+        [pwToSet, girishCheck.rows[0].id]
       );
     } else {
       await pool.query(
-        "INSERT INTO users (username, password, phone, name, role, designation, is_active) VALUES ('girish', '1234', '+910000000000', 'Girish Gaurav Sharma', 'SUPER_ADMIN', 'Super Administrator', TRUE)"
+        "INSERT INTO users (username, password, phone, name, role, designation, is_active) VALUES ('girish', $1, '+910000000000', 'Girish Gaurav Sharma', 'SUPER_ADMIN', 'Super Administrator', TRUE)",
+        [hashedPassword]
       );
     }
     console.log("[Seed:System] Synchronized Super Admin account (girish).");
