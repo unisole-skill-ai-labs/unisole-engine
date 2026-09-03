@@ -45,6 +45,7 @@ app.get("/", (_req, res) => {
   });
 });
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
 // Route Groups
 app.use("/api/auth", authRouter);
