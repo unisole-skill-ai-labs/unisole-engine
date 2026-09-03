@@ -8,10 +8,12 @@ import { adminRouter } from "./routes/admin";
 import { lmsRouter } from "./routes/lms";
 import { publicRouter } from "./routes/public";
 import { webhooksRouter } from "./routes/webhooks";
+import { iaptRouter } from "./routes/iapt";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
 import { pool, db } from "./db";
+import { initializeDatabase } from "./db/init";
 import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
@@ -53,6 +55,8 @@ app.use("/api/admin", adminRouter);
 app.use("/api/lms", lmsRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/webhooks", webhooksRouter);
+app.use("/api/iapt", iaptRouter);
+app.use("/api/v1/iapt", iaptRouter);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -64,13 +68,17 @@ async function bootstrap() {
       console.log("[BOOTSTRAP] PostgreSQL Database connection established successfully.");
     }
 
-    // Run Drizzle ORM official migrations
+    // 1. Direct Idempotent DDL Execution (Guarantees all tables, sequences, enums, FKs, and columns exist)
+    await initializeDatabase();
+
+    // 2. Run Drizzle ORM official migrations
     const migrationsFolder = path.resolve(process.cwd(), "drizzle");
     await migrate(db, { migrationsFolder });
     console.log("[BOOTSTRAP] Drizzle migrations applied successfully.");
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);
   }
+
 
   const PORT = Number(process.env.PORT ?? 3000);
   server.listen(PORT, () => {

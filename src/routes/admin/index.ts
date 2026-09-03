@@ -11,6 +11,7 @@ import { adminLessonsRouter } from "./lessons";
 import { adminEnrollmentsRouter } from "./enrollments";
 import { adminPaymentsRouter } from "./payments";
 import { adminPresentationsRouter } from "./presentations";
+import { adminLeadsRouter } from "./leads";
 import { adminTasksRouter } from "./tasks";
 import { adminProjectsRouter, adminSubProjectsRouter } from "./projects";
 import { adminTeamRouter } from "./team";
@@ -21,6 +22,9 @@ export const adminRouter: Router = Router();
 
 // Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER)
 adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER"]));
+
+// Lead Management CRM
+adminRouter.use("/leads", adminLeadsRouter);
 
 // WorkSole Projects & Hierarchy Management
 adminRouter.use("/projects", adminProjectsRouter);
