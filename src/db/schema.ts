@@ -86,6 +86,44 @@ export const subProjectStatus = pgEnum("sub_project_status", [
   "BLOCKED",
   "COMPLETED",
 ]);
+export const leadQuality = pgEnum("lead_quality", [
+  "HOT",
+  "WARM",
+  "COLD",
+  "POOR",
+  "UNQUALIFIED",
+]);
+export const leadStatus = pgEnum("lead_status", [
+  "NEW",
+  "ATTEMPTED",
+  "CONTACTED",
+  "INTERESTED",
+  "FOLLOW_UP_SCHEDULED",
+  "DEMO_GIVEN",
+  "CONVERTED",
+  "LOST",
+  "JUNK",
+]);
+export const leadSource = pgEnum("lead_source", [
+  "PRESENTATION_SESSION",
+  "COLLEGE_DRIVE",
+  "PAMPHLET_SCAN",
+  "WEBSITE_INQUIRY",
+  "REFERRAL",
+  "MANUAL_IMPORT",
+  "OTHER",
+]);
+export const leadCallOutcome = pgEnum("lead_call_outcome", [
+  "CONNECTED_INTERESTED",
+  "CONNECTED_FOLLOW_UP",
+  "CONNECTED_NOT_INTERESTED",
+  "CONNECTED_CONVERTED",
+  "BUSY_NO_ANSWER",
+  "WRONG_NUMBER",
+  "CALL_BACK_REQUESTED",
+  "VOICEMAIL",
+]);
+
 
 // ============================================================
 // SEQUENCES
@@ -281,6 +319,23 @@ export const iaptNainRegistrationsIdSeq = pgSequence("iapt_nain_registrations_id
   cache: "1",
   cycle: false,
 });
+export const leadsIdSeq = pgSequence("leads_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const leadCallLogsIdSeq = pgSequence("lead_call_logs_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+
 
 // ============================================================
 // 1. USERS
@@ -1412,6 +1467,115 @@ export const iaptNainRegistrations = pgTable(
 );
 
 // ============================================================
+// 19. CRM LEADS
+// ============================================================
+
+export const leads = pgTable(
+  "leads",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('lead_'::text || nextval('leads_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    name: varchar({ length: 150 }).notNull(),
+    phone: varchar({ length: 20 }).notNull(),
+    email: varchar({ length: 255 }),
+    collegeId: varchar("college_id", { length: 50 }),
+    collegeName: varchar("college_name", { length: 200 }),
+    branch: varchar({ length: 100 }),
+    yearOfStudy: varchar("year_of_study", { length: 50 }),
+    assignedToUserId: varchar("assigned_to_user_id", { length: 50 }),
+    quality: leadQuality().default("WARM").notNull(),
+    status: leadStatus().default("NEW").notNull(),
+    source: leadSource().default("COLLEGE_DRIVE").notNull(),
+    sourceDetails: jsonb("source_details").default(sql`'{}'::jsonb`).notNull(),
+    callCount: integer("call_count").default(0).notNull(),
+    lastCallAt: timestamp("last_call_at", { withTimezone: true, mode: "string" }),
+    nextCallAt: timestamp("next_call_at", { withTimezone: true, mode: "string" }),
+    convertedAt: timestamp("converted_at", { withTimezone: true, mode: "string" }),
+    conversionValuePaise: bigint("conversion_value_paise", { mode: "number" }).default(0).notNull(),
+    notes: text(),
+    tags: jsonb().default(sql`'[]'::jsonb`).notNull(),
+    createdById: varchar("created_by_id", { length: 50 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_leads_phone").using("btree", table.phone.asc().nullsLast()),
+    index("idx_leads_college").using("btree", table.collegeId.asc().nullsLast()),
+    index("idx_leads_branch").using("btree", table.branch.asc().nullsLast()),
+    index("idx_leads_assigned_to").using("btree", table.assignedToUserId.asc().nullsLast()),
+    index("idx_leads_quality").using("btree", table.quality.asc().nullsLast()),
+    index("idx_leads_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_leads_next_call").using("btree", table.nextCallAt.asc().nullsLast()),
+    index("idx_leads_created_at").using("btree", table.createdAt.desc().nullsLast()),
+    foreignKey({
+      columns: [table.collegeId],
+      foreignColumns: [colleges.id],
+      name: "fk_leads_college_ref",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.assignedToUserId],
+      foreignColumns: [users.id],
+      name: "fk_leads_assigned_user",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [users.id],
+      name: "fk_leads_creator_user",
+    }).onDelete("set null"),
+  ]
+);
+
+// ============================================================
+// 20. LEAD CALL LOGS & NOTES
+// ============================================================
+
+export const leadCallLogs = pgTable(
+  "lead_call_logs",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('clog_'::text || nextval('lead_call_logs_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    leadId: varchar("lead_id", { length: 50 }).notNull(),
+    callerUserId: varchar("caller_user_id", { length: 50 }).notNull(),
+    callerName: varchar("caller_name", { length: 150 }).notNull(),
+    callDurationSeconds: integer("call_duration_seconds").default(0).notNull(),
+    outcome: leadCallOutcome().notNull(),
+    notes: text().notNull(),
+    previousQuality: leadQuality("previous_quality"),
+    newQuality: leadQuality("new_quality"),
+    previousStatus: leadStatus("previous_status"),
+    newStatus: leadStatus("new_status"),
+    scheduledNextCallAt: timestamp("scheduled_next_call_at", { withTimezone: true, mode: "string" }),
+    recordingUrl: text("recording_url"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_call_logs_lead").using("btree", table.leadId.asc().nullsLast()),
+    index("idx_call_logs_caller").using("btree", table.callerUserId.asc().nullsLast()),
+    index("idx_call_logs_created_at").using("btree", table.createdAt.desc().nullsLast()),
+    foreignKey({
+      columns: [table.leadId],
+      foreignColumns: [leads.id],
+      name: "fk_call_logs_lead",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.callerUserId],
+      foreignColumns: [users.id],
+      name: "fk_call_logs_caller",
+    }).onDelete("cascade"),
+  ]
+);
+
+// ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
@@ -1443,6 +1607,8 @@ export type TaskSubtask = InferSelectModel<typeof taskSubtasks>;
 export type TaskComment = InferSelectModel<typeof taskComments>;
 export type DailyEodLog = InferSelectModel<typeof dailyEodLogs>;
 export type IaptNainRegistration = InferSelectModel<typeof iaptNainRegistrations>;
+export type Lead = InferSelectModel<typeof leads>;
+export type LeadCallLog = InferSelectModel<typeof leadCallLogs>;
 
 // ============================================================
 // INSERT TYPES (write to DB)
@@ -1476,3 +1642,6 @@ export type NewTaskSubtask = InferInsertModel<typeof taskSubtasks>;
 export type NewTaskComment = InferInsertModel<typeof taskComments>;
 export type NewDailyEodLog = InferInsertModel<typeof dailyEodLogs>;
 export type NewIaptNainRegistration = InferInsertModel<typeof iaptNainRegistrations>;
+export type NewLead = InferInsertModel<typeof leads>;
+export type NewLeadCallLog = InferInsertModel<typeof leadCallLogs>;
+

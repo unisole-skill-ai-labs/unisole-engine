@@ -25,6 +25,8 @@ import {
   taskTemplates,
   taskComments,
   dailyEodLogs,
+  leads,
+  leadCallLogs,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -37,6 +39,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   ledSubProjects: many(subProjects, { relationName: "subProjectLead" }),
   taskComments: many(taskComments),
   dailyEodLogs: many(dailyEodLogs),
+  assignedLeads: many(leads, { relationName: "assignedLeadUser" }),
 }));
 
 export const enrollmentsRelations = relations(enrollments, ({ one, many }) => ({
@@ -295,3 +298,33 @@ export const dailyEodLogsRelations = relations(dailyEodLogs, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const leadsRelations = relations(leads, ({ one, many }) => ({
+  college: one(colleges, {
+    fields: [leads.collegeId],
+    references: [colleges.id],
+  }),
+  assignedToUser: one(users, {
+    fields: [leads.assignedToUserId],
+    references: [users.id],
+    relationName: "assignedLeadUser",
+  }),
+  creator: one(users, {
+    fields: [leads.createdById],
+    references: [users.id],
+    relationName: "createdLeadUser",
+  }),
+  callLogs: many(leadCallLogs),
+}));
+
+export const leadCallLogsRelations = relations(leadCallLogs, ({ one }) => ({
+  lead: one(leads, {
+    fields: [leadCallLogs.leadId],
+    references: [leads.id],
+  }),
+  callerUser: one(users, {
+    fields: [leadCallLogs.callerUserId],
+    references: [users.id],
+  }),
+}));
+
