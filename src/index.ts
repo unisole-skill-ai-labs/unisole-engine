@@ -11,9 +11,9 @@ import { webhooksRouter } from "./routes/webhooks";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
-import { pool } from "./db";
-
-dotenv.config();
+import { pool, db } from "./db";
+import path from "path";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 const app = express();
 const server = http.createServer(app);
@@ -45,6 +45,7 @@ app.get("/", (_req, res) => {
   });
 });
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
 // Route Groups
 app.use("/api/auth", authRouter);
@@ -62,8 +63,13 @@ async function bootstrap() {
     if (res.rows?.[0]?.connected) {
       console.log("[BOOTSTRAP] PostgreSQL Database connection established successfully.");
     }
+
+    // Run Drizzle ORM official migrations
+    const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+    await migrate(db, { migrationsFolder });
+    console.log("[BOOTSTRAP] Drizzle migrations applied successfully.");
   } catch (err) {
-    console.error("[BOOTSTRAP] Database connectivity notice:", err);
+    console.error("[BOOTSTRAP] Database bootstrap error:", err);
   }
 
   const PORT = Number(process.env.PORT ?? 3000);

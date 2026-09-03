@@ -73,6 +73,19 @@ export const sessionStatus = pgEnum("session_status", [
   "PAUSED",
   "ENDED",
 ]);
+export const projectStatus = pgEnum("project_status", [
+  "PLANNING",
+  "ACTIVE",
+  "ON_HOLD",
+  "COMPLETED",
+  "ARCHIVED",
+]);
+export const subProjectStatus = pgEnum("sub_project_status", [
+  "TODO",
+  "IN_PROGRESS",
+  "BLOCKED",
+  "COMPLETED",
+]);
 
 // ============================================================
 // SEQUENCES
@@ -197,6 +210,22 @@ export const presentationLeadsIdSeq = pgSequence(
   }
 );
 export const teamDepartmentsIdSeq = pgSequence("team_departments_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const projectsIdSeq = pgSequence("projects_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const subProjectsIdSeq = pgSequence("sub_projects_id_seq", {
   startWith: "1",
   increment: "1",
   minValue: "1",
@@ -1087,6 +1116,94 @@ export const taskTemplates = pgTable(
   ]
 );
 
+export const projects = pgTable(
+  "projects",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('proj_'::text || nextval('projects_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    code: varchar({ length: 50 }).notNull().unique(),
+    name: varchar({ length: 255 }).notNull(),
+    description: text(),
+    departmentId: varchar("department_id", { length: 50 }),
+    leadId: varchar("lead_id", { length: 50 }),
+    createdById: varchar("created_by_id", { length: 50 }),
+    status: projectStatus().default("ACTIVE").notNull(),
+    priority: taskPriority().default("MEDIUM").notNull(),
+    startDate: timestamp("start_date", { withTimezone: true, mode: "string" }),
+    targetEndDate: timestamp("target_end_date", { withTimezone: true, mode: "string" }),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+    color: varchar({ length: 30 }).default("#6366f1").notNull(),
+    icon: varchar({ length: 50 }).default("folder").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_projects_dept").using("btree", table.departmentId.asc().nullsLast()),
+    index("idx_projects_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_projects_lead").using("btree", table.leadId.asc().nullsLast()),
+    foreignKey({
+      columns: [table.departmentId],
+      foreignColumns: [teamDepartments.id],
+      name: "fk_projects_dept",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.leadId],
+      foreignColumns: [users.id],
+      name: "fk_projects_lead",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [users.id],
+      name: "fk_projects_creator",
+    }).onDelete("set null"),
+  ]
+);
+
+export const subProjects = pgTable(
+  "sub_projects",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('sproj_'::text || nextval('sub_projects_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    projectId: varchar("project_id", { length: 50 }).notNull(),
+    name: varchar({ length: 255 }).notNull(),
+    description: text(),
+    leadId: varchar("lead_id", { length: 50 }),
+    status: subProjectStatus().default("TODO").notNull(),
+    orderIndex: integer("order_index").default(0).notNull(),
+    startDate: timestamp("start_date", { withTimezone: true, mode: "string" }),
+    targetEndDate: timestamp("target_end_date", { withTimezone: true, mode: "string" }),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_sub_projects_project").using("btree", table.projectId.asc().nullsLast()),
+    index("idx_sub_projects_status").using("btree", table.status.asc().nullsLast()),
+    foreignKey({
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+      name: "fk_sub_projects_project",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.leadId],
+      foreignColumns: [users.id],
+      name: "fk_sub_projects_lead",
+    }).onDelete("set null"),
+  ]
+);
+
 export const tasks = pgTable(
   "tasks",
   {
@@ -1098,6 +1215,8 @@ export const tasks = pgTable(
     description: text(),
     status: taskStatus().default("TODO").notNull(),
     priority: taskPriority().default("MEDIUM").notNull(),
+    projectId: varchar("project_id", { length: 50 }),
+    subProjectId: varchar("sub_project_id", { length: 50 }),
     assigneeId: varchar("assignee_id", { length: 50 }),
     reporterId: varchar("reporter_id", { length: 50 }),
     departmentId: varchar("department_id", { length: 50 }),
@@ -1122,7 +1241,19 @@ export const tasks = pgTable(
     index("idx_tasks_assignee").using("btree", table.assigneeId.asc().nullsLast()),
     index("idx_tasks_status").using("btree", table.status.asc().nullsLast()),
     index("idx_tasks_department").using("btree", table.departmentId.asc().nullsLast()),
+    index("idx_tasks_project").using("btree", table.projectId.asc().nullsLast()),
+    index("idx_tasks_sub_project").using("btree", table.subProjectId.asc().nullsLast()),
     index("idx_tasks_due_date").using("btree", table.dueDate.asc().nullsLast()),
+    foreignKey({
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+      name: "fk_tasks_project",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.subProjectId],
+      foreignColumns: [subProjects.id],
+      name: "fk_tasks_sub_project",
+    }).onDelete("set null"),
     foreignKey({
       columns: [table.assigneeId],
       foreignColumns: [users.id],
@@ -1258,6 +1389,8 @@ export type Presentation = InferSelectModel<typeof presentations>;
 export type PresentationSession = InferSelectModel<typeof presentationSessions>;
 export type PresentationLead = InferSelectModel<typeof presentationLeads>;
 export type TeamDepartment = InferSelectModel<typeof teamDepartments>;
+export type Project = InferSelectModel<typeof projects>;
+export type SubProject = InferSelectModel<typeof subProjects>;
 export type TaskTemplate = InferSelectModel<typeof taskTemplates>;
 export type Task = InferSelectModel<typeof tasks>;
 export type TaskSubtask = InferSelectModel<typeof taskSubtasks>;
@@ -1288,6 +1421,8 @@ export type NewPresentation = InferInsertModel<typeof presentations>;
 export type NewPresentationSession = InferInsertModel<typeof presentationSessions>;
 export type NewPresentationLead = InferInsertModel<typeof presentationLeads>;
 export type NewTeamDepartment = InferInsertModel<typeof teamDepartments>;
+export type NewProject = InferInsertModel<typeof projects>;
+export type NewSubProject = InferInsertModel<typeof subProjects>;
 export type NewTaskTemplate = InferInsertModel<typeof taskTemplates>;
 export type NewTask = InferInsertModel<typeof tasks>;
 export type NewTaskSubtask = InferInsertModel<typeof taskSubtasks>;

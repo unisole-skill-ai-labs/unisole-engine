@@ -22,6 +22,13 @@
       "when": 1788272065433,
       "tag": "0002_zippy_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788363281211,
+      "tag": "0003_simple_kingpin",
+      "breakpoints": true
     }
   ]
 }
