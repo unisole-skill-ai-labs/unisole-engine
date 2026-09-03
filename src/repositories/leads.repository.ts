@@ -5,6 +5,7 @@ import {
   leadCallLogs,
   users,
   colleges,
+  branches,
   Lead,
   NewLead,
   LeadCallLog,
@@ -231,7 +232,20 @@ export const leadsRepository = {
   },
 
   async create(data: Partial<NewLead>): Promise<Lead> {
-    const rows = await db.insert(leads).values(data as any).returning();
+    const payload: any = {
+      ...data,
+      email: data.email && String(data.email).trim() ? String(data.email).trim().toLowerCase() : null,
+      userId: data.userId && String(data.userId).trim() ? String(data.userId).trim() : null,
+      collegeId: data.collegeId && String(data.collegeId).trim() ? String(data.collegeId).trim() : null,
+      collegeName: data.collegeName && String(data.collegeName).trim() ? String(data.collegeName).trim() : null,
+      branch: data.branch && String(data.branch).trim() ? String(data.branch).trim() : null,
+      yearOfStudy: data.yearOfStudy && String(data.yearOfStudy).trim() ? String(data.yearOfStudy).trim() : null,
+      assignedToUserId: data.assignedToUserId && String(data.assignedToUserId).trim() ? String(data.assignedToUserId).trim() : null,
+      createdById: data.createdById && String(data.createdById).trim() ? String(data.createdById).trim() : null,
+      nextCallAt: data.nextCallAt ? new Date(data.nextCallAt).toISOString() : null,
+      notes: data.notes && String(data.notes).trim() ? String(data.notes).trim() : null,
+    };
+    const rows = await db.insert(leads).values(payload).returning();
     return rows[0];
   },
 
@@ -758,12 +772,14 @@ export const leadsRepository = {
     sources: string[];
     callOutcomes: string[];
   }> {
+    // 1. Get active colleges from colleges table
     const allColleges = await db
       .select({ id: colleges.id, name: colleges.name })
       .from(colleges)
       .where(eq(colleges.isActive, true))
       .orderBy(colleges.name);
 
+    // 2. Get active team members (counselors, staff)
     const allTeam = await db
       .select({
         id: users.id,
@@ -784,14 +800,39 @@ export const leadsRepository = {
       )
       .orderBy(users.name);
 
-    // Get distinct branches from leads
-    const distinctBranchRows = await db
+    // 3. Get system branches from branches table
+    const systemBranches = await db
+      .select({ name: branches.name })
+      .from(branches)
+      .where(eq(branches.isActive, true))
+      .orderBy(branches.name);
+
+    // 4. Get distinct branches from users table
+    const userBranches = await db
+      .select({ branch: users.branch })
+      .from(users)
+      .where(sql`branch IS NOT NULL AND branch != ''`)
+      .groupBy(users.branch);
+
+    // 5. Get distinct branches from leads table
+    const leadBranches = await db
       .select({ branch: leads.branch })
       .from(leads)
       .where(sql`branch IS NOT NULL AND branch != ''`)
       .groupBy(leads.branch);
 
-    const defaultBranches = [
+    const branchSet = new Set<string>();
+    for (const b of systemBranches) {
+      if (b.name && b.name.trim()) branchSet.add(b.name.trim());
+    }
+    for (const u of userBranches) {
+      if (u.branch && u.branch.trim()) branchSet.add(u.branch.trim());
+    }
+    for (const l of leadBranches) {
+      if (l.branch && l.branch.trim()) branchSet.add(l.branch.trim());
+    }
+
+    const defaultFallbacks = [
       "B.Tech CSE",
       "B.Tech ECE",
       "B.Tech Mechanical",
@@ -804,10 +845,8 @@ export const leadsRepository = {
       "B.Sc",
       "Diploma",
     ];
-
-    const branchSet = new Set<string>(defaultBranches);
-    for (const r of distinctBranchRows) {
-      if (r.branch) branchSet.add(r.branch);
+    for (const df of defaultFallbacks) {
+      branchSet.add(df);
     }
 
     return {
