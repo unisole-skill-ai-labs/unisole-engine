@@ -26,6 +26,19 @@ export interface LeadFilters {
   dateTo?: string;
 }
 
+export function normalizeLeadSource(sourceStr?: string | null): string {
+  if (!sourceStr) return "WEBSITE_INQUIRY";
+  const s = String(sourceStr).trim().toUpperCase();
+  if (s === "IAPT") return "IAPT";
+  if (s === "PAMPHLET_QR" || s === "PAMPHLET" || s === "PAMPHLET_SCAN") return "PAMPHLET_QR";
+  if (s === "SESSION_QR" || s === "PRESENTATION_SESSION") return "PRESENTATION_SESSION";
+  if (s === "COLLEGE_DRIVE" || s === "COLLEGE") return "COLLEGE_DRIVE";
+  if (s === "REFERRAL") return "REFERRAL";
+  if (s === "MANUAL_IMPORT" || s === "IMPORT" || s === "CSV") return "MANUAL_IMPORT";
+  if (s === "ORGANIC" || s === "NON_PAMPHLET" || s === "DIRECT_WEB" || s === "WEBSITE_INQUIRY") return "WEBSITE_INQUIRY";
+  return "OTHER";
+}
+
 export const leadsRepository = {
   async list(filters?: LeadFilters): Promise<any[]> {
     const conditions = [];
@@ -436,7 +449,7 @@ export const leadsRepository = {
           branch: u.branch || null,
           quality: "WARM",
           status: "NEW",
-          source: (u.signupSource as any) || "WEBSITE_INQUIRY",
+          source: normalizeLeadSource(u.signupSource) as any,
           notes: `Auto-synced platform user account created at ${u.createdAt}`,
           createdAt: u.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -496,7 +509,7 @@ export const leadsRepository = {
         branch: user.branch || null,
         quality: "WARM",
         status: "NEW",
-        source: (user.signupSource as any) || "WEBSITE_INQUIRY",
+        source: normalizeLeadSource(user.signupSource) as any,
         notes: "Auto-synced registered student",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -875,6 +888,9 @@ export const leadsRepository = {
         "PRESENTATION_SESSION",
         "COLLEGE_DRIVE",
         "PAMPHLET_SCAN",
+        "PAMPHLET_QR",
+        "SESSION_QR",
+        "IAPT",
         "WEBSITE_INQUIRY",
         "REFERRAL",
         "MANUAL_IMPORT",

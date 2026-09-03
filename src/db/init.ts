@@ -172,9 +172,21 @@ export async function initializeDatabase() {
       END $$;
 
       DO $$ BEGIN
-        CREATE TYPE "public"."lead_source" AS ENUM('PRESENTATION_SESSION', 'COLLEGE_DRIVE', 'PAMPHLET_SCAN', 'WEBSITE_INQUIRY', 'REFERRAL', 'MANUAL_IMPORT', 'OTHER');
+        CREATE TYPE "public"."lead_source" AS ENUM('PRESENTATION_SESSION', 'COLLEGE_DRIVE', 'PAMPHLET_SCAN', 'PAMPHLET_QR', 'SESSION_QR', 'IAPT', 'NON_PAMPHLET', 'ORGANIC', 'DIRECT_WEB', 'WEBSITE_INQUIRY', 'REFERRAL', 'MANUAL_IMPORT', 'OTHER');
       EXCEPTION
         WHEN duplicate_object THEN null;
+      END $$;
+
+      DO $$ BEGIN
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'IAPT';
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'PAMPHLET_QR';
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'SESSION_QR';
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'NON_PAMPHLET';
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'ORGANIC';
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'DIRECT_WEB';
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+        WHEN undefined_object THEN null;
       END $$;
 
       DO $$ BEGIN

@@ -1,4 +1,4 @@
-import { leadsRepository, LeadFilters } from "../repositories/leads.repository";
+import { leadsRepository, LeadFilters, normalizeLeadSource } from "../repositories/leads.repository";
 import { Lead, NewLead, LeadCallLog } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { normalizePhone, toTitleCase } from "../helpers/formatters";
@@ -58,7 +58,7 @@ export const leadsService = {
       assignedToUserId: cleanStr(body.assignedToUserId),
       quality: body.quality || "WARM",
       status: body.status || "NEW",
-      source: body.source || "COLLEGE_DRIVE",
+      source: normalizeLeadSource(body.source) as any,
       sourceDetails: body.sourceDetails && typeof body.sourceDetails === "object" ? body.sourceDetails : {},
       nextCallAt: cleanIsoDate(body.nextCallAt),
       notes: cleanStr(body.notes),
@@ -91,7 +91,7 @@ export const leadsService = {
     if (body.assignedToUserId !== undefined) updatePayload.assignedToUserId = cleanStr(body.assignedToUserId);
     if (body.quality !== undefined) updatePayload.quality = body.quality;
     if (body.status !== undefined) updatePayload.status = body.status;
-    if (body.source !== undefined) updatePayload.source = body.source;
+    if (body.source !== undefined) updatePayload.source = normalizeLeadSource(body.source) as any;
     if (body.nextCallAt !== undefined) updatePayload.nextCallAt = cleanIsoDate(body.nextCallAt);
     if (body.conversionValuePaise !== undefined) updatePayload.conversionValuePaise = Number(body.conversionValuePaise) || 0;
     if (body.notes !== undefined) updatePayload.notes = cleanStr(body.notes);
