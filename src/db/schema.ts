@@ -273,6 +273,14 @@ export const dailyEodLogsIdSeq = pgSequence("daily_eod_logs_id_seq", {
   cache: "1",
   cycle: false,
 });
+export const iaptNainRegistrationsIdSeq = pgSequence("iapt_nain_registrations_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
 
 // ============================================================
 // 1. USERS
@@ -1366,6 +1374,44 @@ export const dailyEodLogs = pgTable(
 );
 
 // ============================================================
+// IAPT NAIN REGISTRATIONS
+// ============================================================
+
+export const iaptNainRegistrations = pgTable(
+  "iapt_nain_registrations",
+  {
+    id: varchar({ length: 50 })
+      .default(
+        sql`('nain_'::text || nextval('iapt_nain_registrations_id_seq'::regclass))`
+      )
+      .primaryKey()
+      .notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    name: varchar("name", { length: 150 }).notNull(),
+    phone: varchar("phone", { length: 20 }).notNull(),
+    category: varchar("category", { length: 100 }).notNull(),
+    institution: varchar("institution", { length: 255 }).notNull(),
+    cityState: varchar("city_state", { length: 150 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_iapt_nain_user_id").on(table.userId),
+    index("idx_iapt_nain_phone").using("btree", table.phone.asc().nullsLast()),
+    index("idx_iapt_nain_institution").using("btree", table.institution.asc().nullsLast()),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_iapt_nain_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+// ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
@@ -1396,6 +1442,7 @@ export type Task = InferSelectModel<typeof tasks>;
 export type TaskSubtask = InferSelectModel<typeof taskSubtasks>;
 export type TaskComment = InferSelectModel<typeof taskComments>;
 export type DailyEodLog = InferSelectModel<typeof dailyEodLogs>;
+export type IaptNainRegistration = InferSelectModel<typeof iaptNainRegistrations>;
 
 // ============================================================
 // INSERT TYPES (write to DB)
@@ -1428,3 +1475,4 @@ export type NewTask = InferInsertModel<typeof tasks>;
 export type NewTaskSubtask = InferInsertModel<typeof taskSubtasks>;
 export type NewTaskComment = InferInsertModel<typeof taskComments>;
 export type NewDailyEodLog = InferInsertModel<typeof dailyEodLogs>;
+export type NewIaptNainRegistration = InferInsertModel<typeof iaptNainRegistrations>;

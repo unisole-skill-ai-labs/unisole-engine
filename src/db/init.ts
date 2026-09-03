@@ -120,9 +120,34 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_sub_projects_status" ON "public"."sub_projects" ("status");
       CREATE INDEX IF NOT EXISTS "idx_tasks_project" ON "public"."tasks" ("project_id");
       CREATE INDEX IF NOT EXISTS "idx_tasks_sub_project" ON "public"."tasks" ("sub_project_id");
+
+      -- IAPT NAIN Registrations Sequence & Table
+      CREATE SEQUENCE IF NOT EXISTS "public"."iapt_nain_registrations_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+
+      CREATE TABLE IF NOT EXISTS "public"."iapt_nain_registrations" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('nain_'::text || nextval('public.iapt_nain_registrations_id_seq'::regclass)) NOT NULL,
+        "user_id" varchar(50) NOT NULL,
+        "name" varchar(150) NOT NULL,
+        "phone" varchar(20) NOT NULL,
+        "category" varchar(100) NOT NULL,
+        "institution" varchar(255) NOT NULL,
+        "city_state" varchar(150) NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_iapt_nain_user_id" UNIQUE("user_id")
+      );
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."iapt_nain_registrations" ADD CONSTRAINT "fk_iapt_nain_user" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade;
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      CREATE INDEX IF NOT EXISTS "idx_iapt_nain_phone" ON "public"."iapt_nain_registrations" ("phone");
+      CREATE INDEX IF NOT EXISTS "idx_iapt_nain_institution" ON "public"."iapt_nain_registrations" ("institution");
     `);
 
-    console.log("[DB-INIT] ✅ WorkSole tables, sequences, foreign keys, and indexes verified successfully.");
+    console.log("[DB-INIT] ✅ WorkSole and IAPT NAIN tables, sequences, foreign keys, and indexes verified successfully.");
 
     // 2. Also run official Drizzle migrator if folder exists
     try {
