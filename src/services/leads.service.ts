@@ -3,6 +3,23 @@ import { Lead, NewLead, LeadCallLog } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { normalizePhone, toTitleCase } from "../helpers/formatters";
 
+function cleanStr(val: any): string | null {
+  if (val === undefined || val === null) return null;
+  const s = String(val).trim();
+  return s.length > 0 ? s : null;
+}
+
+function cleanIsoDate(val: any): string | null {
+  if (!val) return null;
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
+  } catch {
+    return null;
+  }
+}
+
 export const leadsService = {
   async list(filters?: LeadFilters): Promise<any[]> {
     return leadsRepository.list(filters);
@@ -32,20 +49,21 @@ export const leadsService = {
     const leadData: Partial<NewLead> = {
       name: toTitleCase(String(body.name).trim()),
       phone: normalizedPhone,
-      email: body.email ? String(body.email).trim().toLowerCase() : null,
-      collegeId: body.collegeId ? String(body.collegeId).trim() : null,
-      collegeName: body.collegeName ? String(body.collegeName).trim() : null,
-      branch: body.branch ? String(body.branch).trim() : null,
-      yearOfStudy: body.yearOfStudy ? String(body.yearOfStudy).trim() : null,
-      assignedToUserId: body.assignedToUserId ? String(body.assignedToUserId).trim() : null,
+      email: cleanStr(body.email) ? String(body.email).trim().toLowerCase() : null,
+      userId: cleanStr(body.userId),
+      collegeId: cleanStr(body.collegeId),
+      collegeName: cleanStr(body.collegeName),
+      branch: cleanStr(body.branch),
+      yearOfStudy: cleanStr(body.yearOfStudy),
+      assignedToUserId: cleanStr(body.assignedToUserId),
       quality: body.quality || "WARM",
       status: body.status || "NEW",
       source: body.source || "COLLEGE_DRIVE",
-      sourceDetails: body.sourceDetails || {},
-      nextCallAt: body.nextCallAt ? new Date(body.nextCallAt).toISOString() : null,
-      notes: body.notes ? String(body.notes).trim() : null,
+      sourceDetails: body.sourceDetails && typeof body.sourceDetails === "object" ? body.sourceDetails : {},
+      nextCallAt: cleanIsoDate(body.nextCallAt),
+      notes: cleanStr(body.notes),
       tags: Array.isArray(body.tags) ? body.tags : [],
-      createdById: currentUserId || null,
+      createdById: cleanStr(currentUserId),
     };
 
     return leadsRepository.create(leadData);
@@ -64,18 +82,19 @@ export const leadsService = {
       const norm = normalizePhone(String(body.phone).trim()) || String(body.phone).replace(/[^\d+]/g, "");
       if (norm) updatePayload.phone = norm;
     }
-    if (body.email !== undefined) updatePayload.email = body.email ? String(body.email).trim().toLowerCase() : null;
-    if (body.collegeId !== undefined) updatePayload.collegeId = body.collegeId ? String(body.collegeId).trim() : null;
-    if (body.collegeName !== undefined) updatePayload.collegeName = body.collegeName ? String(body.collegeName).trim() : null;
-    if (body.branch !== undefined) updatePayload.branch = body.branch ? String(body.branch).trim() : null;
-    if (body.yearOfStudy !== undefined) updatePayload.yearOfStudy = body.yearOfStudy ? String(body.yearOfStudy).trim() : null;
-    if (body.assignedToUserId !== undefined) updatePayload.assignedToUserId = body.assignedToUserId ? String(body.assignedToUserId).trim() : null;
+    if (body.email !== undefined) updatePayload.email = cleanStr(body.email) ? String(body.email).trim().toLowerCase() : null;
+    if (body.userId !== undefined) updatePayload.userId = cleanStr(body.userId);
+    if (body.collegeId !== undefined) updatePayload.collegeId = cleanStr(body.collegeId);
+    if (body.collegeName !== undefined) updatePayload.collegeName = cleanStr(body.collegeName);
+    if (body.branch !== undefined) updatePayload.branch = cleanStr(body.branch);
+    if (body.yearOfStudy !== undefined) updatePayload.yearOfStudy = cleanStr(body.yearOfStudy);
+    if (body.assignedToUserId !== undefined) updatePayload.assignedToUserId = cleanStr(body.assignedToUserId);
     if (body.quality !== undefined) updatePayload.quality = body.quality;
     if (body.status !== undefined) updatePayload.status = body.status;
     if (body.source !== undefined) updatePayload.source = body.source;
-    if (body.nextCallAt !== undefined) updatePayload.nextCallAt = body.nextCallAt ? new Date(body.nextCallAt).toISOString() : null;
-    if (body.conversionValuePaise !== undefined) updatePayload.conversionValuePaise = Number(body.conversionValuePaise);
-    if (body.notes !== undefined) updatePayload.notes = body.notes ? String(body.notes).trim() : null;
+    if (body.nextCallAt !== undefined) updatePayload.nextCallAt = cleanIsoDate(body.nextCallAt);
+    if (body.conversionValuePaise !== undefined) updatePayload.conversionValuePaise = Number(body.conversionValuePaise) || 0;
+    if (body.notes !== undefined) updatePayload.notes = cleanStr(body.notes);
     if (body.tags !== undefined) updatePayload.tags = Array.isArray(body.tags) ? body.tags : [];
 
     const updated = await leadsRepository.update(id, updatePayload);
@@ -84,6 +103,7 @@ export const leadsService = {
     }
     return updated;
   },
+
 
   async delete(id: string): Promise<boolean> {
     const success = await leadsRepository.delete(id);
