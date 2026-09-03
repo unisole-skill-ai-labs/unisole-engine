@@ -19,6 +19,7 @@ export interface LeadFilters {
   quality?: string;
   status?: string;
   source?: string;
+  excludeNonLeads?: boolean;
   nextCallDue?: "overdue" | "today" | "upcoming" | "all" | "none";
   dateFrom?: string;
   dateTo?: string;
@@ -55,6 +56,8 @@ export const leadsRepository = {
 
     if (filters?.status) {
       conditions.push(eq(leads.status, filters.status as any));
+    } else if (filters?.excludeNonLeads) {
+      conditions.push(sql`${leads.status} != 'NOT_A_LEAD'`);
     }
 
     if (filters?.source) {
@@ -122,6 +125,7 @@ export const leadsRepository = {
         name: leads.name,
         phone: leads.phone,
         email: leads.email,
+        userId: leads.userId,
         collegeId: leads.collegeId,
         collegeName: leads.collegeName,
         branch: leads.branch,
@@ -367,6 +371,125 @@ export const leadsRepository = {
 
     return { imported, updated, failed };
   },
+
+  async syncAllUsersToLeads(): Promise<{ synced: number; existing: number; totalUsers: number }> {
+    const allUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, "STUDENT" as any));
+
+    let synced = 0;
+    let existingCount = 0;
+
+    for (const u of allUsers) {
+      if (!u.phone) continue;
+      const normalizedPhone = u.phone.replace(/[^\d+]/g, "");
+
+      const existingLead = await db
+        .select()
+        .from(leads)
+        .where(
+          or(
+            eq(leads.userId, u.id),
+            eq(leads.phone, normalizedPhone),
+            eq(leads.phone, u.phone)
+          )
+        )
+        .limit(1);
+
+      if (existingLead.length > 0) {
+        if (!existingLead[0].userId) {
+          await db
+            .update(leads)
+            .set({
+              userId: u.id,
+              name: existingLead[0].name || u.name || "Student Lead",
+              collegeId: existingLead[0].collegeId || u.collegeId || null,
+              collegeName: existingLead[0].collegeName || u.collegeName || null,
+              branch: existingLead[0].branch || u.branch || null,
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(leads.id, existingLead[0].id));
+        }
+        existingCount++;
+      } else {
+        await db.insert(leads).values({
+          userId: u.id,
+          name: u.name?.trim() || `Student (${u.phone.slice(-4)})`,
+          phone: normalizedPhone,
+          collegeId: u.collegeId || null,
+          collegeName: u.collegeName || null,
+          branch: u.branch || null,
+          quality: "WARM",
+          status: "NEW",
+          source: (u.signupSource as any) || "WEBSITE_INQUIRY",
+          notes: `Auto-synced platform user account created at ${u.createdAt}`,
+          createdAt: u.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        synced++;
+      }
+    }
+
+    return { synced, existing: existingCount, totalUsers: allUsers.length };
+  },
+
+  async upsertUserAsLead(user: {
+    id: string;
+    phone: string;
+    name?: string | null;
+    collegeId?: string | null;
+    collegeName?: string | null;
+    branch?: string | null;
+    signupSource?: string | null;
+  }): Promise<void> {
+    if (!user.phone) return;
+    const normalizedPhone = user.phone.replace(/[^\d+]/g, "");
+
+    const existingLead = await db
+      .select()
+      .from(leads)
+      .where(
+        or(
+          eq(leads.userId, user.id),
+          eq(leads.phone, normalizedPhone),
+          eq(leads.phone, user.phone)
+        )
+      )
+      .limit(1);
+
+    if (existingLead.length > 0) {
+      if (!existingLead[0].userId) {
+        await db
+          .update(leads)
+          .set({
+            userId: user.id,
+            name: existingLead[0].name || user.name || "Student Lead",
+            collegeId: existingLead[0].collegeId || user.collegeId || null,
+            collegeName: existingLead[0].collegeName || user.collegeName || null,
+            branch: existingLead[0].branch || user.branch || null,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(leads.id, existingLead[0].id));
+      }
+    } else {
+      await db.insert(leads).values({
+        userId: user.id,
+        name: user.name?.trim() || `Student (${user.phone.slice(-4)})`,
+        phone: normalizedPhone,
+        collegeId: user.collegeId || null,
+        collegeName: user.collegeName || null,
+        branch: user.branch || null,
+        quality: "WARM",
+        status: "NEW",
+        source: (user.signupSource as any) || "WEBSITE_INQUIRY",
+        notes: "Auto-synced registered student",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  },
+
 
   async addCallLog(data: {
     leadId: string;
@@ -707,6 +830,7 @@ export const leadsRepository = {
         "CONVERTED",
         "LOST",
         "JUNK",
+        "NOT_A_LEAD",
       ],
       sources: [
         "PRESENTATION_SESSION",

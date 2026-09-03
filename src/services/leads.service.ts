@@ -186,4 +186,9 @@ export const leadsService = {
   async getMeta(): Promise<any> {
     return leadsRepository.getMeta();
   },
+
+  async syncAllUsers(): Promise<{ synced: number; existing: number; totalUsers: number }> {
+    return leadsRepository.syncAllUsersToLeads();
+  },
 };
+

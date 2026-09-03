@@ -7,10 +7,12 @@ export const adminLeadsRouter: Router = Router();
 adminLeadsRouter.get("/analytics", leadsController.getAnalytics);
 adminLeadsRouter.get("/meta", leadsController.getMeta);
 
-// Bulk Operations
+// Bulk Operations & User Sync
+adminLeadsRouter.post("/sync-users", leadsController.syncUsers);
 adminLeadsRouter.post("/bulk-assign", leadsController.bulkAssign);
 adminLeadsRouter.post("/bulk-status", leadsController.bulkUpdateStatus);
 adminLeadsRouter.post("/import", leadsController.bulkImport);
+
 
 // Lead Entity Operations
 adminLeadsRouter.get("/", leadsController.list);
