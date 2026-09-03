@@ -101,4 +101,10 @@ export const leadsController = {
     const meta = await leadsService.getMeta();
     res.json({ success: true, data: meta });
   }),
+
+  syncUsers: asyncHandler(async (_req: Request, res: Response) => {
+    const result = await leadsService.syncAllUsers();
+    res.json({ success: true, data: result });
+  }),
 };
+

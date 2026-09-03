@@ -103,6 +103,7 @@ export const leadStatus = pgEnum("lead_status", [
   "CONVERTED",
   "LOST",
   "JUNK",
+  "NOT_A_LEAD",
 ]);
 export const leadSource = pgEnum("lead_source", [
   "PRESENTATION_SESSION",
@@ -1480,6 +1481,7 @@ export const leads = pgTable(
     name: varchar({ length: 150 }).notNull(),
     phone: varchar({ length: 20 }).notNull(),
     email: varchar({ length: 255 }),
+    userId: varchar("user_id", { length: 50 }),
     collegeId: varchar("college_id", { length: 50 }),
     collegeName: varchar("college_name", { length: 200 }),
     branch: varchar({ length: 100 }),
@@ -1506,6 +1508,7 @@ export const leads = pgTable(
   },
   (table) => [
     index("idx_leads_phone").using("btree", table.phone.asc().nullsLast()),
+    index("idx_leads_user").using("btree", table.userId.asc().nullsLast()),
     index("idx_leads_college").using("btree", table.collegeId.asc().nullsLast()),
     index("idx_leads_branch").using("btree", table.branch.asc().nullsLast()),
     index("idx_leads_assigned_to").using("btree", table.assignedToUserId.asc().nullsLast()),
@@ -1513,6 +1516,11 @@ export const leads = pgTable(
     index("idx_leads_status").using("btree", table.status.asc().nullsLast()),
     index("idx_leads_next_call").using("btree", table.nextCallAt.asc().nullsLast()),
     index("idx_leads_created_at").using("btree", table.createdAt.desc().nullsLast()),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_leads_user_account",
+    }).onDelete("set null"),
     foreignKey({
       columns: [table.collegeId],
       foreignColumns: [colleges.id],

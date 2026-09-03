@@ -5,6 +5,7 @@ import { db } from "../db";
 import { users, User } from "../db/schema";
 import { ValidationError, NotFoundError, UnauthorizedError } from "../errors";
 import { usersRepository } from "../repositories/users.repository";
+import { leadsRepository } from "../repositories/leads.repository";
 import { otpService } from "./otp.service";
 import { JWT_SECRET, JWT_REFRESH_SECRET } from "../middleware/auth";
 import { toTitleCase, normalizePhone } from "../helpers/formatters";
@@ -292,6 +293,15 @@ export const authService = {
       }
     }
     // Non-student accounts (ADMIN, SUPER_ADMIN, MEMBER) are authenticated cleanly without student modifications.
+
+    // Auto-sync student into CRM Leads
+    if (user && user.role === "STUDENT") {
+      try {
+        await leadsRepository.upsertUserAsLead(user);
+      } catch (e) {
+        console.error("Auto-sync lead failed on login:", e);
+      }
+    }
 
     const tokens = generateTokens(user!);
     return { ...tokens, user };
