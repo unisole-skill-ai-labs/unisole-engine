@@ -17,11 +17,15 @@ import { adminProjectsRouter, adminSubProjectsRouter } from "./projects";
 import { adminTeamRouter } from "./team";
 import { adminTemplatesRouter } from "./templates";
 import { adminDailyLogsRouter } from "./daily-logs";
+import { adminMyWorkRouter } from "./my-work";
 
 export const adminRouter: Router = Router();
 
 // Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER)
 adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER"]));
+
+// My Work - Centralized Staff Task & Lead Workspace
+adminRouter.use("/my-work", adminMyWorkRouter);
 
 // Lead Management CRM
 adminRouter.use("/leads", adminLeadsRouter);

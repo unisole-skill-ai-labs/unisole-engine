@@ -7,6 +7,10 @@ export interface CustomRequest extends Request {
     phone: string;
     role: string;
     name?: string;
+    username?: string | null;
+    designation?: string | null;
+    departmentId?: string | null;
+    permissions?: string[];
   };
 }
 
@@ -32,6 +36,10 @@ export function authMiddleware(
       phone: string;
       role: string;
       name?: string;
+      username?: string | null;
+      designation?: string | null;
+      departmentId?: string | null;
+      permissions?: string[];
     };
     req.user = decoded;
     next();
@@ -54,6 +62,10 @@ export function optionalAuthMiddleware(
         phone: string;
         role: string;
         name?: string;
+        username?: string | null;
+        designation?: string | null;
+        departmentId?: string | null;
+        permissions?: string[];
       };
       req.user = decoded;
     } catch {
@@ -77,4 +89,30 @@ export function requireRole(roles: string[]) {
   };
 }
 
+export function requirePermission(permission: string) {
+  return (req: CustomRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    // SUPER_ADMIN has full permissions everywhere
+    if (req.user.role === "SUPER_ADMIN") {
+      next();
+      return;
+    }
+    // ADMIN has operational access unless specific super_admin capability is needed
+    if (req.user.role === "ADMIN" && !permission.startsWith("super_admin:")) {
+      next();
+      return;
+    }
+    const userPerms = req.user.permissions || [];
+    if (userPerms.includes(permission) || userPerms.includes("*")) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: `Forbidden: Missing required permission (${permission})` });
+  };
+}
+
 export { JWT_SECRET, JWT_REFRESH_SECRET };
+

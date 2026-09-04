@@ -29,17 +29,20 @@ export const teamService = {
         u.role,
         u.designation,
         u.department_id as "departmentId",
+        u.metadata,
         d.name as "departmentName",
         d.color as "departmentColor",
         u.is_active as "isActive",
         u.created_at as "createdAt",
-        COUNT(t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS'))::int as "activeTasksCount",
-        COUNT(t.id) FILTER (WHERE t.status = 'BLOCKED')::int as "blockedTasksCount",
-        COUNT(t.id) FILTER (WHERE t.status = 'SUBMITTED_FOR_REVIEW')::int as "reviewTasksCount",
-        COUNT(t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasksCount"
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS'))::int as "activeTasksCount",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'BLOCKED')::int as "blockedTasksCount",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'SUBMITTED_FOR_REVIEW')::int as "reviewTasksCount",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasksCount",
+        COUNT(DISTINCT l.id)::int as "assignedLeadsCount"
       FROM users u
       LEFT JOIN team_departments d ON u.department_id = d.id
       LEFT JOIN tasks t ON t.assignee_id = u.id
+      LEFT JOIN leads l ON l.assigned_to_user_id = u.id
       WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER')
         AND ($1::text IS NULL OR u.name ILIKE $1 OR u.username ILIKE $1 OR u.phone ILIKE $1)
       GROUP BY u.id, d.name, d.color
@@ -49,7 +52,10 @@ export const teamService = {
       [search ? `%${search.trim()}%` : null]
     );
 
-    return res.rows;
+    return res.rows.map((row) => ({
+      ...row,
+      permissions: (row.metadata && Array.isArray(row.metadata.permissions)) ? row.metadata.permissions : [],
+    }));
   },
 
   async createMember(data: {
@@ -60,6 +66,7 @@ export const teamService = {
     role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
     departmentId?: string;
     designation?: string;
+    permissions?: string[];
     isActive?: boolean;
   }): Promise<any> {
     if (!data.name || !data.name.trim()) {
@@ -89,10 +96,14 @@ export const teamService = {
       cleanPhone = "0000000000";
     }
 
+    const metadataObj = {
+      permissions: Array.isArray(data.permissions) ? data.permissions : [],
+    };
+
     const newId = `usr_staff_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     await pool.query(
-      `INSERT INTO users (id, username, password, phone, name, role, department_id, designation, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO users (id, username, password, phone, name, role, department_id, designation, metadata, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         newId,
         cleanUsername,
@@ -102,6 +113,7 @@ export const teamService = {
         (data.role as any) || "MEMBER",
         data.departmentId || null,
         data.designation ? data.designation.trim() : null,
+        JSON.stringify(metadataObj),
         data.isActive !== false,
       ]
     );
@@ -120,11 +132,13 @@ export const teamService = {
       role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
       departmentId?: string;
       designation?: string;
+      permissions?: string[];
       isActive?: boolean;
     }
   ): Promise<any> {
     const userRes = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (userRes.length === 0) throw new NotFoundError("User not found");
+    const existing = userRes[0];
 
     if (data.username && data.username.trim()) {
       const cleanUsername = data.username.trim().toLowerCase();
@@ -152,10 +166,34 @@ export const teamService = {
     if (data.designation !== undefined) updatePayload.designation = data.designation;
     if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
+    if (data.permissions !== undefined) {
+      const currentMeta = (existing.metadata as Record<string, any>) || {};
+      updatePayload.metadata = {
+        ...currentMeta,
+        permissions: data.permissions,
+      };
+    }
+
     if (Object.keys(updatePayload).length > 0) {
       await db.update(users).set(updatePayload).where(eq(users.id, userId));
     }
 
+    const updated = await this.listMembers();
+    return updated.find((m) => m.id === userId);
+  },
+
+  async updateMemberPermissions(userId: string, permissions: string[]): Promise<any> {
+    const userRes = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (userRes.length === 0) throw new NotFoundError("User not found");
+    const existing = userRes[0];
+
+    const currentMeta = (existing.metadata as Record<string, any>) || {};
+    const newMeta = {
+      ...currentMeta,
+      permissions: Array.isArray(permissions) ? permissions : [],
+    };
+
+    await db.update(users).set({ metadata: newMeta }).where(eq(users.id, userId));
     const updated = await this.listMembers();
     return updated.find((m) => m.id === userId);
   },

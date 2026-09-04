@@ -21,6 +21,13 @@ export const teamController = {
     res.json({ success: true, data: updated });
   }),
 
+  updateMemberPermissions: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { permissions } = req.body;
+    const updated = await teamService.updateMemberPermissions(id, permissions);
+    res.json({ success: true, data: updated });
+  }),
+
   deleteMember: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     await teamService.deleteMember(id);
