@@ -18,7 +18,14 @@ function generateTokens(user: {
   name?: string | null;
   collegeName?: string | null;
   branch?: string | null;
+  designation?: string | null;
+  departmentId?: string | null;
+  metadata?: any;
 }) {
+  const permissions = (user.metadata && Array.isArray(user.metadata.permissions))
+    ? user.metadata.permissions
+    : [];
+
   const payload = {
     id: user.id,
     phone: user.phone,
@@ -27,6 +34,9 @@ function generateTokens(user: {
     name: user.name,
     collegeName: user.collegeName,
     branch: user.branch,
+    designation: user.designation || null,
+    departmentId: user.departmentId || null,
+    permissions,
   };
   const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
   const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, {
