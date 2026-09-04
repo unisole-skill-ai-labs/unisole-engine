@@ -44,7 +44,12 @@ export const leadsRepository = {
     const conditions = [];
 
     if (filters?.collegeId) {
-      conditions.push(eq(leads.collegeId, filters.collegeId));
+      conditions.push(
+        or(
+          eq(leads.collegeId, filters.collegeId),
+          ilike(leads.collegeName, `%${filters.collegeId}%`)
+        )
+      );
     }
 
     if (filters?.branch) {
