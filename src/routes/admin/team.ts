@@ -23,6 +23,11 @@ adminTeamRouter.patch(
   requireRole(["SUPER_ADMIN"]),
   teamController.updateMember
 );
+adminTeamRouter.patch(
+  "/members/:id/permissions",
+  requireRole(["SUPER_ADMIN"]),
+  teamController.updateMemberPermissions
+);
 adminTeamRouter.delete(
   "/members/:id",
   requireRole(["SUPER_ADMIN"]),

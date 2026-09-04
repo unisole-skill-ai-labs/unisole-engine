@@ -182,6 +182,22 @@ export const teamService = {
     return updated.find((m) => m.id === userId);
   },
 
+  async updateMemberPermissions(userId: string, permissions: string[]): Promise<any> {
+    const userRes = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (userRes.length === 0) throw new NotFoundError("User not found");
+    const existing = userRes[0];
+
+    const currentMeta = (existing.metadata as Record<string, any>) || {};
+    const newMeta = {
+      ...currentMeta,
+      permissions: Array.isArray(permissions) ? permissions : [],
+    };
+
+    await db.update(users).set({ metadata: newMeta }).where(eq(users.id, userId));
+    const updated = await this.listMembers();
+    return updated.find((m) => m.id === userId);
+  },
+
   async deleteMember(userId: string): Promise<boolean> {
     const userRes = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (userRes.length === 0) throw new NotFoundError("User not found");
