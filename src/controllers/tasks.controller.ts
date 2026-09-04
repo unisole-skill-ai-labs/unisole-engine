@@ -40,8 +40,8 @@ export const tasksController = {
 
   toggleSubtask: asyncHandler(async (req: Request, res: Response) => {
     const { taskId, subtaskId } = req.params;
-    const { isCompleted } = req.body;
-    const updated = await tasksService.toggleSubtask(taskId, subtaskId, isCompleted);
+    const { isCompleted, title } = req.body;
+    const updated = await tasksService.updateSubtask(taskId, subtaskId, { isCompleted, title });
     res.json({ success: true, data: updated });
   }),
 
