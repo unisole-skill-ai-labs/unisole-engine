@@ -13,6 +13,7 @@ export const leadsController = {
       status,
       source,
       nextCallDue,
+      excludeNonLeads,
       dateFrom,
       dateTo,
     } = req.query as any;
@@ -25,6 +26,7 @@ export const leadsController = {
       quality: quality ? String(quality) : undefined,
       status: status ? String(status) : undefined,
       source: source ? String(source) : undefined,
+      excludeNonLeads: excludeNonLeads === "true" || excludeNonLeads === true,
       nextCallDue: nextCallDue ? (String(nextCallDue) as any) : undefined,
       dateFrom: dateFrom ? String(dateFrom) : undefined,
       dateTo: dateTo ? String(dateTo) : undefined,
