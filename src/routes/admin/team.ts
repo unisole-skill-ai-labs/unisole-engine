@@ -48,7 +48,7 @@ adminTeamRouter.patch(
 );
 adminTeamRouter.delete(
   "/departments/:id",
-  requireRole(["SUPER_ADMIN"]),
+  requireRole(["SUPER_ADMIN", "ADMIN"]),
   teamController.deleteDepartment
 );
 

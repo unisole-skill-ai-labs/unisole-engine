@@ -373,13 +373,27 @@ export const tasksService = {
   },
 
   // ==================== SUBTASK ACTIONS ====================
-  async toggleSubtask(taskId: string, subtaskId: string, isCompleted: boolean): Promise<any> {
-    await db
-      .update(taskSubtasks)
-      .set({ isCompleted })
-      .where(and(eq(taskSubtasks.id, subtaskId), eq(taskSubtasks.taskId, taskId)));
+  async updateSubtask(
+    taskId: string,
+    subtaskId: string,
+    data: { isCompleted?: boolean; title?: string }
+  ): Promise<any> {
+    const updatePayload: any = {};
+    if (data.isCompleted !== undefined) updatePayload.isCompleted = data.isCompleted;
+    if (data.title !== undefined) updatePayload.title = data.title.trim();
+
+    if (Object.keys(updatePayload).length > 0) {
+      await db
+        .update(taskSubtasks)
+        .set(updatePayload)
+        .where(and(eq(taskSubtasks.id, subtaskId), eq(taskSubtasks.taskId, taskId)));
+    }
 
     return this.getTaskById(taskId);
+  },
+
+  async toggleSubtask(taskId: string, subtaskId: string, isCompleted: boolean): Promise<any> {
+    return this.updateSubtask(taskId, subtaskId, { isCompleted });
   },
 
   async addSubtask(taskId: string, title: string): Promise<any> {

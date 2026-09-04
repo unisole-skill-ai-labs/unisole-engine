@@ -14,6 +14,7 @@ import { adminPresentationsRouter } from "./presentations";
 import { adminLeadsRouter } from "./leads";
 import { adminTasksRouter } from "./tasks";
 import { adminProjectsRouter, adminSubProjectsRouter } from "./projects";
+import { adminHierarchyRouter } from "./hierarchy";
 import { adminTeamRouter } from "./team";
 import { adminTemplatesRouter } from "./templates";
 import { adminDailyLogsRouter } from "./daily-logs";
@@ -33,6 +34,7 @@ adminRouter.use("/leads", adminLeadsRouter);
 // WorkSole Projects & Hierarchy Management
 adminRouter.use("/projects", adminProjectsRouter);
 adminRouter.use("/sub-projects", adminSubProjectsRouter);
+adminRouter.use("/hierarchy", adminHierarchyRouter);
 
 // Team & Task Management
 adminRouter.use("/tasks", adminTasksRouter);
