@@ -6,5 +6,16 @@ export const adminEnrollmentsRouter: Router = Router();
 
 adminEnrollmentsRouter.get("/", enrollmentsController.list);
 adminEnrollmentsRouter.get("/:id", enrollmentsController.getById);
-adminEnrollmentsRouter.post("/", validateBody({ required: ["userId", "pathwayId"] }), enrollmentsController.create);
+adminEnrollmentsRouter.post(
+  "/",
+  validateBody({ required: ["userId"] }),
+  enrollmentsController.create
+);
+adminEnrollmentsRouter.post(
+  "/manual-grant",
+  validateBody({ required: ["userId", "itemType", "itemId"] }),
+  enrollmentsController.adminManualGrant
+);
+adminEnrollmentsRouter.post("/:id/revoke", enrollmentsController.adminRevoke);
 adminEnrollmentsRouter.put("/:id", enrollmentsController.update);
+

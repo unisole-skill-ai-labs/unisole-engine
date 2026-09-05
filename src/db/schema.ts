@@ -58,12 +58,39 @@ export const enrollmentStatus = pgEnum("enrollment_status", [
   "CANCELLED",
   "EXPIRED",
 ]);
+export const enrollmentSource = pgEnum("enrollment_source", [
+  "PURCHASE",
+  "ADMIN_MANUAL",
+  "CAMPUS_SPONSORED",
+  "FREE",
+  "INVITE",
+]);
 export const paymentStatus = pgEnum("payment_status", [
   "CREATED",
   "PENDING",
   "SUCCESS",
   "FAILED",
   "REFUNDED",
+]);
+export const orderStatus = pgEnum("order_status", [
+  "PENDING",
+  "PAID",
+  "FAILED",
+  "CANCELLED",
+  "REFUNDED",
+]);
+export const itemType = pgEnum("item_type", [
+  "PATHWAY",
+  "COURSE",
+  "WORKSHOP",
+  "PROGRAM",
+  "EVENT",
+  "BUNDLE",
+  "MERCHANDISE",
+]);
+export const discountType = pgEnum("discount_type", [
+  "PERCENTAGE",
+  "FLAT",
 ]);
 export const otpChannel = pgEnum("otp_channel", ["SMS", "WHATSAPP"]);
 export const otpStatus = pgEnum("otp_status", ["PENDING", "VERIFIED", "EXPIRED", "FAILED"]);
@@ -112,6 +139,8 @@ export const leadSource = pgEnum("lead_source", [
   "PAMPHLET_QR",
   "SESSION_QR",
   "IAPT",
+  "AI_WORKSHOP",
+  "PROFESSOR_NETWORK",
   "NON_PAMPHLET",
   "ORGANIC",
   "DIRECT_WEB",
@@ -217,6 +246,38 @@ export const enrollmentsIdSeq = pgSequence("enrollments_id_seq", {
   cycle: false,
 });
 export const paymentsIdSeq = pgSequence("payments_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const ordersIdSeq = pgSequence("orders_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const orderItemsIdSeq = pgSequence("order_items_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const offeringsPricingIdSeq = pgSequence("offerings_pricing_id_seq", {
+  startWith: "1",
+  increment: "1",
+  minValue: "1",
+  maxValue: "9223372036854775807",
+  cache: "1",
+  cycle: false,
+});
+export const couponsIdSeq = pgSequence("coupons_id_seq", {
   startWith: "1",
   increment: "1",
   minValue: "1",
@@ -817,7 +878,7 @@ export const moduleLessons = pgTable(
 );
 
 // ============================================================
-// 14. ENROLLMENTS
+// 14. ENROLLMENTS & ENTITLEMENTS (Polymorphic)
 // ============================================================
 
 export const enrollments = pgTable(
@@ -828,8 +889,14 @@ export const enrollments = pgTable(
       .primaryKey()
       .notNull(),
     userId: varchar("user_id", { length: 50 }).notNull(),
-    pathwayId: varchar("pathway_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }), // nullable for non-pathway enrollments
+    itemType: itemType("item_type").default("PATHWAY").notNull(),
+    itemId: varchar("item_id", { length: 100 }),
+    orderId: varchar("order_id", { length: 50 }),
+    paymentId: varchar("payment_id", { length: 50 }),
     status: enrollmentStatus().default("PENDING").notNull(),
+    source: enrollmentSource("source").default("PURCHASE").notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
     enrolledAt: timestamp("enrolled_at", { withTimezone: true, mode: "string" }),
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
@@ -841,20 +908,14 @@ export const enrollments = pgTable(
   },
   (table) => [
     index("idx_enrollments_pathway").using("btree", table.pathwayId.asc().nullsLast()),
-    index("idx_enrollments_pathway_status").using(
-      "btree",
-      table.pathwayId.asc().nullsLast(),
-      table.status.asc().nullsLast()
-    ),
     index("idx_enrollments_user").using("btree", table.userId.asc().nullsLast()),
+    index("idx_enrollments_item").using("btree", table.itemType.asc().nullsLast(), table.itemId.asc().nullsLast()),
+    index("idx_enrollments_order").using("btree", table.orderId.asc().nullsLast()),
     index("idx_enrollments_user_status").using(
       "btree",
       table.userId.asc().nullsLast(),
       table.status.asc().nullsLast()
     ),
-    uniqueIndex("uq_active_user_pathway_enrollment")
-      .using("btree", table.userId.asc().nullsLast(), table.pathwayId.asc().nullsLast())
-      .where(sql`(status = 'ACTIVE'::enrollment_status)`),
     foreignKey({
       columns: [table.userId],
       foreignColumns: [users.id],
@@ -864,12 +925,174 @@ export const enrollments = pgTable(
       columns: [table.pathwayId],
       foreignColumns: [pathways.id],
       name: "fk_enrollments_pathway",
-    }).onDelete("restrict"),
+    }).onDelete("set null"),
   ]
 );
 
 // ============================================================
-// 15. PAYMENTS
+// 15. DYNAMIC OFFERINGS & PRODUCT PRICING CATALOG
+// ============================================================
+
+export const offeringsPricing = pgTable(
+  "offerings_pricing",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('prc_'::text || nextval('offerings_pricing_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    itemType: itemType("item_type").notNull(),
+    itemId: varchar("item_id", { length: 100 }).notNull(),
+    title: varchar({ length: 255 }).notNull(),
+    description: text(),
+    slug: varchar({ length: 220 }),
+    pricePaise: bigint("price_paise", { mode: "number" }).default(0).notNull(),
+    mrpPaise: bigint("mrp_paise", { mode: "number" }).default(0).notNull(),
+    currency: varchar({ length: 3 }).default("INR").notNull(),
+    isFree: boolean("is_free").default(false).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    isPublic: boolean("is_public").default(true).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_offerings_pricing_item").using("btree", table.itemType.asc().nullsLast(), table.itemId.asc().nullsLast()),
+    index("idx_offerings_pricing_is_active").using("btree", table.isActive.asc().nullsLast()),
+    uniqueIndex("uq_offerings_pricing_item").using("btree", table.itemType.asc().nullsLast(), table.itemId.asc().nullsLast()),
+  ]
+);
+
+// ============================================================
+// 15b. PROMO CODES & DISCOUNT COUPONS
+// ============================================================
+
+export const coupons = pgTable(
+  "coupons",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('cpn_'::text || nextval('coupons_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    code: varchar({ length: 50 }).notNull().unique(),
+    description: text(),
+    discountType: discountType("discount_type").default("PERCENTAGE").notNull(),
+    discountValue: integer("discount_value").notNull(), // percentage (e.g. 50 for 50%) or paise (e.g. 50000 for ₹500)
+    maxDiscountPaise: bigint("max_discount_paise", { mode: "number" }),
+    minOrderPaise: bigint("min_order_paise", { mode: "number" }).default(0).notNull(),
+    maxUses: integer("max_uses"),
+    usedCount: integer("used_count").default(0).notNull(),
+    applicableItemTypes: jsonb("applicable_item_types").default(sql`'[]'::jsonb`).notNull(),
+    validFrom: timestamp("valid_from", { withTimezone: true, mode: "string" }),
+    validUntil: timestamp("valid_until", { withTimezone: true, mode: "string" }),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdById: varchar("created_by_id", { length: 50 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_coupons_code").using("btree", table.code.asc().nullsLast()),
+    index("idx_coupons_is_active").using("btree", table.isActive.asc().nullsLast()),
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [users.id],
+      name: "fk_coupons_creator",
+    }).onDelete("set null"),
+  ]
+);
+
+// ============================================================
+// 15c. COMMERCIAL ORDERS (Invoicing & Checkout)
+// ============================================================
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('ord_'::text || nextval('orders_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    orderNumber: varchar("order_number", { length: 60 }),
+    razorpayOrderId: varchar("razorpay_order_id", { length: 150 }),
+    userId: varchar("user_id", { length: 50 }),
+    customerName: varchar("customer_name", { length: 150 }),
+    customerPhone: varchar("customer_phone", { length: 20 }),
+    customerEmail: varchar("customer_email", { length: 255 }),
+    subtotalPaise: bigint("subtotal_paise", { mode: "number" }).default(0).notNull(),
+    discountPaise: bigint("discount_paise", { mode: "number" }).default(0).notNull(),
+    couponCode: varchar("coupon_code", { length: 50 }),
+    totalPaise: bigint("total_paise", { mode: "number" }).default(0).notNull(),
+    currency: varchar({ length: 3 }).default("INR").notNull(),
+    status: orderStatus().default("PENDING").notNull(),
+    notes: text(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    paidAt: timestamp("paid_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_orders_user").using("btree", table.userId.asc().nullsLast()),
+    index("idx_orders_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_orders_number").using("btree", table.orderNumber.asc().nullsLast()),
+    index("idx_orders_rzp").using("btree", table.razorpayOrderId.asc().nullsLast()),
+    index("idx_orders_phone").using("btree", table.customerPhone.asc().nullsLast()),
+    index("idx_orders_created_at").using("btree", table.createdAt.desc().nullsLast()),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_orders_user",
+    }).onDelete("set null"),
+  ]
+);
+
+
+// ============================================================
+// 15d. ORDER LINE ITEMS
+// ============================================================
+
+export const orderItems = pgTable(
+  "order_items",
+  {
+    id: varchar({ length: 50 })
+      .default(sql`('ord_item_'::text || nextval('order_items_id_seq'::regclass))`)
+      .primaryKey()
+      .notNull(),
+    orderId: varchar("order_id", { length: 50 }).notNull(),
+    itemType: itemType("item_type").notNull(),
+    itemId: varchar("item_id", { length: 100 }).notNull(),
+    itemTitle: varchar("item_title", { length: 255 }).notNull(),
+    unitPricePaise: bigint("unit_price_paise", { mode: "number" }).default(0).notNull(),
+    quantity: integer().default(1).notNull(),
+    totalPricePaise: bigint("total_price_paise", { mode: "number" }).default(0).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_order_items_order").using("btree", table.orderId.asc().nullsLast()),
+    index("idx_order_items_item").using("btree", table.itemType.asc().nullsLast(), table.itemId.asc().nullsLast()),
+    foreignKey({
+      columns: [table.orderId],
+      foreignColumns: [orders.id],
+      name: "fk_order_items_order",
+    }).onDelete("cascade"),
+  ]
+);
+
+// ============================================================
+// 15e. GATEWAY PAYMENTS & TRANSACTIONS
 // ============================================================
 
 export const payments = pgTable(
@@ -880,8 +1103,11 @@ export const payments = pgTable(
       .primaryKey()
       .notNull(),
     userId: varchar("user_id", { length: 50 }).notNull(),
+    orderId: varchar("order_id", { length: 50 }),
     enrollmentId: varchar("enrollment_id", { length: 50 }),
-    pathwayId: varchar("pathway_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }), // nullable
+    itemType: itemType("item_type").default("PATHWAY"),
+    itemId: varchar("item_id", { length: 100 }),
     amountPaise: bigint("amount_paise", { mode: "number" }).notNull(),
     currency: varchar({ length: 3 }).default("INR").notNull(),
     status: paymentStatus().default("CREATED").notNull(),
@@ -890,6 +1116,7 @@ export const payments = pgTable(
     providerPaymentId: varchar("provider_payment_id", { length: 150 }),
     providerSignature: varchar("provider_signature", { length: 500 }),
     failureReason: text("failure_reason"),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
     paidAt: timestamp("paid_at", { withTimezone: true, mode: "string" }),
     refundedAt: timestamp("refunded_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
@@ -900,8 +1127,10 @@ export const payments = pgTable(
       .notNull(),
   },
   (table) => [
+    index("idx_payments_order").using("btree", table.orderId.asc().nullsLast()),
     index("idx_payments_enrollment").using("btree", table.enrollmentId.asc().nullsLast()),
     index("idx_payments_pathway").using("btree", table.pathwayId.asc().nullsLast()),
+    index("idx_payments_item").using("btree", table.itemType.asc().nullsLast(), table.itemId.asc().nullsLast()),
     index("idx_payments_provider_order").using(
       "btree",
       table.providerOrderId.asc().nullsLast()
@@ -924,6 +1153,11 @@ export const payments = pgTable(
       name: "fk_payments_user",
     }).onDelete("restrict"),
     foreignKey({
+      columns: [table.orderId],
+      foreignColumns: [orders.id],
+      name: "fk_payments_order",
+    }).onDelete("set null"),
+    foreignKey({
       columns: [table.enrollmentId],
       foreignColumns: [enrollments.id],
       name: "fk_payments_enrollment",
@@ -932,7 +1166,7 @@ export const payments = pgTable(
       columns: [table.pathwayId],
       foreignColumns: [pathways.id],
       name: "fk_payments_pathway",
-    }).onDelete("restrict"),
+    }).onDelete("set null"),
     check("chk_payments_amount", sql`amount_paise >= 0`),
     check("chk_payments_currency", sql`(currency)::text = 'INR'::text`),
   ]
@@ -1590,6 +1824,7 @@ export const leadCallLogs = pgTable(
 );
 
 // ============================================================
+// ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
@@ -1609,6 +1844,10 @@ export type Lesson = InferSelectModel<typeof lessons>;
 export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Enrollment = InferSelectModel<typeof enrollments>;
 export type Payment = InferSelectModel<typeof payments>;
+export type Order = InferSelectModel<typeof orders>;
+export type OrderItem = InferSelectModel<typeof orderItems>;
+export type OfferingPricing = InferSelectModel<typeof offeringsPricing>;
+export type Coupon = InferSelectModel<typeof coupons>;
 export type Presentation = InferSelectModel<typeof presentations>;
 export type PresentationSession = InferSelectModel<typeof presentationSessions>;
 export type PresentationLead = InferSelectModel<typeof presentationLeads>;
@@ -1644,6 +1883,10 @@ export type NewLesson = InferInsertModel<typeof lessons>;
 export type NewModuleLesson = InferInsertModel<typeof moduleLessons>;
 export type NewEnrollment = InferInsertModel<typeof enrollments>;
 export type NewPayment = InferInsertModel<typeof payments>;
+export type NewOrder = InferInsertModel<typeof orders>;
+export type NewOrderItem = InferInsertModel<typeof orderItems>;
+export type NewOfferingPricing = InferInsertModel<typeof offeringsPricing>;
+export type NewCoupon = InferInsertModel<typeof coupons>;
 export type NewPresentation = InferInsertModel<typeof presentations>;
 export type NewPresentationSession = InferInsertModel<typeof presentationSessions>;
 export type NewPresentationLead = InferInsertModel<typeof presentationLeads>;
@@ -1658,4 +1901,14 @@ export type NewDailyEodLog = InferInsertModel<typeof dailyEodLogs>;
 export type NewIaptNainRegistration = InferInsertModel<typeof iaptNainRegistrations>;
 export type NewLead = InferInsertModel<typeof leads>;
 export type NewLeadCallLog = InferInsertModel<typeof leadCallLogs>;
+
+// ============================================================
+// ENUM TYPE ALIASES
+// ============================================================
+
+export type ItemType = "PATHWAY" | "COURSE" | "WORKSHOP" | "PROGRAM" | "EVENT" | "BUNDLE" | "MERCHANDISE";
+export type OrderStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
+export type DiscountType = "PERCENTAGE" | "FLAT";
+export type EnrollmentSource = "PURCHASE" | "ADMIN_MANUAL" | "CAMPUS_SPONSORED" | "FREE" | "INVITE";
+
 

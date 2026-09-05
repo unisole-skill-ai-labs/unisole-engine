@@ -4,6 +4,10 @@ import {
   enrollments,
   pathways,
   payments,
+  orders,
+  orderItems,
+  offeringsPricing,
+  coupons,
   pathwayCategories,
   categories,
   pathwayColleges,
@@ -32,6 +36,8 @@ import {
 export const usersRelations = relations(users, ({ many }) => ({
   enrollments: many(enrollments),
   payments: many(payments),
+  orders: many(orders),
+  createdCoupons: many(coupons),
   assignedTasks: many(tasks, { relationName: "taskAssignee" }),
   reportedTasks: many(tasks, { relationName: "taskReporter" }),
   ledProjects: many(projects, { relationName: "projectLead" }),
@@ -42,6 +48,30 @@ export const usersRelations = relations(users, ({ many }) => ({
   assignedLeads: many(leads, { relationName: "assignedLeadUser" }),
 }));
 
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  user: one(users, {
+    fields: [orders.userId],
+    references: [users.id],
+  }),
+  items: many(orderItems),
+  payments: many(payments),
+  enrollments: many(enrollments),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderItems.orderId],
+    references: [orders.id],
+  }),
+}));
+
+export const couponsRelations = relations(coupons, ({ one }) => ({
+  creator: one(users, {
+    fields: [coupons.createdById],
+    references: [users.id],
+  }),
+}));
+
 export const enrollmentsRelations = relations(enrollments, ({ one, many }) => ({
   user: one(users, {
     fields: [enrollments.userId],
@@ -50,6 +80,14 @@ export const enrollmentsRelations = relations(enrollments, ({ one, many }) => ({
   pathway: one(pathways, {
     fields: [enrollments.pathwayId],
     references: [pathways.id],
+  }),
+  order: one(orders, {
+    fields: [enrollments.orderId],
+    references: [orders.id],
+  }),
+  payment: one(payments, {
+    fields: [enrollments.paymentId],
+    references: [payments.id],
   }),
   payments: many(payments),
 }));
@@ -66,6 +104,10 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   user: one(users, {
     fields: [payments.userId],
     references: [users.id],
+  }),
+  order: one(orders, {
+    fields: [payments.orderId],
+    references: [orders.id],
   }),
   enrollment: one(enrollments, {
     fields: [payments.enrollmentId],

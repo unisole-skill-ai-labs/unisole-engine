@@ -225,7 +225,7 @@ export const authService = {
     const resolvedCollegeId = (collegeId || "").trim() || null;
     const resolvedSessionCode = (sessionCode || "").trim().toUpperCase() || null;
 
-    // Resolve source attribution: PAMPHLET_QR, SESSION_QR, IAPT, NON_PAMPHLET
+    // Resolve source attribution: PAMPHLET_QR, SESSION_QR, IAPT, AI_WORKSHOP, PROFESSOR_NETWORK, NON_PAMPHLET
     const rawSource = (signupSource || source || "").trim().toUpperCase();
     let effectiveSource = "NON_PAMPHLET";
     if (rawSource === "PAMPHLET_QR" || rawSource === "PAMPHLET") {
@@ -234,6 +234,10 @@ export const authService = {
       effectiveSource = "SESSION_QR";
     } else if (rawSource === "IAPT" || rawSource.includes("IAPT")) {
       effectiveSource = "IAPT";
+    } else if (rawSource === "AI_WORKSHOP" || rawSource === "WORKSHOP" || rawSource === "AI_MASTERCLASS") {
+      effectiveSource = "AI_WORKSHOP";
+    } else if (rawSource === "PROFESSOR_NETWORK" || rawSource === "PROFESSOR" || rawSource === "FACULTY") {
+      effectiveSource = "PROFESSOR_NETWORK";
     } else if (rawSource === "NON_PAMPHLET" || rawSource === "DIRECT_WEB" || rawSource === "ORGANIC") {
       effectiveSource = "NON_PAMPHLET";
     } else if (rawSource) {

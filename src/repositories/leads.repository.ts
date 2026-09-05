@@ -29,6 +29,8 @@ export interface LeadFilters {
 export function normalizeLeadSource(sourceStr?: string | null): string {
   if (!sourceStr) return "WEBSITE_INQUIRY";
   const s = String(sourceStr).trim().toUpperCase();
+  if (s === "AI_WORKSHOP" || s === "WORKSHOP" || s === "AI_MASTERCLASS" || s === "MASTERCLASS") return "AI_WORKSHOP";
+  if (s === "PROFESSOR_NETWORK" || s === "PROFESSOR" || s === "FACULTY" || s === "PROFESSOR_CAMPAIGN") return "PROFESSOR_NETWORK";
   if (s === "IAPT") return "IAPT";
   if (s === "PAMPHLET_QR" || s === "PAMPHLET" || s === "PAMPHLET_SCAN") return "PAMPHLET_QR";
   if (s === "SESSION_QR" || s === "PRESENTATION_SESSION") return "PRESENTATION_SESSION";
