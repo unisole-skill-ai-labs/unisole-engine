@@ -110,6 +110,9 @@ DO $$ BEGIN
   ALTER TABLE "coupons" ADD CONSTRAINT "fk_coupons_creator" FOREIGN KEY ("created_by_id") REFERENCES "public"."users"("id") ON DELETE set null;
 EXCEPTION WHEN duplicate_object THEN null; WHEN undefined_table THEN null; END $$;--> statement-breakpoint
 
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "username" varchar(100);--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password" varchar(255);--> statement-breakpoint
+
 DO $$ BEGIN
   ALTER TABLE "payments" ALTER COLUMN "pathway_id" DROP NOT NULL;
 EXCEPTION WHEN undefined_table THEN null; WHEN undefined_column THEN null; END $$;--> statement-breakpoint
@@ -118,6 +121,7 @@ ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "order_id" varchar(50);--> state
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "enrollment_id" varchar(50);--> statement-breakpoint
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "item_type" "public"."item_type" DEFAULT 'PATHWAY';--> statement-breakpoint
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "item_id" varchar(100);--> statement-breakpoint
+ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;--> statement-breakpoint
 
 DO $$ BEGIN
   ALTER TABLE "payments" ADD CONSTRAINT "fk_payments_order" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE set null;
