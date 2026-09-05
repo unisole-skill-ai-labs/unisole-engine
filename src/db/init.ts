@@ -310,9 +310,206 @@ export async function initializeDatabase() {
       EXCEPTION
         WHEN duplicate_object THEN null;
       END $$;
+
+      -- ============================================================
+      -- 3. CENTRALIZED ORDERS, PRICING, COUPONS & POLYMORPHIC ENROLLMENTS
+      -- ============================================================
+
+      -- Enums
+      DO $$ BEGIN
+        CREATE TYPE "public"."order_status" AS ENUM('PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      DO $$ BEGIN
+        CREATE TYPE "public"."item_type" AS ENUM('PATHWAY', 'COURSE', 'WORKSHOP', 'PROGRAM', 'EVENT', 'BUNDLE');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      DO $$ BEGIN
+        CREATE TYPE "public"."discount_type" AS ENUM('PERCENTAGE', 'FLAT');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      DO $$ BEGIN
+        CREATE TYPE "public"."enrollment_source" AS ENUM('PAYMENT', 'ADMIN_MANUAL', 'SCHOLARSHIP', 'PROMOTION', 'BATCH_IMPORT');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      -- Sequences
+      CREATE SEQUENCE IF NOT EXISTS "public"."orders_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS "public"."order_items_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS "public"."offerings_pricing_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1;
+      CREATE SEQUENCE IF NOT EXISTS "public"."coupons_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1;
+
+      -- Orders Table
+      CREATE TABLE IF NOT EXISTS "public"."orders" (
+        "id" integer PRIMARY KEY DEFAULT nextval('public.orders_id_seq'::regclass) NOT NULL,
+        "order_number" varchar(50) NOT NULL,
+        "user_id" varchar(50) NOT NULL,
+        "customer_name" varchar(150) NOT NULL,
+        "customer_email" varchar(255) NOT NULL,
+        "customer_phone" varchar(20),
+        "total_amount_paise" bigint NOT NULL,
+        "discount_amount_paise" bigint DEFAULT 0 NOT NULL,
+        "final_amount_paise" bigint NOT NULL,
+        "currency" varchar(10) DEFAULT 'INR' NOT NULL,
+        "status" "public"."order_status" DEFAULT 'PENDING' NOT NULL,
+        "coupon_code" varchar(50),
+        "razorpay_order_id" varchar(100),
+        "notes" text,
+        "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_orders_order_number" UNIQUE("order_number"),
+        CONSTRAINT "uq_orders_razorpay_order_id" UNIQUE("razorpay_order_id")
+      );
+
+      -- Order Items Table
+      CREATE TABLE IF NOT EXISTS "public"."order_items" (
+        "id" integer PRIMARY KEY DEFAULT nextval('public.order_items_id_seq'::regclass) NOT NULL,
+        "order_id" integer NOT NULL,
+        "item_type" "public"."item_type" NOT NULL,
+        "item_id" varchar(255) NOT NULL,
+        "item_title" varchar(255) NOT NULL,
+        "quantity" integer DEFAULT 1 NOT NULL,
+        "unit_price_paise" bigint NOT NULL,
+        "total_price_paise" bigint NOT NULL,
+        "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      -- Offerings Pricing Table
+      CREATE TABLE IF NOT EXISTS "public"."offerings_pricing" (
+        "id" integer PRIMARY KEY DEFAULT nextval('public.offerings_pricing_id_seq'::regclass) NOT NULL,
+        "item_type" "public"."item_type" NOT NULL,
+        "item_id" varchar(255) NOT NULL,
+        "title" varchar(255) NOT NULL,
+        "description" text,
+        "price_paise" bigint NOT NULL,
+        "mrp_paise" bigint NOT NULL,
+        "currency" varchar(10) DEFAULT 'INR' NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "is_public" boolean DEFAULT true NOT NULL,
+        "valid_from" timestamp with time zone,
+        "valid_until" timestamp with time zone,
+        "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_offering_item" UNIQUE("item_type", "item_id")
+      );
+
+      -- Coupons Table
+      CREATE TABLE IF NOT EXISTS "public"."coupons" (
+        "id" integer PRIMARY KEY DEFAULT nextval('public.coupons_id_seq'::regclass) NOT NULL,
+        "code" varchar(50) NOT NULL,
+        "discount_type" "public"."discount_type" NOT NULL,
+        "discount_value" integer NOT NULL,
+        "max_discount_paise" bigint,
+        "min_order_amount_paise" bigint DEFAULT 0 NOT NULL,
+        "applicable_item_types" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "applicable_item_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "usage_limit" integer,
+        "usage_count" integer DEFAULT 0 NOT NULL,
+        "valid_from" timestamp with time zone,
+        "valid_until" timestamp with time zone,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_coupons_code" UNIQUE("code")
+      );
+
+      -- Foreign Keys
+      DO $$ BEGIN
+        ALTER TABLE "public"."orders" ADD CONSTRAINT "fk_orders_user" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE restrict;
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+        WHEN undefined_table THEN null;
+      END $$;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."order_items" ADD CONSTRAINT "fk_order_items_order" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade;
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+        WHEN undefined_table THEN null;
+      END $$;
+
+      -- Alter Payments Table for polymorphism and order linkage
+      DO $$ BEGIN
+        ALTER TABLE "public"."payments" ALTER COLUMN "pathway_id" DROP NOT NULL;
+      EXCEPTION
+        WHEN undefined_table THEN null;
+        WHEN undefined_column THEN null;
+      END $$;
+
+      ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "order_id" integer;
+      ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "item_type" "public"."item_type";
+      ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "item_id" varchar(255);
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."payments" ADD CONSTRAINT "fk_payments_order" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE set null;
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+        WHEN undefined_table THEN null;
+      END $$;
+
+      -- Alter Enrollments Table for polymorphism, order linkage, and source tracking
+      DO $$ BEGIN
+        ALTER TABLE "public"."enrollments" ALTER COLUMN "pathway_id" DROP NOT NULL;
+      EXCEPTION
+        WHEN undefined_table THEN null;
+        WHEN undefined_column THEN null;
+      END $$;
+
+      ALTER TABLE "public"."enrollments" ADD COLUMN IF NOT EXISTS "item_type" "public"."item_type" DEFAULT 'PATHWAY' NOT NULL;
+      ALTER TABLE "public"."enrollments" ADD COLUMN IF NOT EXISTS "item_id" varchar(255);
+      ALTER TABLE "public"."enrollments" ADD COLUMN IF NOT EXISTS "source" "public"."enrollment_source" DEFAULT 'PAYMENT' NOT NULL;
+      ALTER TABLE "public"."enrollments" ADD COLUMN IF NOT EXISTS "order_id" integer;
+      ALTER TABLE "public"."enrollments" ADD COLUMN IF NOT EXISTS "expires_at" timestamp with time zone;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."enrollments" ADD CONSTRAINT "fk_enrollments_order" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE set null;
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+        WHEN undefined_table THEN null;
+      END $$;
+
+      -- Backfill legacy enrollments item_id from pathway_id if null
+      UPDATE "public"."enrollments" SET "item_id" = "pathway_id" WHERE "item_id" IS NULL AND "pathway_id" IS NOT NULL;
+
+      -- Indexes for Orders, Pricing, Coupons, Polymorphic Enrollments
+      CREATE INDEX IF NOT EXISTS "idx_orders_user_id" ON "public"."orders" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_orders_status" ON "public"."orders" ("status");
+      CREATE INDEX IF NOT EXISTS "idx_orders_created_at" ON "public"."orders" ("created_at" DESC);
+      CREATE INDEX IF NOT EXISTS "idx_order_items_order_id" ON "public"."order_items" ("order_id");
+      CREATE INDEX IF NOT EXISTS "idx_order_items_item" ON "public"."order_items" ("item_type", "item_id");
+      CREATE INDEX IF NOT EXISTS "idx_offerings_pricing_lookup" ON "public"."offerings_pricing" ("item_type", "item_id", "is_active");
+      CREATE INDEX IF NOT EXISTS "idx_coupons_lookup" ON "public"."coupons" ("code", "is_active");
+      CREATE INDEX IF NOT EXISTS "idx_enrollments_item_lookup" ON "public"."enrollments" ("user_id", "item_type", "item_id");
+      CREATE INDEX IF NOT EXISTS "idx_enrollments_order_id" ON "public"."enrollments" ("order_id");
+      CREATE INDEX IF NOT EXISTS "idx_payments_order_id" ON "public"."payments" ("order_id");
+
+      -- Seed Initial Default Offering Pricing for AI Workshop Masterclass
+      INSERT INTO "public"."offerings_pricing" (
+        "item_type", "item_id", "title", "description", "price_paise", "mrp_paise", "is_active", "is_public"
+      ) VALUES (
+        'WORKSHOP',
+        'AI_MASTERCLASS_2026',
+        'AI Revolution & Agentic Engineering Masterclass',
+        'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems',
+        3900,
+        99900,
+        true,
+        true
+      )
+      ON CONFLICT ("item_type", "item_id") DO NOTHING;
     `);
 
-    console.log("[DB-INIT] ✅ WorkSole, IAPT NAIN, and Lead CRM tables, sequences, foreign keys, and indexes verified successfully.");
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, and Polymorphic Enrollment tables verified successfully.");
 
 
     // 2. Also run official Drizzle migrator if folder exists

@@ -10,6 +10,8 @@ import { publicRouter } from "./routes/public";
 import { webhooksRouter } from "./routes/webhooks";
 import { iaptRouter } from "./routes/iapt";
 import { workshopRouter } from "./routes/workshop";
+import { ordersRouter } from "./routes/orders";
+import { paymentsRouter } from "./routes/payments";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
@@ -55,11 +57,14 @@ app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/lms", lmsRouter);
 app.use("/api/public", publicRouter);
+app.use("/api/orders", ordersRouter);
+app.use("/api/payments", paymentsRouter);
 app.use("/api/webhooks", webhooksRouter);
 app.use("/api/iapt", iaptRouter);
 app.use("/api/v1/iapt", iaptRouter);
 app.use("/api/workshop", workshopRouter);
 app.use("/api/public/workshop", workshopRouter);
+
 
 app.use(notFound);
 app.use(errorHandler);

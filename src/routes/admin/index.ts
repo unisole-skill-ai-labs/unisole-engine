@@ -19,6 +19,9 @@ import { adminTeamRouter } from "./team";
 import { adminTemplatesRouter } from "./templates";
 import { adminDailyLogsRouter } from "./daily-logs";
 import { adminMyWorkRouter } from "./my-work";
+import { adminOrdersRouter } from "./orders";
+import { adminPricingRouter } from "./pricing";
+import { adminCouponsRouter } from "./coupons";
 
 export const adminRouter: Router = Router();
 
@@ -54,6 +57,10 @@ adminRouter.use("/lessons", adminLessonsRouter);
 adminRouter.use("/enrollments", adminEnrollmentsRouter);
 adminRouter.use("/presentations", adminPresentationsRouter);
 
-// Protected sensitive finance ledger (Super Admin only)
+// Financial Management & Pricing Suite (Super Admin & Admin)
+adminRouter.use("/orders", requireRole(["SUPER_ADMIN", "ADMIN"]), adminOrdersRouter);
+adminRouter.use("/pricing", requireRole(["SUPER_ADMIN", "ADMIN"]), adminPricingRouter);
+adminRouter.use("/coupons", requireRole(["SUPER_ADMIN", "ADMIN"]), adminCouponsRouter);
 adminRouter.use("/payments", requireRole(["SUPER_ADMIN", "ADMIN"]), adminPaymentsRouter);
+
 

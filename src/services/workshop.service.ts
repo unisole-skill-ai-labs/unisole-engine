@@ -7,7 +7,10 @@ import { usersRepository } from "../repositories/users.repository";
 import { collegesRepository } from "../repositories/colleges.repository";
 import { branchesRepository } from "../repositories/branches.repository";
 import { paymentsRepository } from "../repositories/payments.repository";
+import { enrollmentsRepository } from "../repositories/enrollments.repository";
 import { authService } from "./auth.service";
+import { ordersService } from "./orders.service";
+import { paymentsService } from "./payments.service";
 import { ValidationError, NotFoundError } from "../errors";
 import { normalizePhone, toTitleCase } from "../helpers/formatters";
 
@@ -354,9 +357,9 @@ export const workshopService = {
   },
 
   /**
-   * Create Razorpay payment order for ₹39 token fee.
+   * Create centralized payment order for workshop seat with dynamic catalog pricing.
    */
-  async createTokenOrder(userId?: string, phone?: string) {
+  async createTokenOrder(userId?: string, phone?: string, couponCode?: string) {
     let targetUser = null;
     if (userId) {
       targetUser = await usersRepository.getById(userId);
@@ -376,7 +379,14 @@ export const workshopService = {
       ? (targetUser.metadata as Record<string, any>)
       : {};
 
-    if (meta.tokenPaid) {
+    // Check active enrollment in workshop
+    const existingEnrollment = await enrollmentsRepository.getActiveByUserAndItem(
+      targetUser.id,
+      "WORKSHOP",
+      "AI_MASTERCLASS_2026"
+    );
+
+    if (existingEnrollment || meta.tokenPaid) {
       return {
         alreadyPaid: true,
         message: "You have already confirmed your registration for this masterclass!",
@@ -384,23 +394,37 @@ export const workshopService = {
       };
     }
 
-    // Generate provider order ID
-    const providerOrderId = `order_wksp_${crypto.randomBytes(8).toString("hex")}`;
-    const tokenAmountPaise = 3900; // ₹39
+    // Delegate to centralized orders service
+    const { order, checkout } = await ordersService.createCheckoutOrder({
+      userId: targetUser.id,
+      customerName: targetUser.name || "Student",
+      customerEmail: meta.email || undefined,
+      customerPhone: targetUser.phone || undefined,
+      couponCode,
+      items: [
+        {
+          itemType: "WORKSHOP",
+          itemId: "AI_MASTERCLASS_2026",
+          quantity: 1,
+        },
+      ],
+      notes: "AI Masterclass Registration Token",
+    });
 
     return {
       alreadyPaid: false,
-      orderId: providerOrderId,
-      amount: tokenAmountPaise,
-      currency: "INR",
-      name: targetUser.name,
-      phone: targetUser.phone,
-      email: meta.email || "",
+      orderId: checkout.razorpayOrderId,
+      orderNumber: checkout.orderNumber,
+      amount: checkout.amountPaise,
+      currency: checkout.currency,
+      name: checkout.customerName,
+      phone: checkout.customerPhone,
+      email: checkout.customerEmail,
     };
   },
 
   /**
-   * Verify Razorpay payment and confirm workshop seat
+   * Verify Razorpay payment and confirm workshop seat via centralized paymentsService
    */
   async verifyTokenPayment(body: {
     providerOrderId?: string;
@@ -426,54 +450,20 @@ export const workshopService = {
       }
     }
 
-    if (!targetUser) {
-      throw new NotFoundError("User account for this payment was not found");
-    }
-
-    const currentMeta = (typeof targetUser.metadata === "object" && targetUser.metadata !== null)
-      ? (targetUser.metadata as Record<string, any>)
-      : {};
-
-    // Update user metadata to mark token paid
-    await usersRepository.update(targetUser.id, {
-      metadata: {
-        ...currentMeta,
-        tokenPaid: true,
-        providerOrderId,
-        providerPaymentId,
-        providerSignature: providerSignature || "verified",
-        tokenPaidAt: new Date().toISOString(),
-      },
+    // Call centralized payments service
+    const result = await paymentsService.verifyPayment({
+      providerOrderId,
+      providerPaymentId,
+      providerSignature: providerSignature || "verified",
+      userId: targetUser?.id,
     });
-
-    // Update CRM Lead conversion value (₹39)
-    try {
-      const cleanPhone = normalizePhone(targetUser.phone);
-      if (cleanPhone) {
-        await db
-          .update(leads)
-          .set({
-            status: "CONVERTED" as any,
-            conversionValuePaise: 3900,
-            convertedAt: new Date().toISOString(),
-            notes: "Converted: Paid ₹39 AI Workshop Token Fee",
-            updatedAt: new Date().toISOString(),
-          })
-          .where(
-            or(
-              eq(leads.userId, targetUser.id),
-              eq(leads.phone, cleanPhone)
-            )
-          );
-      }
-    } catch (leadUpdateErr) {
-      console.error("[Workshop Service] Failed to update lead conversion value:", leadUpdateErr);
-    }
 
     return {
       success: true,
-      message: "₹39 Token Fee received successfully. Your masterclass seat is secured!",
+      message: "Payment received successfully. Your masterclass seat is secured!",
       tokenPaid: true,
+      order: result.order,
+      enrolledItems: result.enrolledItems,
     };
   },
 

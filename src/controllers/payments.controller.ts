@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { paymentsService } from "../services/payments.service";
+import { ordersService } from "../services/orders.service";
 import { asyncHandler } from "../middleware/async-handler";
 import { CustomRequest } from "../middleware/auth";
 
@@ -12,9 +13,21 @@ export const paymentsController = {
   }),
   createOrder: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user!.id;
-    const { pathwayId } = req.body;
-    const order = await paymentsService.createOrder(userId, pathwayId);
-    res.status(201).json(order);
+    const { pathwayId, workshopId, items, couponCode } = req.body;
+    
+    let resolvedItems = items;
+    if (!resolvedItems && pathwayId) {
+      resolvedItems = [{ itemType: "PATHWAY", itemId: pathwayId, quantity: 1 }];
+    } else if (!resolvedItems && workshopId) {
+      resolvedItems = [{ itemType: "WORKSHOP", itemId: workshopId, quantity: 1 }];
+    }
+
+    const orderResult = await ordersService.createCheckoutOrder({
+      userId,
+      items: resolvedItems,
+      couponCode,
+    });
+    res.status(201).json(orderResult);
   }),
   verifyPayment: asyncHandler(async (req: Request, res: Response) => {
     const result = await paymentsService.verifyPayment(req.body);
