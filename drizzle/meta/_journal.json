@@ -43,6 +43,13 @@
       "when": 1788446435788,
       "tag": "0005_leads_crm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788640000000,
+      "tag": "0006_orders_pricing_polymorphic",
+      "breakpoints": true
     }
   ]
 }
