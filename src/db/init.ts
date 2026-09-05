@@ -308,6 +308,41 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
       ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
 
+      -- Drop NOT NULL on legacy column names if they exist from older schema
+      DO $$ BEGIN
+        ALTER TABLE "public"."orders" ALTER COLUMN "total_amount_paise" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."orders" ALTER COLUMN "final_amount_paise" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."orders" ALTER COLUMN "discount_amount_paise" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      -- Ensure id and order_id columns are varchar(50) with correct defaults
+      DO $$ BEGIN
+        ALTER TABLE "public"."orders" ALTER COLUMN "id" TYPE varchar(50) USING id::varchar(50);
+        ALTER TABLE "public"."orders" ALTER COLUMN "id" SET DEFAULT ('ord_'::text || nextval('public.orders_id_seq'::regclass));
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."order_items" ALTER COLUMN "id" TYPE varchar(50) USING id::varchar(50);
+        ALTER TABLE "public"."order_items" ALTER COLUMN "id" SET DEFAULT ('ord_item_'::text || nextval('public.order_items_id_seq'::regclass));
+        ALTER TABLE "public"."order_items" ALTER COLUMN "order_id" TYPE varchar(50) USING order_id::varchar(50);
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."offerings_pricing" ALTER COLUMN "id" TYPE varchar(50) USING id::varchar(50);
+        ALTER TABLE "public"."offerings_pricing" ALTER COLUMN "id" SET DEFAULT ('prc_'::text || nextval('public.offerings_pricing_id_seq'::regclass));
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."coupons" ALTER COLUMN "id" TYPE varchar(50) USING id::varchar(50);
+        ALTER TABLE "public"."coupons" ALTER COLUMN "id" SET DEFAULT ('cpn_'::text || nextval('public.coupons_id_seq'::regclass));
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
       -- Ensure columns on existing coupons table if created in earlier runs
       ALTER TABLE "public"."coupons" ADD COLUMN IF NOT EXISTS "created_by_id" varchar(50);
       ALTER TABLE "public"."coupons" ADD COLUMN IF NOT EXISTS "description" text;
