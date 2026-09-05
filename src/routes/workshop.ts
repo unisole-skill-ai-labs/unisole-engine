@@ -1,24 +1,32 @@
 import { Router } from "express";
 import { workshopController } from "../controllers/workshop.controller";
-import { authMiddleware, optionalAuthMiddleware, requireRole } from "../middleware/auth";
+import { optionalAuthMiddleware } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
 export const workshopRouter: Router = Router();
 
-// Public / Student Registration & Status
+// Public / Student Registration
 workshopRouter.post(
   "/register",
   validateBody({ required: ["name", "phone"] }),
   workshopController.register
 );
 
-workshopRouter.get(
-  "/my-registration",
+// Post-login survey & expectations
+workshopRouter.post(
+  "/survey",
   optionalAuthMiddleware,
-  workshopController.getMyRegistration
+  workshopController.saveSurvey
 );
 
-// Payment Endpoints (₹39 Token fee)
+// Student registration & token status
+workshopRouter.get(
+  "/status",
+  optionalAuthMiddleware,
+  workshopController.getMyStatus
+);
+
+// ₹39 Razorpay Token Order & Verification
 workshopRouter.post(
   "/payment/create-order",
   optionalAuthMiddleware,
@@ -28,24 +36,10 @@ workshopRouter.post(
 workshopRouter.post(
   "/payment/verify",
   validateBody({ required: ["providerOrderId", "providerPaymentId"] }),
+  optionalAuthMiddleware,
   workshopController.verifyTokenPayment
 );
 
-// QR Code Generation
+// Universal Workshop QR Code Generation
 workshopRouter.get("/qr", workshopController.generateQrCode);
 workshopRouter.post("/qr", workshopController.generateQrCode);
-
-// Admin Reporting & Stats
-workshopRouter.get(
-  "/admin/registrations",
-  authMiddleware,
-  requireRole(["ADMIN", "SUPER_ADMIN", "MEMBER"]),
-  workshopController.listRegistrations
-);
-
-workshopRouter.get(
-  "/admin/stats",
-  authMiddleware,
-  requireRole(["ADMIN", "SUPER_ADMIN", "MEMBER"]),
-  workshopController.getStats
-);

@@ -9,20 +9,31 @@ export const workshopController = {
     res.status(200).json(result);
   }),
 
-  getMyRegistration: asyncHandler(async (req: CustomRequest, res: Response) => {
+  saveSurvey: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user?.id || req.body.userId;
+    const phone = req.body.phone;
+    const result = await workshopService.saveSurvey({
+      ...req.body,
+      userId,
+      phone,
+    });
+    res.status(200).json(result);
+  }),
+
+  getMyStatus: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user?.id;
     const phone = req.query.phone as string | undefined;
-    const registration = await workshopService.getMyRegistration(userId, phone);
+    const status = await workshopService.getMyStatus(userId, phone);
     res.status(200).json({
       success: true,
-      registration,
+      status,
     });
   }),
 
   createTokenOrder: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const userId = req.user?.id;
-    const { registrationId, phone } = req.body;
-    const order = await workshopService.createTokenOrder(userId, registrationId, phone);
+    const userId = req.user?.id || req.body.userId;
+    const phone = req.body.phone;
+    const order = await workshopService.createTokenOrder(userId, phone);
     res.status(200).json({
       success: true,
       data: order,
@@ -30,44 +41,23 @@ export const workshopController = {
   }),
 
   verifyTokenPayment: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const result = await workshopService.verifyTokenPayment(req.body);
+    const userId = req.user?.id || req.body.userId;
+    const phone = req.body.phone;
+    const result = await workshopService.verifyTokenPayment({
+      ...req.body,
+      userId,
+      phone,
+    });
     res.status(200).json(result);
   }),
 
   generateQrCode: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const targetUrl = (req.query.url as string) || (req.body.url as string);
+    const targetUrl = (req.query.url as string) || (req.body.url as string) || "https://unisole.org/workshop";
     const qrDataUrl = await workshopService.generateQrCode(targetUrl);
     res.status(200).json({
       success: true,
       qrDataUrl,
       targetUrl,
-    });
-  }),
-
-  listRegistrations: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const filters = {
-      search: req.query.search as string,
-      paymentStatus: req.query.paymentStatus as string,
-      collegeId: req.query.collegeId as string,
-      referredBy: req.query.referredBy as string,
-      campaignSource: req.query.campaignSource as string,
-      dateFrom: req.query.dateFrom as string,
-      dateTo: req.query.dateTo as string,
-      limit: req.query.limit ? Number(req.query.limit) : 50,
-      offset: req.query.offset ? Number(req.query.offset) : 0,
-    };
-    const result = await workshopService.listRegistrations(filters);
-    res.status(200).json({
-      success: true,
-      ...result,
-    });
-  }),
-
-  getStats: asyncHandler(async (_req: CustomRequest, res: Response) => {
-    const stats = await workshopService.getStats();
-    res.status(200).json({
-      success: true,
-      stats,
     });
   }),
 };

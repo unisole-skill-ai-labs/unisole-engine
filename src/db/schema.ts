@@ -344,14 +344,6 @@ export const leadCallLogsIdSeq = pgSequence("lead_call_logs_id_seq", {
   cache: "1",
   cycle: false,
 });
-export const workshopRegistrationsIdSeq = pgSequence("workshop_registrations_id_seq", {
-  startWith: "1",
-  increment: "1",
-  minValue: "1",
-  maxValue: "9223372036854775807",
-  cache: "1",
-  cycle: false,
-});
 
 
 // ============================================================
@@ -1600,54 +1592,6 @@ export const leadCallLogs = pgTable(
 );
 
 // ============================================================
-// 21. WORKSHOP REGISTRATIONS (AI Masterclass & Token Payments)
-// ============================================================
-
-export const workshopRegistrations = pgTable(
-  "workshop_registrations",
-  {
-    id: varchar({ length: 50 })
-      .default(
-        sql`('wreg_'::text || nextval('workshop_registrations_id_seq'::regclass))`
-      )
-      .primaryKey()
-      .notNull(),
-    userId: varchar("user_id", { length: 50 }),
-    name: varchar("name", { length: 150 }).notNull(),
-    phone: varchar("phone", { length: 20 }).notNull(),
-    email: varchar("email", { length: 255 }),
-    collegeId: varchar("college_id", { length: 50 }),
-    collegeName: varchar("college_name", { length: 200 }),
-    branch: varchar("branch", { length: 100 }),
-    yearOfStudy: varchar("year_of_study", { length: 50 }),
-    referredBy: varchar("referred_by", { length: 150 }),
-    campaignSource: varchar("campaign_source", { length: 100 }).default("PROFESSOR_NETWORK").notNull(),
-    paymentStatus: varchar("payment_status", { length: 50 }).default("PENDING").notNull(),
-    providerOrderId: varchar("provider_order_id", { length: 150 }),
-    providerPaymentId: varchar("provider_payment_id", { length: 150 }),
-    tokenAmountPaise: integer("token_amount_paise").default(3900).notNull(),
-    paidAt: timestamp("paid_at", { withTimezone: true, mode: "string" }),
-    metadata: jsonb("metadata").default(sql`'{}'::jsonb`).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("idx_workshop_reg_phone").using("btree", table.phone.asc().nullsLast()),
-    index("idx_workshop_reg_user").using("btree", table.userId.asc().nullsLast()),
-    index("idx_workshop_reg_status").using("btree", table.paymentStatus.asc().nullsLast()),
-    index("idx_workshop_reg_ref").using("btree", table.referredBy.asc().nullsLast()),
-    foreignKey({
-      columns: [table.userId],
-      foreignColumns: [users.id],
-      name: "fk_workshop_reg_user",
-    }).onDelete("set null"),
-  ]
-);
-
 // ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
@@ -1682,7 +1626,6 @@ export type DailyEodLog = InferSelectModel<typeof dailyEodLogs>;
 export type IaptNainRegistration = InferSelectModel<typeof iaptNainRegistrations>;
 export type Lead = InferSelectModel<typeof leads>;
 export type LeadCallLog = InferSelectModel<typeof leadCallLogs>;
-export type WorkshopRegistration = InferSelectModel<typeof workshopRegistrations>;
 
 // ============================================================
 // INSERT TYPES (write to DB)
@@ -1718,5 +1661,4 @@ export type NewDailyEodLog = InferInsertModel<typeof dailyEodLogs>;
 export type NewIaptNainRegistration = InferInsertModel<typeof iaptNainRegistrations>;
 export type NewLead = InferInsertModel<typeof leads>;
 export type NewLeadCallLog = InferInsertModel<typeof leadCallLogs>;
-export type NewWorkshopRegistration = InferInsertModel<typeof workshopRegistrations>;
 

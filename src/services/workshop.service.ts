@@ -1,35 +1,40 @@
 import crypto from "crypto";
 import QRCode from "qrcode";
-import { workshopRepository, WorkshopListFilters } from "../repositories/workshop.repository";
+import { eq, or, ilike } from "drizzle-orm";
+import { db } from "../db";
+import { users, leads, colleges, branches, payments } from "../db/schema";
 import { usersRepository } from "../repositories/users.repository";
-import { leadsRepository } from "../repositories/leads.repository";
+import { collegesRepository } from "../repositories/colleges.repository";
+import { branchesRepository } from "../repositories/branches.repository";
+import { paymentsRepository } from "../repositories/payments.repository";
 import { authService } from "./auth.service";
 import { ValidationError, NotFoundError } from "../errors";
 import { normalizePhone, toTitleCase } from "../helpers/formatters";
-import { db } from "../db";
-import { leads } from "../db/schema";
-import { eq, or } from "drizzle-orm";
 
 export interface RegisterWorkshopDto {
   name: string;
   phone: string;
   email?: string;
-  collegeId?: string;
   collegeName?: string;
   branch?: string;
+  occupation?: string; // Student, Working Professional, Professor / Faculty, Other
   yearOfStudy?: string;
-  referredBy?: string;
-  campaignSource?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
+}
+
+export interface WorkshopSurveyDto {
+  userId?: string;
+  phone?: string;
+  primaryGoal?: string;
+  aiToolsUsed?: string[];
+  priorityTopic?: string;
+  additionalNotes?: string;
 }
 
 export const workshopService = {
   /**
-   * Register or log in a student for the AI Masterclass / Workshop campaign.
-   * Frictionless entry: automatically creates/retrieves student user account,
-   * creates/updates workshop registration, and logs lead into CRM.
+   * Register or log in a student for the AI Masterclass.
+   * Auto-creates user, auto-populates college & branch in database if newly entered,
+   * and synchronizes into CRM Leads.
    */
   async register(data: RegisterWorkshopDto) {
     if (!data.name || !data.name.trim()) {
@@ -45,86 +50,124 @@ export const workshopService = {
     }
 
     const formattedName = toTitleCase(data.name.trim());
-    const referredBy = data.referredBy?.trim() || null;
-    const campaignSource = data.campaignSource?.trim() || (referredBy ? "PROFESSOR_NETWORK" : "AI_WORKSHOP");
+    const formattedEmail = data.email?.trim().toLowerCase() || null;
+    const formattedCollege = data.collegeName?.trim() || null;
+    const formattedBranch = data.branch?.trim() || null;
+    const occupation = data.occupation?.trim() || "STUDENT";
+    const yearOfStudy = data.yearOfStudy?.trim() || null;
 
-    // 1. Authenticate or create user account seamlessly
+    let resolvedCollegeId: string | null = null;
+
+    // 1. Dynamic College Lookup / Auto-Add to DB so all future users can see it
+    if (formattedCollege) {
+      try {
+        const [existingCollege] = await db
+          .select()
+          .from(colleges)
+          .where(ilike(colleges.name, formattedCollege))
+          .limit(1);
+
+        if (existingCollege) {
+          resolvedCollegeId = existingCollege.id;
+        } else {
+          // Auto-insert newly typed college so it appears in future dropdowns
+          const slug =
+            formattedCollege
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/(^-|-$)/g, "")
+              .slice(0, 40) + `-${Date.now().toString(36)}`;
+
+          const newCol = await collegesRepository.create({
+            name: formattedCollege,
+            slug,
+            isActive: true,
+          });
+          if (newCol) resolvedCollegeId = newCol.id;
+        }
+      } catch (colErr) {
+        console.warn("[Workshop] Auto-create college notice:", colErr);
+      }
+    }
+
+    // 2. Dynamic Branch Lookup / Auto-Add to DB
+    if (formattedBranch && resolvedCollegeId) {
+      try {
+        const [existingBranch] = await db
+          .select()
+          .from(branches)
+          .where(ilike(branches.name, formattedBranch))
+          .limit(1);
+
+        if (!existingBranch) {
+          const code =
+            formattedBranch
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, "")
+              .slice(0, 10) || "GEN";
+
+          await branchesRepository.create({
+            name: formattedBranch,
+            code,
+            collegeId: resolvedCollegeId,
+            isActive: true,
+          });
+        }
+      } catch (branchErr) {
+        console.warn("[Workshop] Auto-create branch notice:", branchErr);
+      }
+    }
+
+    // 3. Authenticate or create user account seamlessly
     const authResult = await authService.login({
       phone: cleanPhone,
       name: formattedName,
-      college: data.collegeName,
-      collegeName: data.collegeName,
-      collegeId: data.collegeId,
-      branch: data.branch,
+      college: formattedCollege || undefined,
+      collegeName: formattedCollege || undefined,
+      collegeId: resolvedCollegeId || undefined,
+      branch: formattedBranch || undefined,
       signupSource: "AI_WORKSHOP",
-      source: campaignSource,
+      source: "AI_WORKSHOP",
       metadata: {
         registeredForWorkshop: true,
-        referredBy,
+        email: formattedEmail,
+        occupation,
+        yearOfStudy,
         workshopDate: "2026-09-12",
-        utmSource: data.utmSource,
-        utmMedium: data.utmMedium,
-        utmCampaign: data.utmCampaign,
+        registeredAt: new Date().toISOString(),
       },
     });
 
-    const user = authResult.user;
+    let user = authResult.user;
     if (!user) {
-      throw new ValidationError("Failed to authenticate user profile");
+      throw new ValidationError("Failed to initialize user profile");
     }
 
-    // 2. Check if a workshop registration already exists for this phone/user
-    let registration = await workshopRepository.getByPhone(cleanPhone);
+    // Update user metadata with email and occupation if existing user
+    const existingMeta = (typeof user.metadata === "object" && user.metadata !== null)
+      ? (user.metadata as Record<string, any>)
+      : {};
 
-    const metadataObj = {
-      email: data.email?.trim() || null,
-      utmSource: data.utmSource || null,
-      utmMedium: data.utmMedium || null,
-      utmCampaign: data.utmCampaign || null,
-      registeredAt: new Date().toISOString(),
-    };
+    const updatedUser = await usersRepository.update(user.id, {
+      name: formattedName,
+      collegeName: formattedCollege || user.collegeName,
+      collegeId: resolvedCollegeId || user.collegeId,
+      branch: formattedBranch || user.branch,
+      metadata: {
+        ...existingMeta,
+        registeredForWorkshop: true,
+        email: formattedEmail || existingMeta.email,
+        occupation: occupation || existingMeta.occupation,
+        yearOfStudy: yearOfStudy || existingMeta.yearOfStudy,
+        lastWorkshopLoginAt: new Date().toISOString(),
+      },
+    });
 
-    if (registration) {
-      const prevMeta = (typeof registration.metadata === "object" && registration.metadata !== null)
-        ? (registration.metadata as Record<string, any>)
-        : {};
-
-      // Update registration with latest details if not already paid
-      registration = await workshopRepository.update(registration.id, {
-        userId: user.id,
-        name: formattedName,
-        email: data.email?.trim() || registration.email,
-        collegeId: data.collegeId || registration.collegeId,
-        collegeName: data.collegeName?.trim() || registration.collegeName,
-        branch: data.branch?.trim() || registration.branch,
-        yearOfStudy: data.yearOfStudy?.trim() || registration.yearOfStudy,
-        referredBy: referredBy || registration.referredBy,
-        campaignSource: campaignSource || registration.campaignSource,
-        metadata: {
-          ...prevMeta,
-          ...metadataObj,
-        },
-      });
-    } else {
-      // Create new workshop registration
-      registration = await workshopRepository.create({
-        userId: user.id,
-        name: formattedName,
-        phone: cleanPhone,
-        email: data.email?.trim() || null,
-        collegeId: data.collegeId || null,
-        collegeName: data.collegeName?.trim() || null,
-        branch: data.branch?.trim() || null,
-        yearOfStudy: data.yearOfStudy?.trim() || null,
-        referredBy,
-        campaignSource,
-        paymentStatus: "PENDING",
-        tokenAmountPaise: 3900, // ₹39
-        metadata: metadataObj,
-      });
+    if (updatedUser) {
+      user = updatedUser;
     }
 
-    // 3. Ensure CRM Lead is enriched with Workshop tags and note
+    // 4. Ensure CRM Lead is enriched with email & Workshop tags
     try {
       const existingLead = await db
         .select()
@@ -137,30 +180,49 @@ export const workshopService = {
         )
         .limit(1);
 
-      if (existingLead.length > 0) {
-        const leadRow = existingLead[0];
-        const currentTags: string[] = Array.isArray(leadRow.tags) ? leadRow.tags : [];
-        const updatedTags = Array.from(
-          new Set([...currentTags, "AI_WORKSHOP", "PROFESSOR_CAMPAIGN"])
-        );
+      const tags = Array.from(
+        new Set([
+          ...(existingLead[0]?.tags as string[] || []),
+          "AI_WORKSHOP",
+          occupation,
+        ])
+      );
 
+      if (existingLead.length > 0) {
         await db
           .update(leads)
           .set({
+            name: formattedName,
+            email: formattedEmail || existingLead[0].email,
+            collegeName: formattedCollege || existingLead[0].collegeName,
+            branch: formattedBranch || existingLead[0].branch,
+            yearOfStudy: yearOfStudy || existingLead[0].yearOfStudy,
             source: "AI_WORKSHOP" as any,
-            sourceDetails: {
-              ...(leadRow.sourceDetails as object || {}),
-              referredBy,
-              campaignSource,
-              workshopRegistrationId: registration?.id,
-            },
-            tags: updatedTags,
-            notes: leadRow.notes
-              ? `${leadRow.notes} | AI Workshop Registered`
+            tags,
+            notes: existingLead[0].notes
+              ? `${existingLead[0].notes} | AI Workshop Registered`
               : "Registered for AI Prompting & Systemizing Masterclass",
             updatedAt: new Date().toISOString(),
           })
-          .where(eq(leads.id, leadRow.id));
+          .where(eq(leads.id, existingLead[0].id));
+      } else {
+        await db.insert(leads).values({
+          userId: user.id,
+          name: formattedName,
+          phone: cleanPhone,
+          email: formattedEmail,
+          collegeId: resolvedCollegeId,
+          collegeName: formattedCollege,
+          branch: formattedBranch,
+          yearOfStudy,
+          quality: "HOT",
+          status: "INTERESTED",
+          source: "AI_WORKSHOP" as any,
+          tags,
+          notes: "Registered for AI Prompting & Systemizing Masterclass",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       }
     } catch (leadSyncErr) {
       console.error("[Workshop Service] CRM lead sync warning:", leadSyncErr);
@@ -172,69 +234,168 @@ export const workshopService = {
       accessToken: authResult.accessToken,
       refreshToken: authResult.refreshToken,
       user,
-      registration,
     };
   },
 
   /**
-   * Get registration status for the current user or phone
+   * Save post-login workshop survey questions & expectations
    */
-  async getMyRegistration(userId?: string, phone?: string) {
-    let registration = null;
+  async saveSurvey(body: WorkshopSurveyDto) {
+    const { userId, phone, primaryGoal, aiToolsUsed, priorityTopic, additionalNotes } = body;
+
+    let targetUser = null;
     if (userId) {
-      registration = await workshopRepository.getByUserId(userId);
+      targetUser = await usersRepository.getById(userId);
     }
-    if (!registration && phone) {
-      registration = await workshopRepository.getByPhone(phone);
+    if (!targetUser && phone) {
+      const cleanPhone = normalizePhone(phone);
+      if (cleanPhone) {
+        targetUser = await usersRepository.getByPhone(cleanPhone);
+      }
     }
-    return registration;
+
+    if (!targetUser) {
+      throw new NotFoundError("User not found for saving survey");
+    }
+
+    const currentMeta = (typeof targetUser.metadata === "object" && targetUser.metadata !== null)
+      ? (targetUser.metadata as Record<string, any>)
+      : {};
+
+    const surveyData = {
+      primaryGoal: primaryGoal || "Productivity & AI Workflow Systems",
+      aiToolsUsed: Array.isArray(aiToolsUsed) ? aiToolsUsed : [],
+      priorityTopic: priorityTopic || null,
+      additionalNotes: additionalNotes || null,
+      submittedAt: new Date().toISOString(),
+    };
+
+    // Update user metadata
+    await usersRepository.update(targetUser.id, {
+      metadata: {
+        ...currentMeta,
+        workshopSurvey: surveyData,
+      },
+    });
+
+    // Update CRM Lead source details
+    try {
+      const cleanPhone = normalizePhone(targetUser.phone);
+      if (cleanPhone) {
+        const [leadRow] = await db
+          .select()
+          .from(leads)
+          .where(
+            or(
+              eq(leads.userId, targetUser.id),
+              eq(leads.phone, cleanPhone)
+            )
+          )
+          .limit(1);
+
+        if (leadRow) {
+          await db
+            .update(leads)
+            .set({
+              sourceDetails: {
+                ...(leadRow.sourceDetails as object || {}),
+                workshopSurvey: surveyData,
+              },
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(leads.id, leadRow.id));
+        }
+      }
+    } catch (err) {
+      console.error("[Workshop Service] Lead survey update warning:", err);
+    }
+
+    return {
+      success: true,
+      message: "Survey expectations recorded successfully",
+      survey: surveyData,
+    };
+  },
+
+  /**
+   * Get registration status for the user
+   */
+  async getMyStatus(userId?: string, phone?: string) {
+    let targetUser = null;
+    if (userId) {
+      targetUser = await usersRepository.getById(userId);
+    }
+    if (!targetUser && phone) {
+      const cleanPhone = normalizePhone(phone);
+      if (cleanPhone) {
+        targetUser = await usersRepository.getByPhone(cleanPhone);
+      }
+    }
+
+    if (!targetUser) return null;
+
+    const meta = (typeof targetUser.metadata === "object" && targetUser.metadata !== null)
+      ? (targetUser.metadata as Record<string, any>)
+      : {};
+
+    return {
+      userId: targetUser.id,
+      name: targetUser.name,
+      phone: targetUser.phone,
+      collegeName: targetUser.collegeName,
+      branch: targetUser.branch,
+      email: meta.email || null,
+      occupation: meta.occupation || "STUDENT",
+      yearOfStudy: meta.yearOfStudy || null,
+      isRegistered: !!meta.registeredForWorkshop,
+      isTokenPaid: !!meta.tokenPaid,
+      survey: meta.workshopSurvey || null,
+    };
   },
 
   /**
    * Create Razorpay payment order for ₹39 token fee.
    */
-  async createTokenOrder(userId?: string, registrationId?: string, phone?: string) {
-    let registration = null;
-
-    if (registrationId) {
-      registration = await workshopRepository.getById(registrationId);
-    } else if (userId) {
-      registration = await workshopRepository.getByUserId(userId);
-    } else if (phone) {
-      registration = await workshopRepository.getByPhone(phone);
+  async createTokenOrder(userId?: string, phone?: string) {
+    let targetUser = null;
+    if (userId) {
+      targetUser = await usersRepository.getById(userId);
+    }
+    if (!targetUser && phone) {
+      const cleanPhone = normalizePhone(phone);
+      if (cleanPhone) {
+        targetUser = await usersRepository.getByPhone(cleanPhone);
+      }
     }
 
-    if (!registration) {
-      throw new NotFoundError("Workshop registration not found. Please submit your details first.");
+    if (!targetUser) {
+      throw new NotFoundError("User not found. Please complete registration first.");
     }
 
-    if (registration.paymentStatus === "SUCCESS") {
+    const meta = (typeof targetUser.metadata === "object" && targetUser.metadata !== null)
+      ? (targetUser.metadata as Record<string, any>)
+      : {};
+
+    if (meta.tokenPaid) {
       return {
         alreadyPaid: true,
-        message: "You have already confirmed your registration for this workshop!",
-        registration,
+        message: "You have already confirmed your registration for this masterclass!",
+        user: targetUser,
       };
     }
 
-    // Generate unique order ID
+    // Generate provider order ID
     const providerOrderId = `order_wksp_${crypto.randomBytes(8).toString("hex")}`;
-    const tokenAmountPaise = registration.tokenAmountPaise || 3900;
-
-    // Save provider order ID to registration record
-    const updated = await workshopRepository.update(registration.id, {
-      providerOrderId,
-      paymentStatus: "PENDING",
-    });
+    const tokenAmountPaise = 3900; // ₹39
 
     return {
       alreadyPaid: false,
       orderId: providerOrderId,
       amount: tokenAmountPaise,
       currency: "INR",
-      registrationId: updated?.id || registration.id,
-      name: registration.name,
-      phone: registration.phone,
-      email: registration.email,
+      name: targetUser.name,
+      phone: targetUser.phone,
+      email: meta.email || "",
     };
   },
 
@@ -245,55 +406,49 @@ export const workshopService = {
     providerOrderId?: string;
     providerPaymentId?: string;
     providerSignature?: string;
-    registrationId?: string;
+    userId?: string;
+    phone?: string;
   }) {
-    const { providerOrderId, providerPaymentId, providerSignature, registrationId } = body;
+    const { providerOrderId, providerPaymentId, providerSignature, userId, phone } = body;
 
     if (!providerOrderId || !providerPaymentId) {
       throw new ValidationError("Order ID and Payment ID are required to verify token payment");
     }
 
-    let registration = null;
-    if (registrationId) {
-      registration = await workshopRepository.getById(registrationId);
+    let targetUser = null;
+    if (userId) {
+      targetUser = await usersRepository.getById(userId);
     }
-    if (!registration && providerOrderId) {
-      registration = await workshopRepository.getByProviderOrderId(providerOrderId);
-    }
-
-    if (!registration) {
-      throw new NotFoundError("Registration record for this payment order was not found");
-    }
-
-    if (registration.paymentStatus === "SUCCESS") {
-      return {
-        success: true,
-        alreadyProcessed: true,
-        message: "Payment was already confirmed.",
-        registration,
-      };
+    if (!targetUser && phone) {
+      const cleanPhone = normalizePhone(phone);
+      if (cleanPhone) {
+        targetUser = await usersRepository.getByPhone(cleanPhone);
+      }
     }
 
-    const currentMeta = (typeof registration.metadata === "object" && registration.metadata !== null)
-      ? (registration.metadata as Record<string, any>)
+    if (!targetUser) {
+      throw new NotFoundError("User account for this payment was not found");
+    }
+
+    const currentMeta = (typeof targetUser.metadata === "object" && targetUser.metadata !== null)
+      ? (targetUser.metadata as Record<string, any>)
       : {};
 
-    // Update registration to SUCCESS
-    const updated = await workshopRepository.update(registration.id, {
-      paymentStatus: "SUCCESS",
-      providerOrderId,
-      providerPaymentId,
-      paidAt: new Date().toISOString(),
+    // Update user metadata to mark token paid
+    await usersRepository.update(targetUser.id, {
       metadata: {
         ...currentMeta,
-        providerSignature: providerSignature || "signature_verified",
-        paidPaise: registration.tokenAmountPaise || 3900,
+        tokenPaid: true,
+        providerOrderId,
+        providerPaymentId,
+        providerSignature: providerSignature || "verified",
+        tokenPaidAt: new Date().toISOString(),
       },
     });
 
     // Update CRM Lead conversion value (₹39)
     try {
-      const cleanPhone = normalizePhone(registration.phone);
+      const cleanPhone = normalizePhone(targetUser.phone);
       if (cleanPhone) {
         await db
           .update(leads)
@@ -306,7 +461,7 @@ export const workshopService = {
           })
           .where(
             or(
-              eq(leads.userId, registration.userId || ""),
+              eq(leads.userId, targetUser.id),
               eq(leads.phone, cleanPhone)
             )
           );
@@ -317,21 +472,17 @@ export const workshopService = {
 
     return {
       success: true,
-      alreadyProcessed: false,
-      message: "₹39 Token Fee received successfully. Your seat has been secured!",
-      registration: updated,
+      message: "₹39 Token Fee received successfully. Your masterclass seat is secured!",
+      tokenPaid: true,
     };
   },
 
   /**
-   * Generate QR code Data URL for any campaign/referral link
+   * Generate QR code Data URL for the universal workshop link
    */
   async generateQrCode(url: string): Promise<string> {
-    if (!url || typeof url !== "string") {
-      throw new ValidationError("Target URL is required for QR code generation");
-    }
-
-    return QRCode.toDataURL(url, {
+    const targetUrl = url && typeof url === "string" ? url : "https://unisole.org/workshop";
+    return QRCode.toDataURL(targetUrl, {
       errorCorrectionLevel: "H",
       margin: 2,
       width: 400,
@@ -340,19 +491,5 @@ export const workshopService = {
         light: "#ffffff",
       },
     });
-  },
-
-  /**
-   * List all registrations (for admin reporting & analytics)
-   */
-  async listRegistrations(filters?: WorkshopListFilters) {
-    return workshopRepository.list(filters);
-  },
-
-  /**
-   * Get registration metrics & totals
-   */
-  async getStats() {
-    return workshopRepository.getStats();
   },
 };
