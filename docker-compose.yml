@@ -29,6 +29,7 @@ services:
       DATABASE_URL: postgres://postgres:postgres@db:5432/unisole
       JWT_SECRET: ${JWT_SECRET:-unisole-secret-key}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-unisole-refresh-secret-key}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_placeholder}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_test_secret}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-unisole_webhook_secret_2026}
       NODE_ENV: ${NODE_ENV:-development}
