@@ -110,6 +110,43 @@ DO $$ BEGIN
   ALTER TABLE "coupons" ADD CONSTRAINT "fk_coupons_creator" FOREIGN KEY ("created_by_id") REFERENCES "public"."users"("id") ON DELETE set null;
 EXCEPTION WHEN duplicate_object THEN null; WHEN undefined_table THEN null; END $$;--> statement-breakpoint
 
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "slug" varchar(220);--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "is_free" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "price_paise" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "mrp_paise" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "currency" varchar(3) DEFAULT 'INR' NOT NULL;--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "is_public" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;--> statement-breakpoint
+ALTER TABLE "offerings_pricing" ADD COLUMN IF NOT EXISTS "description" text;--> statement-breakpoint
+
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "order_number" varchar(60);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "razorpay_order_id" varchar(150);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "user_id" varchar(50);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customer_name" varchar(150);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customer_phone" varchar(20);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customer_email" varchar(255);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "subtotal_paise" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "discount_paise" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "coupon_code" varchar(50);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "total_paise" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "currency" varchar(3) DEFAULT 'INR' NOT NULL;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "status" "public"."order_status" DEFAULT 'PENDING' NOT NULL;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "notes" text;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "paid_at" timestamp with time zone;--> statement-breakpoint
+
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "created_by_id" varchar(50);--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "description" text;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "max_discount_paise" bigint;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "min_order_paise" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "max_uses" integer;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "used_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "applicable_item_types" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "valid_from" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "valid_until" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "username" varchar(100);--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password" varchar(255);--> statement-breakpoint
 

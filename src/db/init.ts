@@ -276,6 +276,38 @@ export async function initializeDatabase() {
         "updated_at" timestamp with time zone DEFAULT now() NOT NULL
       );
 
+      -- Ensure columns on existing offerings_pricing table if created in earlier runs
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "slug" varchar(220);
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "is_free" boolean DEFAULT false NOT NULL;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "price_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "mrp_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "currency" varchar(3) DEFAULT 'INR' NOT NULL;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "is_public" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+
+      -- Ensure columns on existing orders table if created in earlier runs
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "order_number" varchar(60);
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "razorpay_order_id" varchar(150);
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "user_id" varchar(50);
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "customer_name" varchar(150);
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "customer_phone" varchar(20);
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "customer_email" varchar(255);
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "subtotal_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "discount_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "coupon_code" varchar(50);
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "total_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "currency" varchar(3) DEFAULT 'INR' NOT NULL;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "status" "public"."order_status" DEFAULT 'PENDING' NOT NULL;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "notes" text;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "paid_at" timestamp with time zone;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+
       -- Ensure columns on existing coupons table if created in earlier runs
       ALTER TABLE "public"."coupons" ADD COLUMN IF NOT EXISTS "created_by_id" varchar(50);
       ALTER TABLE "public"."coupons" ADD COLUMN IF NOT EXISTS "description" text;
