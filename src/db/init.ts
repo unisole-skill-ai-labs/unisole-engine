@@ -428,6 +428,10 @@ export async function initializeDatabase() {
 
     // 8. Polymorphic Enrollments & Payments Alterations
     await pool.query(`
+      -- Users compatibility alterations
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "username" varchar(100);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "password" varchar(255);
+
       -- Payments polymorphic alterations
       DO $$ BEGIN
         ALTER TABLE "public"."payments" ALTER COLUMN "pathway_id" DROP NOT NULL;
@@ -437,6 +441,7 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "enrollment_id" varchar(50);
       ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "item_type" "public"."item_type" DEFAULT 'PATHWAY';
       ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "item_id" varchar(100);
+      ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
 
       DO $$ BEGIN
         ALTER TABLE "public"."payments" ADD CONSTRAINT "fk_payments_order" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE set null;
