@@ -497,15 +497,6 @@ export async function initializeDatabase() {
     `);
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, and Polymorphic Enrollment tables verified successfully.");
-
-    // 10. Run official Drizzle migrator if folder exists
-    try {
-      const migrationsFolder = path.resolve(process.cwd(), "drizzle");
-      await migrate(db, { migrationsFolder });
-      console.log("[DB-INIT] ✅ Drizzle migration journal synchronized.");
-    } catch (migErr) {
-      console.log("[DB-INIT] Note: Drizzle migration runner notice:", migErr);
-    }
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }
