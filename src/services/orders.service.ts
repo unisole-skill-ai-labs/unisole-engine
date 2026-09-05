@@ -145,7 +145,7 @@ export const ordersService = {
         totalPaise: finalAmountPaise,
         currency: "INR",
         status: "PENDING",
-        couponCode: validatedCouponCode,
+        couponCode: validatedCouponCode || undefined,
         razorpayOrderId,
         notes: dto.notes || null,
         metadata: dto.metadata || {},
