@@ -9,6 +9,7 @@ import { lmsRouter } from "./routes/lms";
 import { publicRouter } from "./routes/public";
 import { webhooksRouter } from "./routes/webhooks";
 import { iaptRouter } from "./routes/iapt";
+import { workshopRouter } from "./routes/workshop";
 import { notFound } from "./middleware/not-found";
 import { errorHandler } from "./middleware/error-handler";
 import { setupPresentationSocket } from "./socket/presentation.socket";
@@ -57,6 +58,8 @@ app.use("/api/public", publicRouter);
 app.use("/api/webhooks", webhooksRouter);
 app.use("/api/iapt", iaptRouter);
 app.use("/api/v1/iapt", iaptRouter);
+app.use("/api/workshop", workshopRouter);
+app.use("/api/public/workshop", workshopRouter);
 
 app.use(notFound);
 app.use(errorHandler);

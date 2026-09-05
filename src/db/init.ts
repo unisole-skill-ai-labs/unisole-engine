@@ -303,9 +303,60 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_call_logs_lead" ON "public"."lead_call_logs" ("lead_id");
       CREATE INDEX IF NOT EXISTS "idx_call_logs_caller" ON "public"."lead_call_logs" ("caller_user_id");
       CREATE INDEX IF NOT EXISTS "idx_call_logs_created_at" ON "public"."lead_call_logs" ("created_at" DESC);
+
+      -- Workshop Registrations Sequence
+      CREATE SEQUENCE IF NOT EXISTS "public"."workshop_registrations_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+
+      -- Lead Source Enum Extension (Idempotent)
+      DO $$ BEGIN
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'AI_WORKSHOP';
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      DO $$ BEGIN
+        ALTER TYPE "public"."lead_source" ADD VALUE IF NOT EXISTS 'PROFESSOR_NETWORK';
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      -- Workshop Registrations Table
+      CREATE TABLE IF NOT EXISTS "public"."workshop_registrations" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('wreg_'::text || nextval('public.workshop_registrations_id_seq'::regclass)) NOT NULL,
+        "user_id" varchar(50),
+        "name" varchar(150) NOT NULL,
+        "phone" varchar(20) NOT NULL,
+        "email" varchar(255),
+        "college_id" varchar(50),
+        "college_name" varchar(200),
+        "branch" varchar(100),
+        "year_of_study" varchar(50),
+        "referred_by" varchar(150),
+        "campaign_source" varchar(100) DEFAULT 'PROFESSOR_NETWORK' NOT NULL,
+        "payment_status" varchar(50) DEFAULT 'PENDING' NOT NULL,
+        "provider_order_id" varchar(150),
+        "provider_payment_id" varchar(150),
+        "token_amount_paise" integer DEFAULT 3900 NOT NULL,
+        "paid_at" timestamp with time zone,
+        "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."workshop_registrations" ADD CONSTRAINT "fk_workshop_reg_user" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null;
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+        WHEN undefined_table THEN null;
+      END $$;
+
+      CREATE INDEX IF NOT EXISTS "idx_workshop_reg_phone" ON "public"."workshop_registrations" ("phone");
+      CREATE INDEX IF NOT EXISTS "idx_workshop_reg_user" ON "public"."workshop_registrations" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_workshop_reg_status" ON "public"."workshop_registrations" ("payment_status");
+      CREATE INDEX IF NOT EXISTS "idx_workshop_reg_ref" ON "public"."workshop_registrations" ("referred_by");
     `);
 
-    console.log("[DB-INIT] ✅ WorkSole, IAPT NAIN, and Lead CRM tables, sequences, foreign keys, and indexes verified successfully.");
+    console.log("[DB-INIT] ✅ WorkSole, IAPT NAIN, Lead CRM, and Workshop Registration tables, sequences, foreign keys, and indexes verified successfully.");
 
 
     // 2. Also run official Drizzle migrator if folder exists
