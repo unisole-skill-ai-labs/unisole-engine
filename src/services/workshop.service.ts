@@ -420,6 +420,7 @@ export const workshopService = {
       name: checkout.customerName,
       phone: checkout.customerPhone,
       email: checkout.customerEmail,
+      keyId: checkout.keyId || process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY || "",
     };
   },
 

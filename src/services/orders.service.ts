@@ -39,6 +39,7 @@ export const ordersService = {
       customerName: string;
       customerEmail: string;
       customerPhone: string;
+      keyId?: string;
     };
   }> {
     if (!dto.userId) {
@@ -178,6 +179,7 @@ export const ordersService = {
         customerName,
         customerEmail,
         customerPhone,
+        keyId: process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY || "",
       },
     };
   },
