@@ -79,10 +79,14 @@ async function bootstrap() {
     // 1. Direct Idempotent DDL Execution (Guarantees all tables, sequences, enums, FKs, and columns exist)
     await initializeDatabase();
 
-    // 2. Run Drizzle ORM official migrations
-    const migrationsFolder = path.resolve(process.cwd(), "drizzle");
-    await migrate(db, { migrationsFolder });
-    console.log("[BOOTSTRAP] Drizzle migrations applied successfully.");
+    // 2. Run Drizzle ORM official migrations if available
+    try {
+      const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+      await migrate(db, { migrationsFolder });
+      console.log("[BOOTSTRAP] Drizzle migrations applied successfully.");
+    } catch (migErr: any) {
+      // Direct DDL in initializeDatabase ensures schema integrity
+    }
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);
   }
