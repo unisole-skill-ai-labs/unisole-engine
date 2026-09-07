@@ -78,7 +78,7 @@ export const paymentsService = {
       payment = await paymentsRepository.create({
         userId: targetUserId,
         orderId: order?.id,
-        amountPaise: order?.totalPaise || 3900,
+        amountPaise: order?.totalPaise || 100,
         currency: order?.currency || "INR",
         status: "SUCCESS",
         provider: "RAZORPAY",

@@ -580,12 +580,12 @@ export async function initializeDatabase() {
         'AI_MASTERCLASS_2026',
         'AI Revolution & Agentic Engineering Masterclass',
         'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems',
-        3900,
+        100,
         99900,
         true,
         true
       )
-      ON CONFLICT ("item_type", "item_id") DO NOTHING;
+      ON CONFLICT ("item_type", "item_id") DO UPDATE SET "price_paise" = 100;
     `);
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, and Polymorphic Enrollment tables verified successfully.");
