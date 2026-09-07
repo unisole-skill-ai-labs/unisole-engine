@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { ordersRepository, ListOrdersFilter } from "../repositories/orders.repository";
 import { pricingService } from "./pricing.service";
+import { razorpayService } from "./razorpay.service";
 import { usersRepository } from "../repositories/users.repository";
 import { paymentsRepository } from "../repositories/payments.repository";
 import { enrollmentsRepository } from "../repositories/enrollments.repository";
@@ -131,7 +132,27 @@ export const ordersService = {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const randomHex = crypto.randomBytes(3).toString("hex").toUpperCase();
     const orderNumber = `ORD-${dateStr}-${randomHex}`;
-    const razorpayOrderId = `order_${crypto.randomBytes(8).toString("hex")}`;
+
+    let razorpayOrderId = `order_${crypto.randomBytes(8).toString("hex")}`;
+    if (finalAmountPaise > 0) {
+      try {
+        const rzpOrder = await razorpayService.createOrder({
+          amountPaise: finalAmountPaise,
+          currency: "INR",
+          receipt: orderNumber,
+          notes: {
+            orderNumber,
+            userId: user.id,
+            customerPhone,
+            itemCount: resolvedItems.length,
+          },
+        });
+        razorpayOrderId = rzpOrder.id;
+      } catch (rzpErr: any) {
+        console.error("[OrdersService] Razorpay order creation failed:", rzpErr);
+        throw new ValidationError(`Payment gateway error: ${rzpErr.message || "Failed to initialize order with Razorpay"}`);
+      }
+    }
 
     // 4. Save Order and Order Items atomically in DB
     const createdOrder = await ordersRepository.create(

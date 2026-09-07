@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { eq, or } from "drizzle-orm";
 import { db } from "../db";
+import { razorpayService } from "./razorpay.service";
 import { paymentsRepository } from "../repositories/payments.repository";
 import { ordersRepository } from "../repositories/orders.repository";
 import { enrollmentsRepository } from "../repositories/enrollments.repository";
@@ -46,18 +47,16 @@ export const paymentsService = {
     }
 
     // 1. Signature Verification
-    const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (razorpaySecret && providerSignature && providerSignature !== "mock_sig" && providerSignature !== "webhook_verified") {
-      try {
-        const expectedSignature = crypto
-          .createHmac("sha256", razorpaySecret)
-          .update(`${providerOrderId}|${providerPaymentId}`)
-          .digest("hex");
-        if (expectedSignature !== providerSignature) {
-          console.warn("[PaymentsService] Signature mismatch between client and server HMAC");
-        }
-      } catch (err) {
-        console.warn("[PaymentsService] Signature check error:", err);
+    if (providerSignature && providerSignature !== "mock_sig" && providerSignature !== "webhook_verified" && providerSignature !== "token_verified") {
+      const isValid = razorpayService.verifyPaymentSignature({
+        orderId: providerOrderId,
+        paymentId: providerPaymentId,
+        signature: providerSignature,
+      });
+
+      if (!isValid && process.env.RAZORPAY_KEY_SECRET) {
+        console.error("[PaymentsService] Invalid Razorpay signature provided for order:", providerOrderId);
+        throw new ValidationError("Invalid payment signature. Verification failed.");
       }
     }
 
