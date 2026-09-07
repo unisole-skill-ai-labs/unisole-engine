@@ -11,8 +11,8 @@ export const ordersController = {
    */
   createCheckout: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user?.id || req.body.userId;
-    if (!userId) {
-      throw new ValidationError("User authentication or userId is required");
+    if (!userId && !req.body.customerPhone) {
+      throw new ValidationError("User authentication or customer mobile number is required");
     }
 
     // Support both new `items: []` format AND legacy `{ pathwayId: string }`

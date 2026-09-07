@@ -12,14 +12,14 @@ export const lmsController = {
 
   getPathwayContent: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user!.id;
-    const isAdmin = req.user?.role === "ADMIN";
+    const isAdmin = req.user?.role === "ADMIN" || req.user?.role === "SUPER_ADMIN";
     const pathwayContent = await lmsService.getPathwayContent(userId, req.params.id, isAdmin);
     res.json(pathwayContent);
   }),
 
   getLessonContent: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user!.id;
-    const isAdmin = req.user?.role === "ADMIN";
+    const isAdmin = req.user?.role === "ADMIN" || req.user?.role === "SUPER_ADMIN";
     const lesson = await lmsService.getLessonContent(userId, req.params.id, isAdmin);
     res.json(lesson);
   }),

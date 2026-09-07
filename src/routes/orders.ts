@@ -9,5 +9,6 @@ export const ordersRouter: Router = Router();
 ordersRouter.post("/checkout", ordersController.createCheckout);
 
 // Authenticated user order queries
+ordersRouter.get("/", authMiddleware, ordersController.listMyOrders);
 ordersRouter.get("/my-orders", authMiddleware, ordersController.listMyOrders);
 ordersRouter.get("/:id", authMiddleware, ordersController.getById);

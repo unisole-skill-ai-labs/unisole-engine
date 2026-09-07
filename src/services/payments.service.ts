@@ -14,7 +14,7 @@ import { normalizePhone } from "../helpers/formatters";
 export const paymentsService = {
   async list(user?: { id: string; role: string }): Promise<Payment[]> {
     if (!user) return [];
-    if (user.role === "ADMIN") return paymentsRepository.list();
+    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") return paymentsRepository.list();
     return paymentsRepository.listByUser(user.id);
   },
 

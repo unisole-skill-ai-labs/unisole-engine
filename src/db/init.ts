@@ -169,6 +169,7 @@ export async function initializeDatabase() {
     await execSqlSafe("enrollments_alterations", `
       DO $$ BEGIN
         ALTER TABLE "public"."enrollments" ALTER COLUMN "pathway_id" DROP NOT NULL;
+        ALTER TABLE "public"."enrollments" DROP CONSTRAINT IF EXISTS "fk_enrollments_pathway";
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
       ALTER TABLE "public"."enrollments" ADD COLUMN IF NOT EXISTS "item_type" "public"."item_type" DEFAULT 'PATHWAY' NOT NULL;
@@ -190,6 +191,7 @@ export async function initializeDatabase() {
     await execSqlSafe("payments_alterations", `
       DO $$ BEGIN
         ALTER TABLE "public"."payments" ALTER COLUMN "pathway_id" DROP NOT NULL;
+        ALTER TABLE "public"."payments" DROP CONSTRAINT IF EXISTS "fk_payments_pathway";
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
       ALTER TABLE "public"."payments" ADD COLUMN IF NOT EXISTS "order_id" varchar(50);
@@ -569,23 +571,41 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_call_logs_lead" ON "public"."lead_call_logs" ("lead_id");
       CREATE INDEX IF NOT EXISTS "idx_call_logs_caller" ON "public"."lead_call_logs" ("caller_user_id");
       CREATE INDEX IF NOT EXISTS "idx_call_logs_created_at" ON "public"."lead_call_logs" ("created_at" DESC);
+
+      -- EOD Logs
+      CREATE SEQUENCE IF NOT EXISTS "public"."daily_eod_logs_id_seq";
+      CREATE TABLE IF NOT EXISTS "public"."daily_eod_logs" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('eod_'::text || nextval('public.daily_eod_logs_id_seq'::regclass)) NOT NULL,
+        "user_id" varchar(50) NOT NULL,
+        "log_date" varchar(10) NOT NULL,
+        "completed_summary" text NOT NULL,
+        "plan_tomorrow" text NOT NULL,
+        "blockers" text,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      ALTER TABLE "public"."daily_eod_logs" ADD COLUMN IF NOT EXISTS "completed_summary" text;
+      ALTER TABLE "public"."daily_eod_logs" ADD COLUMN IF NOT EXISTS "plan_tomorrow" text;
+      ALTER TABLE "public"."daily_eod_logs" ADD COLUMN IF NOT EXISTS "blockers" text;
     `);
 
     // 8. Default Offering Pricing Seed
     await execSqlSafe("seed_offering_pricing", `
       INSERT INTO "public"."offerings_pricing" (
         "item_type", "item_id", "title", "description", "price_paise", "mrp_paise", "is_active", "is_public"
-      ) VALUES (
-        'WORKSHOP',
-        'AI_MASTERCLASS_2026',
-        'AI Revolution & Agentic Engineering Masterclass',
-        'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems',
-        3900,
-        99900,
-        true,
-        true
-      )
-      ON CONFLICT ("item_type", "item_id") DO UPDATE SET "price_paise" = 3900;
+      ) VALUES 
+        ('WORKSHOP', 'AI_MASTERCLASS_2026', 'AI Revolution & Agentic Engineering Masterclass', 'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems', 3900, 99900, true, true),
+        ('PATHWAY', 'cs-p1', 'Machine Learning Engineering in Production', 'Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.', 299900, 999900, true, true),
+        ('PATHWAY', 'cs-p2', 'Full Stack Web Development (AI-Powered)', 'Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI capabilities.', 149900, 699900, true, true),
+        ('PATHWAY', 'cs-p3', 'Complete Machine Learning + Full Stack', 'Comprehensive dual curriculum merging Machine Learning, Deep Learning, and MLOps with full-stack React and Node.js.', 399900, 1499900, true, true),
+        ('PATHWAY', 'cs-common', 'AI Entrepreneurship & Innovation', 'Structured incubator track teaching students how to convert AI technical capability into commercial startups.', 59900, 299900, true, true),
+        ('PATHWAY', 'sci-p1', 'Scientific Machine Learning & AI for Science', 'Mathematical principles with modern scientific computing, differential equations, and Physics-Informed Neural Networks.', 200000, 699900, true, true),
+        ('PATHWAY', 'sci-p2', 'Mathematics + AI / Computational Intelligence', 'Mathematics-oriented pathway focusing on optimization theory, statistical learning, and computational algorithms.', 150000, 599900, true, true),
+        ('PATHWAY', 'mgmt-p1', 'Business Analytics & Data Engineering', 'Advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, true, true),
+        ('PATHWAY', 'mgmt-p2', 'AI in Finance & FinTech Systems', 'Digital banking, financial modeling, credit risk scoring, fraud detection algorithms, and responsible AI.', 200000, 699900, true, true),
+        ('PATHWAY', 'mgmt-p3', 'Complete Business AI Pathway', 'Dual-track program merging Business Analytics with FinTech AI, credit scoring, fraud risk intelligence, and BI dashboards.', 299900, 999900, true, true),
+        ('PATHWAY', 'mgmt-common', 'AI Entrepreneurship & Business Innovation', 'Launch AI-enabled business services, SaaS tools, SME automation platforms, and investor pitch decks.', 59900, 299900, true, true),
+        ('PATHWAY', 'arts-p1', 'Applied AI for Humanities, Research & Careers', 'Prompt engineering, AI research methods, automated content, executive communication, and career acceleration.', 99900, 399900, true, true)
+      ON CONFLICT ("item_type", "item_id") DO UPDATE SET "title" = EXCLUDED."title", "description" = EXCLUDED."description", "price_paise" = EXCLUDED."price_paise", "mrp_paise" = EXCLUDED."mrp_paise";
     `);
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, and Polymorphic Enrollment tables verified successfully.");

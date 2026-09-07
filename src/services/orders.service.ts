@@ -2,14 +2,16 @@ import crypto from "crypto";
 import { ordersRepository, ListOrdersFilter } from "../repositories/orders.repository";
 import { pricingService } from "./pricing.service";
 import { razorpayService } from "./razorpay.service";
+import { authService } from "./auth.service";
 import { usersRepository } from "../repositories/users.repository";
 import { paymentsRepository } from "../repositories/payments.repository";
 import { enrollmentsRepository } from "../repositories/enrollments.repository";
 import { Order, OrderItem, ItemType, OrderStatus } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
+import { normalizePhone } from "../helpers/formatters";
 
 export interface CreateOrderDto {
-  userId: string;
+  userId?: string;
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -43,16 +45,36 @@ export const ordersService = {
       keyId?: string;
     };
   }> {
-    if (!dto.userId) {
-      throw new ValidationError("User ID is required to create an order");
-    }
     if (!dto.items || dto.items.length === 0) {
       throw new ValidationError("At least one item is required to checkout");
     }
 
-    const user = await usersRepository.getById(dto.userId);
+    let user = null;
+    if (dto.userId) {
+      user = await usersRepository.getById(dto.userId);
+    }
+    if (!user && dto.customerPhone) {
+      const cleanPhone = normalizePhone(dto.customerPhone);
+      if (cleanPhone) {
+        user = await usersRepository.getByPhone(cleanPhone);
+        if (!user) {
+          const authRes = await authService.login({
+            phone: cleanPhone,
+            name: dto.customerName || "Student",
+            signupSource: "DIRECT_WEB",
+            source: "DIRECT_WEB",
+            metadata: {
+              email: dto.customerEmail,
+              ...(dto.metadata || {}),
+            },
+          });
+          user = authRes.user;
+        }
+      }
+    }
+
     if (!user) {
-      throw new NotFoundError("User account not found");
+      throw new ValidationError("User authentication or customer mobile number is required to create an order");
     }
 
     const customerName = dto.customerName || user.name || "Student";
@@ -215,7 +237,7 @@ export const ordersService = {
     if (!user) return { items: [], total: 0 };
 
     const queryFilters: ListOrdersFilter = { ...filters };
-    if (user.role !== "ADMIN") {
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       queryFilters.userId = user.id;
     }
 
@@ -229,7 +251,7 @@ export const ordersService = {
     const order = await ordersRepository.getById(id);
     if (!order) throw new NotFoundError("Order not found");
 
-    if (user && user.role !== "ADMIN" && order.userId !== user.id) {
+    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN" && order.userId !== user.id) {
       throw new NotFoundError("Order not found");
     }
 

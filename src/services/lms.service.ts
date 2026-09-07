@@ -1,4 +1,4 @@
-import { eq, and, inArray, asc } from "drizzle-orm";
+import { eq, and, or, inArray, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
   enrollments,
@@ -14,6 +14,75 @@ import {
 } from "../db/schema";
 import { ForbiddenError, NotFoundError } from "../errors";
 
+const PATHWAY_CATALOG: Record<string, { title: string; description: string; duration: string; level: string }> = {
+  "cs-p1": {
+    title: "Machine Learning Engineering in Production",
+    description: "Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.",
+    duration: "6 Months",
+    level: "Intermediate to Advanced",
+  },
+  "cs-p2": {
+    title: "Full Stack Web Development (AI-Powered)",
+    description: "Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI capabilities.",
+    duration: "3 Months",
+    level: "Beginner to Intermediate",
+  },
+  "cs-p3": {
+    title: "Complete Machine Learning + Full Stack",
+    description: "Comprehensive dual curriculum merging Machine Learning, Deep Learning, and MLOps with full-stack React and Node.js.",
+    duration: "6 Months",
+    level: "Dual-Track Mastery",
+  },
+  "cs-common": {
+    title: "AI Entrepreneurship & Innovation",
+    description: "Structured incubator track teaching students how to convert AI technical capability into commercial startups.",
+    duration: "Weekend Track",
+    level: "All Students",
+  },
+  "sci-p1": {
+    title: "Scientific Machine Learning & AI for Science",
+    description: "Mathematical principles with modern scientific computing, differential equations, and Physics-Informed Neural Networks.",
+    duration: "3 Months",
+    level: "Physics, Math & Science",
+  },
+  "sci-p2": {
+    title: "Mathematics + AI / Computational Intelligence",
+    description: "Mathematics-oriented pathway focusing on optimization theory, statistical learning, and computational algorithms.",
+    duration: "3 Months",
+    level: "Math & Applied Sciences",
+  },
+  "mgmt-p1": {
+    title: "Business Analytics & Data Engineering",
+    description: "Advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.",
+    duration: "3 Months",
+    level: "Business & Management",
+  },
+  "mgmt-p2": {
+    title: "AI in Finance & FinTech Systems",
+    description: "Digital banking, financial modeling, credit risk scoring, fraud detection algorithms, and responsible AI.",
+    duration: "3 Months",
+    level: "Finance & Banking",
+  },
+  "mgmt-p3": {
+    title: "Complete Business AI Pathway",
+    description: "Dual-track program merging Business Analytics with FinTech AI, credit scoring, fraud risk intelligence, and BI dashboards.",
+    duration: "6 Months",
+    level: "Executive & Analytics",
+  },
+  "mgmt-common": {
+    title: "AI Entrepreneurship & Business Innovation",
+    description: "Launch AI-enabled business services, SaaS tools, SME automation platforms, and investor pitch decks.",
+    duration: "Weekend Track",
+    level: "All Commerce & Management",
+  },
+  "arts-p1": {
+    title: "Applied AI for Humanities, Research & Careers",
+    description: "Prompt engineering, AI research methods, automated content, executive communication, and career acceleration.",
+    duration: "3 Months",
+    level: "All Students (No Coding Required)",
+  },
+};
+
 export const lmsService = {
   /**
    * Get all pathways that the student has an ACTIVE enrollment in.
@@ -22,13 +91,22 @@ export const lmsService = {
     const activeEnrollments = await db
       .select({
         enrollmentId: enrollments.id,
+        itemType: enrollments.itemType,
+        itemId: enrollments.itemId,
+        pathwayId: enrollments.pathwayId,
         enrolledAt: enrollments.enrolledAt,
         expiresAt: enrollments.expiresAt,
         status: enrollments.status,
         pathway: pathways,
       })
       .from(enrollments)
-      .innerJoin(pathways, eq(enrollments.pathwayId, pathways.id))
+      .leftJoin(
+        pathways,
+        or(
+          eq(enrollments.pathwayId, pathways.id),
+          eq(enrollments.itemId, pathways.id)
+        )
+      )
       .where(
         and(
           eq(enrollments.userId, userId),
@@ -36,7 +114,45 @@ export const lmsService = {
         )
       );
 
-    return activeEnrollments;
+    return activeEnrollments.map((enr) => {
+      if (enr.pathway) {
+        return {
+          enrollmentId: enr.enrollmentId,
+          enrolledAt: enr.enrolledAt,
+          expiresAt: enr.expiresAt,
+          status: enr.status,
+          pathway: enr.pathway,
+        };
+      }
+
+      const targetId = enr.itemId || enr.pathwayId || "cs-p1";
+      const cat = PATHWAY_CATALOG[targetId] || {
+        title: "Unisole Career Skill Pathway",
+        description: "Verified academic training track.",
+        duration: "3 Months",
+        level: "All Learners",
+      };
+
+      return {
+        enrollmentId: enr.enrollmentId,
+        enrolledAt: enr.enrolledAt,
+        expiresAt: enr.expiresAt,
+        status: enr.status,
+        pathway: {
+          id: targetId,
+          title: cat.title,
+          description: cat.description,
+          slug: targetId,
+          duration: cat.duration,
+          level: cat.level,
+          isActive: true,
+          isPublic: true,
+          pricePaise: 299900,
+          createdAt: enr.enrolledAt,
+          updatedAt: enr.enrolledAt,
+        },
+      };
+    });
   },
 
   /**
