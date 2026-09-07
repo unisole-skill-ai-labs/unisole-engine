@@ -1,8 +1,8 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 
-const DEFAULT_KEY_ID = "rzp_test_TZACmk4obIcqzg";
-const DEFAULT_KEY_SECRET = "WstGaLUoxyiSuxxRYgYt8tnO";
+const DEFAULT_KEY_ID = "rzp_live_TZ6USoYRgfUZsQ";
+const DEFAULT_KEY_SECRET = "qA2dxVKo42d4n9rHrDKYujUh";
 
 function getClient(): Razorpay | null {
   const keyId = process.env.RAZORPAY_KEY_ID || DEFAULT_KEY_ID;

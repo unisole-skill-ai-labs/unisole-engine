@@ -59,7 +59,7 @@ export const pricingService = {
         itemType: "WORKSHOP",
         itemId: "AI_MASTERCLASS_2026",
         title: "AI Revolution & Agentic Engineering Masterclass",
-        pricePaise: 100,
+        pricePaise: 3900,
         mrpPaise: 99900,
         currency: "INR",
       };
