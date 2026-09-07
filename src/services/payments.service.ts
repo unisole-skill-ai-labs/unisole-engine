@@ -40,10 +40,23 @@ export const paymentsService = {
     enrolledItems: any[];
     message: string;
   }> {
-    const { providerOrderId, providerPaymentId, providerSignature } = body;
+    const providerOrderId =
+      body.providerOrderId ||
+      (body as any).razorpay_order_id ||
+      (body as any).order_id ||
+      (body as any).orderId;
+    const providerPaymentId =
+      body.providerPaymentId ||
+      (body as any).razorpay_payment_id ||
+      (body as any).payment_id ||
+      (body as any).paymentId;
+    const providerSignature =
+      body.providerSignature ||
+      (body as any).razorpay_signature ||
+      (body as any).signature;
 
     if (!providerOrderId || !providerPaymentId) {
-      throw new ValidationError("providerOrderId and providerPaymentId are required");
+      throw new ValidationError("providerOrderId (or razorpay_order_id) and providerPaymentId (or razorpay_payment_id) are required");
     }
 
     // 1. Signature Verification
