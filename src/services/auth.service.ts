@@ -1,11 +1,13 @@
-import { eq, or, sql } from "drizzle-orm";
+import { eq, or, and, ilike, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db } from "../db";
-import { users, User } from "../db/schema";
+import { users, User, colleges, branches } from "../db/schema";
 import { ValidationError, NotFoundError, UnauthorizedError } from "../errors";
 import { usersRepository } from "../repositories/users.repository";
 import { leadsRepository } from "../repositories/leads.repository";
+import { collegesRepository } from "../repositories/colleges.repository";
+import { branchesRepository } from "../repositories/branches.repository";
 import { otpService } from "./otp.service";
 import { JWT_SECRET, JWT_REFRESH_SECRET } from "../middleware/auth";
 import { toTitleCase, normalizePhone } from "../helpers/formatters";
@@ -228,10 +230,96 @@ export const authService = {
       }
     }
 
-    const resolvedCollegeName = (collegeName || college || "").trim() || null;
-    const resolvedBranch = (branch || "").trim() || null;
-    const resolvedCollegeId = (collegeId || "").trim() || null;
+    let resolvedCollegeName = (collegeName || college || "").trim() || null;
+    let resolvedBranch = (branch || "").trim() || null;
+    let resolvedCollegeId: string | null = (collegeId || "").trim() || null;
     const resolvedSessionCode = (sessionCode || "").trim().toUpperCase() || null;
+
+    // Auto-resolve college by name if collegeId not provided
+    if (resolvedCollegeName && !resolvedCollegeId) {
+      try {
+        const [existingCollege] = await db
+          .select()
+          .from(colleges)
+          .where(ilike(colleges.name, `%${resolvedCollegeName}%`))
+          .limit(1);
+
+        if (existingCollege) {
+          resolvedCollegeId = existingCollege.id;
+          resolvedCollegeName = existingCollege.name;
+        } else {
+          // Check by keywords e.g. Hydro Engineering / Bandla / Bilaspur
+          const [fuzzyCollege] = await db
+            .select()
+            .from(colleges)
+            .where(
+              or(
+                ilike(colleges.name, "%Hydro%"),
+                ilike(colleges.name, "%Bandla%"),
+                ilike(colleges.shortName, "%Hydro%"),
+                ilike(colleges.shortName, "%Bandla%")
+              )
+            )
+            .limit(1);
+
+          if (fuzzyCollege && resolvedCollegeName.toLowerCase().includes("hydro")) {
+            resolvedCollegeId = fuzzyCollege.id;
+            resolvedCollegeName = fuzzyCollege.name;
+          } else {
+            const slug =
+              resolvedCollegeName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "")
+                .slice(0, 40) + `-${Date.now().toString(36)}`;
+
+            const newCol = await collegesRepository.create({
+              name: resolvedCollegeName,
+              slug,
+              isActive: true,
+            });
+            if (newCol) {
+              resolvedCollegeId = newCol.id;
+            }
+          }
+        }
+      } catch (colErr) {
+        console.warn("[AuthService] Dynamic college lookup notice:", colErr);
+      }
+    }
+
+    // Auto-register branch under college if not present
+    if (resolvedBranch && resolvedCollegeId) {
+      try {
+        const [existingBranch] = await db
+          .select()
+          .from(branches)
+          .where(
+            and(
+              eq(branches.collegeId, resolvedCollegeId),
+              ilike(branches.name, resolvedBranch)
+            )
+          )
+          .limit(1);
+
+        if (!existingBranch) {
+          const code =
+            resolvedBranch
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, "")
+              .slice(0, 10) || "GEN";
+
+          await branchesRepository.create({
+            name: resolvedBranch,
+            code,
+            collegeId: resolvedCollegeId,
+            isActive: true,
+          });
+        }
+      } catch (brErr) {
+        console.warn("[AuthService] Branch creation notice:", brErr);
+      }
+    }
 
     // Resolve source attribution: PAMPHLET_QR, SESSION_QR, IAPT, AI_WORKSHOP, PROFESSOR_NETWORK, NON_PAMPHLET
     const rawSource = (signupSource || source || "").trim().toUpperCase();
@@ -301,6 +389,12 @@ export const authService = {
       }
       if (resolvedCollegeName && !user.signupCollegeName) {
         updateData.signupCollegeName = resolvedCollegeName;
+      }
+      if (metadata && typeof metadata === "object") {
+        const prevMeta = (typeof user.metadata === "object" && user.metadata !== null)
+          ? (user.metadata as Record<string, any>)
+          : {};
+        updateData.metadata = { ...prevMeta, ...metadata };
       }
       // If user had default NON_PAMPHLET or none, and joined via specific source like PAMPHLET_QR or SESSION_QR
       if (

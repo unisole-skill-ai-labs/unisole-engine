@@ -289,6 +289,50 @@ const DUMMY_COLLEGES: DummyCollege[] = [
       },
     ],
   },
+  {
+    name: "Government Hydro Engineering College Bandla, Bilaspur, HP",
+    shortName: "GHEC Bandla",
+    slug: "hydro-engineering-college-bandla-bilaspur",
+    description: "Premier state engineering college located in Bandla, Bilaspur, Himachal Pradesh, focused on Hydro Engineering, Computing, Electrical, Mechanical, and Applied AI systems.",
+    branches: [
+      {
+        name: "Computer Science & Engineering (CSE)",
+        code: "CSE",
+        description: "Focuses on algorithms, cloud architecture, machine learning, and full-stack software development.",
+        students: [],
+      },
+      {
+        name: "Electrical Engineering (EE)",
+        code: "EE",
+        description: "Power systems, hydro electrical machinery, control systems, and renewable energy.",
+        students: [],
+      },
+      {
+        name: "Civil Engineering (CE)",
+        code: "CE",
+        description: "Structural engineering, hydrology, dam engineering, and environmental systems.",
+        students: [],
+      },
+      {
+        name: "Mechanical Engineering (ME)",
+        code: "ME",
+        description: "Thermal engineering, fluid mechanics, hydro turbines, and robotics.",
+        students: [],
+      },
+      {
+        name: "Artificial Intelligence & Data Science",
+        code: "AIDS",
+        description: "Specialization in deep learning, generative AI, data analysis, and predictive systems.",
+        students: [],
+      },
+      {
+        name: "Other",
+        code: "OTHER",
+        description: "Multidisciplinary and vocational certificate streams.",
+        students: [],
+      },
+    ],
+  },
 ];
 
 export async function seedPartnerColleges() {
@@ -347,6 +391,29 @@ export async function seedPartnerColleges() {
           );
         }
       }
+
+      // 4. Backfill any existing unlinked users and leads
+      await pool.query(
+        `UPDATE users
+         SET college_id = $1, college_name = $2
+         WHERE (college_id IS NULL OR college_id = '')
+           AND (
+             college_name ILIKE ('%' || $3 || '%')
+             OR college_name ILIKE ('%' || $2 || '%')
+           )`,
+        [collegeId, collegeName, cData.shortName]
+      );
+
+      await pool.query(
+        `UPDATE leads
+         SET college_id = $1, college_name = $2
+         WHERE (college_id IS NULL OR college_id = '')
+           AND (
+             college_name ILIKE ('%' || $3 || '%')
+             OR college_name ILIKE ('%' || $2 || '%')
+           )`,
+        [collegeId, collegeName, cData.shortName]
+      );
     }
 
     console.log("[Seed] Partner colleges, branches, and students seeded successfully!");
