@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import { leadsService } from "../services/leads.service";
 import { asyncHandler } from "../middleware/async-handler";
+import { CustomRequest } from "../middleware/auth";
 
 export const leadsController = {
-  list: asyncHandler(async (req: Request, res: Response) => {
+  list: asyncHandler(async (req: CustomRequest, res: Response) => {
     const {
       search,
       collegeId,
@@ -30,50 +31,50 @@ export const leadsController = {
       nextCallDue: nextCallDue ? (String(nextCallDue) as any) : undefined,
       dateFrom: dateFrom ? String(dateFrom) : undefined,
       dateTo: dateTo ? String(dateTo) : undefined,
-    });
+    }, req.user);
 
     res.json({ success: true, data });
   }),
 
-  getById: asyncHandler(async (req: Request, res: Response) => {
-    const data = await leadsService.getById(req.params.id);
+  getById: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const data = await leadsService.getById(req.params.id, req.user);
     res.json({ success: true, data });
   }),
 
-  create: asyncHandler(async (req: any, res: Response) => {
-    const created = await leadsService.create(req.body, req.user?.id);
+  create: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const created = await leadsService.create(req.body, req.user);
     res.status(201).json({ success: true, data: created });
   }),
 
-  update: asyncHandler(async (req: Request, res: Response) => {
-    const updated = await leadsService.update(req.params.id, req.body);
+  update: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const updated = await leadsService.update(req.params.id, req.body, req.user);
     res.json({ success: true, data: updated });
   }),
 
-  delete: asyncHandler(async (req: Request, res: Response) => {
-    await leadsService.delete(req.params.id);
+  delete: asyncHandler(async (req: CustomRequest, res: Response) => {
+    await leadsService.delete(req.params.id, req.user);
     res.json({ success: true, message: "Lead deleted successfully" });
   }),
 
-  bulkAssign: asyncHandler(async (req: Request, res: Response) => {
+  bulkAssign: asyncHandler(async (req: CustomRequest, res: Response) => {
     const { leadIds, assignedToUserId } = req.body;
-    const result = await leadsService.bulkAssign(leadIds, assignedToUserId);
+    const result = await leadsService.bulkAssign(leadIds, assignedToUserId, req.user);
     res.json({ success: true, ...result });
   }),
 
-  bulkUpdateStatus: asyncHandler(async (req: Request, res: Response) => {
+  bulkUpdateStatus: asyncHandler(async (req: CustomRequest, res: Response) => {
     const { leadIds, status } = req.body;
-    const result = await leadsService.bulkUpdateStatus(leadIds, status);
+    const result = await leadsService.bulkUpdateStatus(leadIds, status, req.user);
     res.json({ success: true, ...result });
   }),
 
-  bulkImport: asyncHandler(async (req: any, res: Response) => {
+  bulkImport: asyncHandler(async (req: CustomRequest, res: Response) => {
     const { leads: leadsList } = req.body;
-    const result = await leadsService.bulkImport(leadsList, req.user?.id);
+    const result = await leadsService.bulkImport(leadsList, req.user);
     res.json({ success: true, data: result });
   }),
 
-  logCall: asyncHandler(async (req: any, res: Response) => {
+  logCall: asyncHandler(async (req: CustomRequest, res: Response) => {
     const callLog = await leadsService.logCall(
       req.params.id,
       req.body,
@@ -82,12 +83,12 @@ export const leadsController = {
     res.status(201).json({ success: true, data: callLog });
   }),
 
-  getCallLogs: asyncHandler(async (req: Request, res: Response) => {
-    const callLogs = await leadsService.getCallLogs(req.params.id);
+  getCallLogs: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const callLogs = await leadsService.getCallLogs(req.params.id, req.user);
     res.json({ success: true, data: callLogs });
   }),
 
-  getAnalytics: asyncHandler(async (req: Request, res: Response) => {
+  getAnalytics: asyncHandler(async (req: CustomRequest, res: Response) => {
     const { collegeId, branch, assignedToUserId, dateFrom, dateTo } = req.query as any;
     const analytics = await leadsService.getAnalytics({
       collegeId: collegeId ? String(collegeId) : undefined,
@@ -95,7 +96,7 @@ export const leadsController = {
       assignedToUserId: assignedToUserId ? String(assignedToUserId) : undefined,
       dateFrom: dateFrom ? String(dateFrom) : undefined,
       dateTo: dateTo ? String(dateTo) : undefined,
-    });
+    }, req.user);
     res.json({ success: true, data: analytics });
   }),
 
@@ -104,8 +105,8 @@ export const leadsController = {
     res.json({ success: true, data: meta });
   }),
 
-  syncUsers: asyncHandler(async (_req: Request, res: Response) => {
-    const result = await leadsService.syncAllUsers();
+  syncUsers: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const result = await leadsService.syncAllUsers(req.user);
     res.json({ success: true, data: result });
   }),
 };
