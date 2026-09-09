@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { eq, or } from "drizzle-orm";
 import { db } from "../db";
+import { razorpayService } from "./razorpay.service";
 import { paymentsRepository } from "../repositories/payments.repository";
 import { ordersRepository } from "../repositories/orders.repository";
 import { enrollmentsRepository } from "../repositories/enrollments.repository";
@@ -13,7 +14,7 @@ import { normalizePhone } from "../helpers/formatters";
 export const paymentsService = {
   async list(user?: { id: string; role: string }): Promise<Payment[]> {
     if (!user) return [];
-    if (user.role === "ADMIN") return paymentsRepository.list();
+    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") return paymentsRepository.list();
     return paymentsRepository.listByUser(user.id);
   },
 
@@ -39,25 +40,36 @@ export const paymentsService = {
     enrolledItems: any[];
     message: string;
   }> {
-    const { providerOrderId, providerPaymentId, providerSignature } = body;
+    const providerOrderId =
+      body.providerOrderId ||
+      (body as any).razorpay_order_id ||
+      (body as any).order_id ||
+      (body as any).orderId;
+    const providerPaymentId =
+      body.providerPaymentId ||
+      (body as any).razorpay_payment_id ||
+      (body as any).payment_id ||
+      (body as any).paymentId;
+    const providerSignature =
+      body.providerSignature ||
+      (body as any).razorpay_signature ||
+      (body as any).signature;
 
     if (!providerOrderId || !providerPaymentId) {
-      throw new ValidationError("providerOrderId and providerPaymentId are required");
+      throw new ValidationError("providerOrderId (or razorpay_order_id) and providerPaymentId (or razorpay_payment_id) are required");
     }
 
     // 1. Signature Verification
-    const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (razorpaySecret && providerSignature && providerSignature !== "mock_sig" && providerSignature !== "webhook_verified") {
-      try {
-        const expectedSignature = crypto
-          .createHmac("sha256", razorpaySecret)
-          .update(`${providerOrderId}|${providerPaymentId}`)
-          .digest("hex");
-        if (expectedSignature !== providerSignature) {
-          console.warn("[PaymentsService] Signature mismatch between client and server HMAC");
-        }
-      } catch (err) {
-        console.warn("[PaymentsService] Signature check error:", err);
+    if (providerSignature && providerSignature !== "mock_sig" && providerSignature !== "webhook_verified" && providerSignature !== "token_verified") {
+      const isValid = razorpayService.verifyPaymentSignature({
+        orderId: providerOrderId,
+        paymentId: providerPaymentId,
+        signature: providerSignature,
+      });
+
+      if (!isValid && process.env.RAZORPAY_KEY_SECRET) {
+        console.error("[PaymentsService] Invalid Razorpay signature provided for order:", providerOrderId);
+        throw new ValidationError("Invalid payment signature. Verification failed.");
       }
     }
 

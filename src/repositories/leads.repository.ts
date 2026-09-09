@@ -786,7 +786,7 @@ export const leadsRepository = {
   async getMeta(): Promise<{
     colleges: Array<{ id: string; name: string }>;
     branches: string[];
-    teamMembers: Array<{ id: string; name: string; phone: string; role: string }>;
+    teamMembers: Array<{ id: string; name: string | null; username: string | null; phone: string; role: string; designation: string | null }>;
     qualities: string[];
     statuses: string[];
     sources: string[];
@@ -799,13 +799,15 @@ export const leadsRepository = {
       .where(eq(colleges.isActive, true))
       .orderBy(colleges.name);
 
-    // 2. Get active team members (counselors, staff)
+    // 2. Get active team members (sales reps, counselors, staff, admins)
     const allTeam = await db
       .select({
         id: users.id,
         name: users.name,
+        username: users.username,
         phone: users.phone,
         role: users.role,
+        designation: users.designation,
       })
       .from(users)
       .where(
@@ -814,11 +816,12 @@ export const leadsRepository = {
           or(
             eq(users.role, "ADMIN" as any),
             eq(users.role, "SUPER_ADMIN" as any),
-            eq(users.role, "MEMBER" as any)
+            eq(users.role, "MEMBER" as any),
+            eq(users.role, "SALES" as any)
           )
         )
       )
-      .orderBy(users.name);
+      .orderBy(asc(users.name), asc(users.username));
 
     // 3. Get system branches from branches table
     const systemBranches = await db
@@ -874,9 +877,11 @@ export const leadsRepository = {
       branches: Array.from(branchSet).sort(),
       teamMembers: allTeam.map((t) => ({
         id: t.id,
-        name: t.name || t.phone || "Team Member",
+        name: t.name || t.username || t.phone || "Team Member",
+        username: t.username || null,
         phone: t.phone,
         role: t.role,
+        designation: t.designation || null,
       })),
       qualities: ["HOT", "WARM", "COLD", "POOR", "UNQUALIFIED"],
       statuses: [

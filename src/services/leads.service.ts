@@ -1,6 +1,6 @@
 import { leadsRepository, LeadFilters, normalizeLeadSource } from "../repositories/leads.repository";
 import { Lead, NewLead, LeadCallLog } from "../db/schema";
-import { NotFoundError, ValidationError } from "../errors";
+import { NotFoundError, ValidationError, ForbiddenError } from "../errors";
 import { normalizePhone, toTitleCase } from "../helpers/formatters";
 
 function cleanStr(val: any): string | null {
@@ -20,20 +20,38 @@ function cleanIsoDate(val: any): string | null {
   }
 }
 
+export function isSalesRestrictedUser(user?: { id: string; role: string; designation?: string | null; permissions?: string[] }): boolean {
+  if (!user) return false;
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") return false;
+  const role = (user.role || "").toUpperCase();
+  const des = (user.designation || "").toUpperCase();
+  if (role === "SALES" || des.includes("SALES") || des.includes("TELECALL") || des.includes("COUNSEL")) {
+    return true;
+  }
+  return false;
+}
+
 export const leadsService = {
-  async list(filters?: LeadFilters): Promise<any[]> {
-    return leadsRepository.list(filters);
+  async list(filters?: LeadFilters, requestingUser?: any): Promise<any[]> {
+    const effectiveFilters: LeadFilters = { ...(filters || {}) };
+    if (isSalesRestrictedUser(requestingUser)) {
+      effectiveFilters.assignedToUserId = requestingUser.id;
+    }
+    return leadsRepository.list(effectiveFilters);
   },
 
-  async getById(id: string): Promise<any> {
+  async getById(id: string, requestingUser?: any): Promise<any> {
     const lead = await leadsRepository.getById(id);
     if (!lead) {
       throw new NotFoundError(`Lead not found with id ${id}`);
     }
+    if (isSalesRestrictedUser(requestingUser) && lead.assignedToUserId !== requestingUser.id) {
+      throw new ForbiddenError("Access restricted: You can only view leads assigned to you");
+    }
     return lead;
   },
 
-  async create(body: Record<string, any>, currentUserId?: string): Promise<Lead> {
+  async create(body: Record<string, any>, requestingUser?: any): Promise<Lead> {
     if (!body.name || !String(body.name).trim()) {
       throw new ValidationError("Lead full name is required");
     }
@@ -46,6 +64,11 @@ export const leadsService = {
       throw new ValidationError("Invalid phone number format. Please provide a valid 10-digit number.");
     }
 
+    let assignedToUserId = cleanStr(body.assignedToUserId);
+    if (isSalesRestrictedUser(requestingUser)) {
+      assignedToUserId = requestingUser.id;
+    }
+
     const leadData: Partial<NewLead> = {
       name: toTitleCase(String(body.name).trim()),
       phone: normalizedPhone,
@@ -55,7 +78,7 @@ export const leadsService = {
       collegeName: cleanStr(body.collegeName),
       branch: cleanStr(body.branch),
       yearOfStudy: cleanStr(body.yearOfStudy),
-      assignedToUserId: cleanStr(body.assignedToUserId),
+      assignedToUserId,
       quality: body.quality || "WARM",
       status: body.status || "NEW",
       source: normalizeLeadSource(body.source) as any,
@@ -63,16 +86,22 @@ export const leadsService = {
       nextCallAt: cleanIsoDate(body.nextCallAt),
       notes: cleanStr(body.notes),
       tags: Array.isArray(body.tags) ? body.tags : [],
-      createdById: cleanStr(currentUserId),
+      createdById: cleanStr(requestingUser?.id),
     };
 
     return leadsRepository.create(leadData);
   },
 
-  async update(id: string, body: Record<string, any>): Promise<Lead> {
+  async update(id: string, body: Record<string, any>, requestingUser?: any): Promise<Lead> {
     const existing = await leadsRepository.getById(id);
     if (!existing) {
       throw new NotFoundError(`Lead with id ${id} not found`);
+    }
+
+    if (isSalesRestrictedUser(requestingUser)) {
+      if (existing.assignedToUserId !== requestingUser.id) {
+        throw new ForbiddenError("Access restricted: You can only update leads assigned to you");
+      }
     }
 
     const updatePayload: Partial<NewLead> = {};
@@ -88,7 +117,10 @@ export const leadsService = {
     if (body.collegeName !== undefined) updatePayload.collegeName = cleanStr(body.collegeName);
     if (body.branch !== undefined) updatePayload.branch = cleanStr(body.branch);
     if (body.yearOfStudy !== undefined) updatePayload.yearOfStudy = cleanStr(body.yearOfStudy);
-    if (body.assignedToUserId !== undefined) updatePayload.assignedToUserId = cleanStr(body.assignedToUserId);
+    // Only admins can reassign leads to another user
+    if (body.assignedToUserId !== undefined && !isSalesRestrictedUser(requestingUser)) {
+      updatePayload.assignedToUserId = cleanStr(body.assignedToUserId);
+    }
     if (body.quality !== undefined) updatePayload.quality = body.quality;
     if (body.status !== undefined) updatePayload.status = body.status;
     if (body.source !== undefined) updatePayload.source = normalizeLeadSource(body.source) as any;
@@ -104,8 +136,10 @@ export const leadsService = {
     return updated;
   },
 
-
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string, requestingUser?: any): Promise<boolean> {
+    if (isSalesRestrictedUser(requestingUser)) {
+      throw new ForbiddenError("Permission denied: Sales representatives cannot delete leads");
+    }
     const success = await leadsRepository.delete(id);
     if (!success) {
       throw new NotFoundError(`Lead with id ${id} not found`);
@@ -113,7 +147,10 @@ export const leadsService = {
     return true;
   },
 
-  async bulkAssign(leadIds: string[], assignedToUserId: string | null): Promise<{ updatedCount: number }> {
+  async bulkAssign(leadIds: string[], assignedToUserId: string | null, requestingUser?: any): Promise<{ updatedCount: number }> {
+    if (isSalesRestrictedUser(requestingUser)) {
+      throw new ForbiddenError("Permission denied: Sales representatives cannot reassign leads");
+    }
     if (!Array.isArray(leadIds) || leadIds.length === 0) {
       throw new ValidationError("leadIds array is required");
     }
@@ -121,12 +158,23 @@ export const leadsService = {
     return { updatedCount: count };
   },
 
-  async bulkUpdateStatus(leadIds: string[], status: string): Promise<{ updatedCount: number }> {
+  async bulkUpdateStatus(leadIds: string[], status: string, requestingUser?: any): Promise<{ updatedCount: number }> {
     if (!Array.isArray(leadIds) || leadIds.length === 0) {
       throw new ValidationError("leadIds array is required");
     }
     if (!status) {
       throw new ValidationError("status is required");
+    }
+    // If sales user, only allow status update on leads assigned to them
+    if (isSalesRestrictedUser(requestingUser)) {
+      const allowedLeads = await leadsRepository.list({ assignedToUserId: requestingUser.id });
+      const allowedIds = new Set(allowedLeads.map((l) => l.id));
+      const filteredLeadIds = leadIds.filter((id) => allowedIds.has(id));
+      if (filteredLeadIds.length === 0) {
+        throw new ForbiddenError("No matching assigned leads found to update");
+      }
+      const count = await leadsRepository.bulkUpdateStatus(filteredLeadIds, status);
+      return { updatedCount: count };
     }
     const count = await leadsRepository.bulkUpdateStatus(leadIds, status);
     return { updatedCount: count };
@@ -147,12 +195,15 @@ export const leadsService = {
       source?: string;
       notes?: string;
     }>,
-    currentUserId?: string
+    requestingUser?: any
   ): Promise<{ imported: number; updated: number; failed: number }> {
+    if (isSalesRestrictedUser(requestingUser)) {
+      throw new ForbiddenError("Permission denied: Sales representatives cannot bulk import leads");
+    }
     if (!Array.isArray(leadsList) || leadsList.length === 0) {
       throw new ValidationError("A non-empty list of leads is required for import");
     }
-    return leadsRepository.bulkImport(leadsList, currentUserId);
+    return leadsRepository.bulkImport(leadsList, requestingUser?.id);
   },
 
   async logCall(
@@ -166,13 +217,21 @@ export const leadsService = {
       scheduledNextCallAt?: string;
       recordingUrl?: string;
     },
-    callerUser: { id: string; name?: string; phone?: string }
+    callerUser: { id: string; name?: string; phone?: string; role?: string; designation?: string | null }
   ): Promise<LeadCallLog> {
     if (!body.outcome) {
       throw new ValidationError("Call outcome is required");
     }
     if (!body.notes || !String(body.notes).trim()) {
       throw new ValidationError("Call discussion notes are required");
+    }
+
+    const lead = await leadsRepository.getById(leadId);
+    if (!lead) {
+      throw new NotFoundError(`Lead not found with id ${leadId}`);
+    }
+    if (isSalesRestrictedUser(callerUser as any) && lead.assignedToUserId !== callerUser.id) {
+      throw new ForbiddenError("Access restricted: You can only log calls for leads assigned to you");
     }
 
     return leadsRepository.addCallLog({
@@ -189,7 +248,14 @@ export const leadsService = {
     });
   },
 
-  async getCallLogs(leadId: string): Promise<any[]> {
+  async getCallLogs(leadId: string, requestingUser?: any): Promise<any[]> {
+    const lead = await leadsRepository.getById(leadId);
+    if (!lead) {
+      throw new NotFoundError(`Lead not found with id ${leadId}`);
+    }
+    if (isSalesRestrictedUser(requestingUser) && lead.assignedToUserId !== requestingUser.id) {
+      throw new ForbiddenError("Access restricted: You can only view call history for leads assigned to you");
+    }
     return leadsRepository.getCallLogs(leadId);
   },
 
@@ -199,15 +265,22 @@ export const leadsService = {
     assignedToUserId?: string;
     dateFrom?: string;
     dateTo?: string;
-  }): Promise<any> {
-    return leadsRepository.getAnalytics(filters);
+  }, requestingUser?: any): Promise<any> {
+    const effectiveFilters = { ...(filters || {}) };
+    if (isSalesRestrictedUser(requestingUser)) {
+      effectiveFilters.assignedToUserId = requestingUser.id;
+    }
+    return leadsRepository.getAnalytics(effectiveFilters);
   },
 
   async getMeta(): Promise<any> {
     return leadsRepository.getMeta();
   },
 
-  async syncAllUsers(): Promise<{ synced: number; existing: number; totalUsers: number }> {
+  async syncAllUsers(requestingUser?: any): Promise<{ synced: number; existing: number; totalUsers: number }> {
+    if (isSalesRestrictedUser(requestingUser)) {
+      throw new ForbiddenError("Permission denied: Sales representatives cannot sync platform users");
+    }
     return leadsRepository.syncAllUsersToLeads();
   },
 };

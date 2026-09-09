@@ -25,8 +25,8 @@ import { adminCouponsRouter } from "./coupons";
 
 export const adminRouter: Router = Router();
 
-// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER)
-adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER"]));
+// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES)
+adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES"]));
 
 // My Work - Centralized Staff Task & Lead Workspace
 adminRouter.use("/my-work", adminMyWorkRouter);

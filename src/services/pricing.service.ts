@@ -42,13 +42,39 @@ export const pricingService = {
     // 2. Fallbacks based on itemType
     if (itemType === "PATHWAY") {
       const pathway = await pathwaysRepository.getById(itemId);
-      if (pathway && pathway.isActive) {
+      if (pathway && pathway.isActive && pathway.pricePaise > 0) {
         return {
           itemType: "PATHWAY",
           itemId: pathway.id,
           title: pathway.title,
-          pricePaise: pathway.pricePaise || 0,
-          mrpPaise: pathway.pricePaise || 0,
+          pricePaise: pathway.pricePaise,
+          mrpPaise: pathway.pricePaise * 3 || 99900,
+          currency: "INR",
+        };
+      }
+
+      // Standard catalog static fallback lookup
+      const PATHWAY_CATALOG: Record<string, { title: string; pricePaise: number; mrpPaise: number }> = {
+        "cs-p1": { title: "Machine Learning Engineering in Production", pricePaise: 299900, mrpPaise: 999900 },
+        "cs-p2": { title: "Full Stack Web Development (AI-Powered)", pricePaise: 149900, mrpPaise: 699900 },
+        "cs-p3": { title: "Complete Machine Learning + Full Stack (Dual Track)", pricePaise: 399900, mrpPaise: 1499900 },
+        "cs-common": { title: "AI Entrepreneurship & Innovation (CS Edition)", pricePaise: 59900, mrpPaise: 299900 },
+        "sci-p1": { title: "Scientific Machine Learning & AI for Science", pricePaise: 200000, mrpPaise: 699900 },
+        "sci-p2": { title: "Mathematics + AI / Computational Intelligence", pricePaise: 150000, mrpPaise: 599900 },
+        "mgmt-p1": { title: "Business Analytics & Data Engineering", pricePaise: 200000, mrpPaise: 699900 },
+        "mgmt-p2": { title: "AI in Finance & FinTech Systems", pricePaise: 200000, mrpPaise: 699900 },
+        "mgmt-p3": { title: "Complete Business AI Pathway (Dual Track)", pricePaise: 299900, mrpPaise: 999900 },
+        "mgmt-common": { title: "AI Entrepreneurship & Business Innovation", pricePaise: 59900, mrpPaise: 299900 },
+        "arts-p1": { title: "Applied AI for Humanities, Research & Careers", pricePaise: 99900, mrpPaise: 399900 },
+      };
+
+      if (PATHWAY_CATALOG[itemId]) {
+        return {
+          itemType: "PATHWAY",
+          itemId,
+          title: PATHWAY_CATALOG[itemId].title,
+          pricePaise: PATHWAY_CATALOG[itemId].pricePaise,
+          mrpPaise: PATHWAY_CATALOG[itemId].mrpPaise,
           currency: "INR",
         };
       }

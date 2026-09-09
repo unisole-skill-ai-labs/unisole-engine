@@ -37,7 +37,7 @@ export const usersService = {
     }
 
     const role = (body.role as string) || "STUDENT";
-    if (!["STUDENT", "ADMIN", "SUPER_ADMIN", "MEMBER"].includes(role)) {
+    if (!["STUDENT", "ADMIN", "SUPER_ADMIN", "MEMBER", "SALES"].includes(role)) {
       throw new ValidationError("Invalid role");
     }
 
@@ -74,7 +74,7 @@ export const usersService = {
     if (body.name !== undefined) data.name = body.name ? toTitleCase(body.name as string) : null;
     if (body.role !== undefined) {
       const role = body.role as string;
-      if (!["STUDENT", "ADMIN", "SUPER_ADMIN", "MEMBER"].includes(role)) throw new ValidationError("Invalid role");
+      if (!["STUDENT", "ADMIN", "SUPER_ADMIN", "MEMBER", "SALES"].includes(role)) throw new ValidationError("Invalid role");
       data.role = role as any;
     }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);

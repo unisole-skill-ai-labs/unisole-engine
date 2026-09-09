@@ -27,6 +27,7 @@ export const userRole = pgEnum("user_role", [
   "MEMBER",
   "ADMIN",
   "SUPER_ADMIN",
+  "SALES",
 ]);
 export const pathwayStatus = pgEnum("pathway_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export const contentStatus = pgEnum("content_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);

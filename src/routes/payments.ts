@@ -11,7 +11,6 @@ paymentsRouter.post("/create-order", ordersController.createCheckout);
 // Razorpay payment verification and auto-enrollment fulfillment
 paymentsRouter.post(
   "/verify",
-  validateBody({ required: ["providerOrderId", "providerPaymentId"] }),
   paymentsController.verifyPayment
 );
 

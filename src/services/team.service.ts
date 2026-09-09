@@ -43,11 +43,11 @@ export const teamService = {
       LEFT JOIN team_departments d ON u.department_id = d.id
       LEFT JOIN tasks t ON t.assignee_id = u.id
       LEFT JOIN leads l ON l.assigned_to_user_id = u.id
-      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER')
+      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES')
         AND ($1::text IS NULL OR u.name ILIKE $1 OR u.username ILIKE $1 OR u.phone ILIKE $1)
       GROUP BY u.id, d.name, d.color
       ORDER BY 
-        CASE WHEN u.role = 'SUPER_ADMIN' THEN 1 WHEN u.role = 'ADMIN' THEN 2 ELSE 3 END,
+        CASE WHEN u.role = 'SUPER_ADMIN' THEN 1 WHEN u.role = 'ADMIN' THEN 2 WHEN u.role = 'SALES' THEN 3 ELSE 4 END,
         u.name ASC`,
       [search ? `%${search.trim()}%` : null]
     );
@@ -63,7 +63,7 @@ export const teamService = {
     username: string;
     password?: string;
     phone?: string;
-    role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
+    role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES";
     departmentId?: string;
     designation?: string;
     permissions?: string[];
@@ -129,7 +129,7 @@ export const teamService = {
       username?: string;
       password?: string;
       phone?: string;
-      role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER";
+      role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES";
       departmentId?: string;
       designation?: string;
       permissions?: string[];
@@ -228,7 +228,7 @@ export const teamService = {
         COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'SUBMITTED_FOR_REVIEW', 'BLOCKED'))::int as "activeTasksCount"
       FROM team_departments d
       LEFT JOIN users u ON d.lead_id = u.id
-      LEFT JOIN users mem ON mem.department_id = d.id AND mem.role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN')
+      LEFT JOIN users mem ON mem.department_id = d.id AND mem.role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES')
       LEFT JOIN tasks t ON t.department_id = d.id
       GROUP BY d.id, u.name
       ORDER BY d.name ASC;
@@ -512,7 +512,7 @@ export const teamService = {
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED' AND t.completed_at >= NOW() - INTERVAL '7 days')::int as "completedThisWeek"
       FROM team_departments d
       LEFT JOIN users u ON d.lead_id = u.id
-      LEFT JOIN users mem ON mem.department_id = d.id AND mem.role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN') AND mem.is_active = TRUE
+      LEFT JOIN users mem ON mem.department_id = d.id AND mem.role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES') AND mem.is_active = TRUE
       LEFT JOIN tasks t ON t.department_id = d.id
       GROUP BY d.id, u.name
       ORDER BY d.name ASC;
@@ -564,7 +564,7 @@ export const teamService = {
     // 4. Standup Pulse for Today
     const today = new Date().toISOString().split("T")[0];
     const totalStaffRes = await pool.query(
-      `SELECT id, name, phone, role, department_id as "departmentId" FROM users WHERE role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN') AND is_active = TRUE`
+      `SELECT id, name, phone, role, department_id as "departmentId" FROM users WHERE role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES') AND is_active = TRUE`
     );
     const allStaff = totalStaffRes.rows;
 
@@ -797,7 +797,7 @@ export const teamService = {
       LEFT JOIN team_departments d ON u.department_id = d.id
       LEFT JOIN tasks t ON t.assignee_id = u.id
       LEFT JOIN daily_eod_logs e ON e.user_id = u.id AND e.log_date >= CURRENT_DATE - INTERVAL '30 days'
-      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER') AND u.is_active = TRUE
+      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
       GROUP BY u.id, d.name, d.color
       ORDER BY u.name ASC;
     `);
@@ -871,7 +871,7 @@ export const teamService = {
         d.color as "departmentColor"
       FROM users u
       LEFT JOIN team_departments d ON u.department_id = d.id
-      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER') AND u.is_active = TRUE
+      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
       ORDER BY u.name ASC
     `);
     const allStaff = staffRes.rows;

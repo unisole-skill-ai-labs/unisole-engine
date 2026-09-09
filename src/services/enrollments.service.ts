@@ -17,7 +17,7 @@ export const enrollmentsService = {
   async list(user?: { id: string; role: string }, options: { userId?: string; itemType?: ItemType; status?: string } = {}) {
     if (!user) return [];
 
-    if (user.role === "ADMIN") {
+    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
       if (options.userId) return enrollmentsRepository.listByUser(options.userId);
       return enrollmentsRepository.listWithDetails({
         itemType: options.itemType,
@@ -31,7 +31,7 @@ export const enrollmentsService = {
   async getById(id: string, user?: { id: string; role: string }): Promise<Enrollment> {
     const row = await enrollmentsRepository.getById(id);
     if (!row) throw new NotFoundError("Enrollment not found");
-    if (user && user.role !== "ADMIN" && row.userId !== user.id) {
+    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN" && row.userId !== user.id) {
       throw new NotFoundError("Enrollment not found");
     }
     return row;
@@ -49,7 +49,7 @@ export const enrollmentsService = {
       throw new ValidationError("userId and itemId (or pathwayId) are required");
     }
 
-    if (user && user.role !== "ADMIN" && targetUserId !== user.id) {
+    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN" && targetUserId !== user.id) {
       throw new ValidationError("Cannot enroll on behalf of another user");
     }
 
@@ -109,7 +109,7 @@ export const enrollmentsService = {
   async update(id: string, body: Record<string, unknown>, user?: { id: string; role: string }): Promise<Enrollment> {
     const existing = await enrollmentsRepository.getById(id);
     if (!existing) throw new NotFoundError("Enrollment not found");
-    if (user && user.role !== "ADMIN" && existing.userId !== user.id) {
+    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN" && existing.userId !== user.id) {
       throw new NotFoundError("Enrollment not found");
     }
 

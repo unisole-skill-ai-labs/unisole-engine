@@ -22,9 +22,17 @@ function generateTokens(user: {
   departmentId?: string | null;
   metadata?: any;
 }) {
-  const permissions = (user.metadata && Array.isArray(user.metadata.permissions))
+  let permissions = (user.metadata && Array.isArray(user.metadata.permissions))
     ? user.metadata.permissions
     : [];
+
+  if (permissions.length === 0) {
+    const des = (user.designation || "").toUpperCase();
+    const role = (user.role || "").toUpperCase();
+    if (role === "SALES" || des.includes("SALES") || des.includes("TELECALL") || des.includes("COUNSEL")) {
+      permissions = ["leads:view", "leads:manage"];
+    }
+  }
 
   const payload = {
     id: user.id,
@@ -83,7 +91,7 @@ export const authService = {
       throw new UnauthorizedError("Account has been deactivated. Please contact Super Administrator.");
     }
 
-    if (!["SUPER_ADMIN", "ADMIN", "MEMBER"].includes(user.role)) {
+    if (!["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES"].includes(user.role)) {
       throw new UnauthorizedError("Access denied. Internal staff privileges required.");
     }
 
