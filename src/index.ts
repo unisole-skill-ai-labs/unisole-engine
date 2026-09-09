@@ -2,6 +2,10 @@ import http from "http";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
+dotenv.config();
+
 import { Server as SocketIOServer } from "socket.io";
 import { authRouter } from "./routes/auth";
 import { adminRouter } from "./routes/admin";

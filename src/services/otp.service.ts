@@ -33,10 +33,12 @@ export const otpService = {
       throw new Error("Invalid mobile number. Please enter a valid 10-digit number.");
     }
 
+    const hasFast2sms = !!process.env.FAST2SMS_API_KEY;
     const isMock =
-      !process.env.OTP_PROVIDER ||
-      process.env.OTP_PROVIDER.toUpperCase() === "MOCK" ||
-      process.env.NODE_ENV !== "production";
+      !hasFast2sms &&
+      (!process.env.OTP_PROVIDER ||
+        process.env.OTP_PROVIDER.toUpperCase() === "MOCK" ||
+        process.env.NODE_ENV !== "production");
 
     // Generate real 4-digit numeric verification code (e.g. 1234 or random code)
     const otp = isMock
