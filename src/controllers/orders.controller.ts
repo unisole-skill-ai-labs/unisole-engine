@@ -57,7 +57,11 @@ export const ordersController = {
    * GET /api/orders/my-orders
    */
   listMyOrders: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const result = await ordersService.listOrders({}, req.user);
+    const status = req.query.status as string | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+    const result = await ordersService.listOrders({ status, limit, offset }, req.user);
     res.json({
       success: true,
       ...result,
