@@ -814,7 +814,8 @@ export const leadsRepository = {
           or(
             eq(users.role, "ADMIN" as any),
             eq(users.role, "SUPER_ADMIN" as any),
-            eq(users.role, "MEMBER" as any)
+            eq(users.role, "MEMBER" as any),
+            eq(users.role, "SALES" as any)
           )
         )
       )

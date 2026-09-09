@@ -27,7 +27,7 @@ export async function initializeDatabase() {
     // 1. Ensure Base Enums Exist
     await execSqlSafe("base_enums", `
       DO $$ BEGIN
-        CREATE TYPE "public"."user_role" AS ENUM('STUDENT', 'MEMBER', 'ADMIN', 'SUPER_ADMIN');
+        CREATE TYPE "public"."user_role" AS ENUM('STUDENT', 'MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES');
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
       DO $$ BEGIN
@@ -140,6 +140,8 @@ export async function initializeDatabase() {
     await addEnumValueSafely("lead_source", "DIRECT_WEB");
 
     await addEnumValueSafely("lead_status", "NOT_A_LEAD");
+
+    await addEnumValueSafely("user_role", "SALES");
 
     // 3. Sequences
     await execSqlSafe("sequences", `
