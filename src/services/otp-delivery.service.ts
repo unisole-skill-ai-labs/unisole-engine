@@ -131,16 +131,24 @@ export class Fast2SMSDeliveryProvider implements OtpDeliveryProvider {
       // 1. WhatsApp Delivery Attempt if requested
       if (payload.channel === "WHATSAPP") {
         try {
+          const messageId = process.env.FAST2SMS_WHATSAPP_MESSAGE_ID;
+          const waPayload: any = {
+            numbers: cleanPhone,
+            variables_values: payload.otp,
+          };
+          if (messageId) {
+            waPayload.message_id = parseInt(messageId, 10) || messageId;
+          } else {
+            waPayload.message = `Your Unisole verification code is ${payload.otp}. Valid for 10 minutes.`;
+          }
+
           const waRes = await fetch("https://www.fast2sms.com/dev/whatsapp", {
             method: "POST",
             headers: {
               authorization: this.apiKey,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              message: `Your Unisole verification code is ${payload.otp}. Valid for 10 minutes.`,
-              numbers: cleanPhone,
-            }),
+            body: JSON.stringify(waPayload),
           });
 
           const waData: any = await waRes.json().catch(() => ({}));
