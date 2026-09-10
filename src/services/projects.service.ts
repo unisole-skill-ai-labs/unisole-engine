@@ -1,4 +1,4 @@
-import { db, pool } from "../db";
+import { db } from "../db";
 import {
   projects,
   subProjects,
@@ -11,7 +11,7 @@ import {
   NewProject,
   NewSubProject,
 } from "../db/schema";
-import { eq, desc, and, ilike, count, sql, asc, inArray } from "drizzle-orm";
+import { eq, desc, and, or, ilike, count, sql, asc, inArray } from "drizzle-orm";
 
 export interface ProjectListFilter {
   departmentId?: string;
@@ -236,11 +236,12 @@ export const projectsService = {
       
       if (!isLead && !isSubProjectLead) {
         // Check if user has any assigned or reported tasks in this project
-        const assignedTaskRes = await pool.query(
-          `SELECT id FROM tasks WHERE project_id = $1 AND (assignee_id = $2 OR reporter_id = $2) LIMIT 1`,
-          [id, userId]
-        );
-        if (assignedTaskRes.rows.length === 0) {
+        const assignedTaskRes = await db
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(and(eq(tasks.projectId, id), or(eq(tasks.assigneeId, userId), eq(tasks.reporterId, userId))))
+          .limit(1);
+        if (assignedTaskRes.length === 0) {
           return null; // Not authorized to access this project
         }
       }

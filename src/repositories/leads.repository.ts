@@ -1,5 +1,5 @@
 import { eq, and, or, ilike, desc, asc, inArray, isNull, sql, lte, gte } from "drizzle-orm";
-import { db, pool } from "../db";
+import { db } from "../db";
 import {
   leads,
   leadCallLogs,

@@ -1,5 +1,6 @@
 import { Response } from "express";
-import { pool } from "../db";
+import { db } from "../db";
+import { sql } from "drizzle-orm";
 import { asyncHandler } from "../middleware/async-handler";
 import { CustomRequest } from "../middleware/auth";
 import { NotFoundError, UnauthorizedError } from "../errors";
@@ -45,8 +46,8 @@ export const myWorkController = {
       };
       targetUserPermissions = [];
     } else {
-      const userRes = await pool.query(
-        `SELECT 
+      const userRes = await db.execute<any>(sql`
+        SELECT 
           u.id,
           u.name,
           u.username,
@@ -59,15 +60,15 @@ export const myWorkController = {
           d.color as "departmentColor"
         FROM users u
         LEFT JOIN team_departments d ON u.department_id = d.id
-        WHERE u.id = $1`,
-        [targetUserId]
-      );
+        WHERE u.id = ${targetUserId}
+      `);
 
-      if (userRes.rows.length === 0) {
+      const userRows = (userRes.rows || userRes) as any[];
+      if (userRows.length === 0) {
         throw new NotFoundError("Team member not found");
       }
 
-      targetUser = userRes.rows[0];
+      targetUser = userRows[0];
       targetUserPermissions =
         targetUser.metadata && Array.isArray(targetUser.metadata.permissions)
           ? targetUser.metadata.permissions
@@ -77,8 +78,8 @@ export const myWorkController = {
     // 2. Fetch Tasks (with project, subproject, assignee, reporter)
     let tasksRes;
     if (!isFilteredToUser) {
-      tasksRes = await pool.query(
-        `SELECT 
+      tasksRes = await db.execute<any>(sql`
+        SELECT 
           t.id,
           t.title,
           t.description,
@@ -145,11 +146,11 @@ export const myWorkController = {
           END,
           t.due_date ASC NULLS LAST,
           t.created_at DESC
-        LIMIT 250`
-      );
+        LIMIT 250
+      `);
     } else {
-      tasksRes = await pool.query(
-        `SELECT 
+      tasksRes = await db.execute<any>(sql`
+        SELECT 
           t.id,
           t.title,
           t.description,
@@ -191,7 +192,7 @@ export const myWorkController = {
         LEFT JOIN users rep ON t.reporter_id = rep.id
         LEFT JOIN team_departments d ON t.department_id = d.id
         LEFT JOIN task_subtasks s ON s.task_id = t.id
-        WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR p.created_by_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
+        WHERE (t.assignee_id = ${targetUserId} OR p.lead_id = ${targetUserId} OR p.created_by_id = ${targetUserId} OR sp.lead_id = ${targetUserId} OR t.reporter_id = ${targetUserId})
           AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
         GROUP BY 
           t.id, 
@@ -217,17 +218,16 @@ export const myWorkController = {
           END,
           t.due_date ASC NULLS LAST,
           t.created_at DESC
-        LIMIT 100`,
-        [targetUserId]
-      );
+        LIMIT 100
+      `);
     }
 
-    // Fetch individual subtasks for each task in this workspace
-    const taskIds = tasksRes.rows.map((t: any) => t.id);
+    const taskRows = ((tasksRes.rows || tasksRes) as any[]);
+    const taskIds = taskRows.map((t: any) => t.id);
     const subtasksByTaskId: Record<string, any[]> = {};
     if (taskIds.length > 0) {
-      const subtasksRes = await pool.query(
-        `SELECT 
+      const subtasksRes = await db.execute<any>(sql`
+        SELECT 
           s.id,
           s.task_id as "taskId",
           s.title,
@@ -235,11 +235,11 @@ export const myWorkController = {
           s.order_index as "orderIndex",
           s.created_at as "createdAt"
         FROM task_subtasks s
-        WHERE s.task_id = ANY($1::text[])
-        ORDER BY s.order_index ASC, s.created_at ASC`,
-        [taskIds]
-      );
-      for (const st of subtasksRes.rows) {
+        WHERE s.task_id IN (${sql.join(taskIds.map(id => sql`${id}`), sql`, `)})
+        ORDER BY s.order_index ASC, s.created_at ASC
+      `);
+      const subtaskRows = (subtasksRes.rows || subtasksRes) as any[];
+      for (const st of subtaskRows) {
         if (!subtasksByTaskId[st.taskId]) {
           subtasksByTaskId[st.taskId] = [];
         }
@@ -247,7 +247,7 @@ export const myWorkController = {
       }
     }
 
-    const allTasks = tasksRes.rows.map((t: any) => ({
+    const allTasks = taskRows.map((t: any) => ({
       ...t,
       assignee: t.assigneeId
         ? {
@@ -270,8 +270,8 @@ export const myWorkController = {
     // 2.5 Fetch Projects (Admins see ALL active projects; regular members see their assigned/led projects)
     let projectsRes;
     if (!isFilteredToUser) {
-      projectsRes = await pool.query(
-        `SELECT 
+      projectsRes = await db.execute<any>(sql`
+        SELECT 
           p.id,
           p.name,
           p.code,
@@ -287,7 +287,7 @@ export const myWorkController = {
           d.color as "departmentColor",
           COUNT(DISTINCT t.id)::int as "totalTasks",
           COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasks",
-          COUNT(DISTINCT t.id) FILTER (WHERE t.assignee_id = $1)::int as "myTasksCount",
+          COUNT(DISTINCT t.id) FILTER (WHERE t.assignee_id = ${currentUserId})::int as "myTasksCount",
           COUNT(DISTINCT sp.id)::int as "subProjectsCount"
         FROM projects p
         LEFT JOIN users lead ON p.lead_id = lead.id
@@ -303,12 +303,11 @@ export const myWorkController = {
             WHEN p.priority = 'MEDIUM' THEN 3 
             ELSE 4 
           END,
-          p.created_at DESC`,
-        [currentUserId]
-      );
+          p.created_at DESC
+      `);
     } else {
-      projectsRes = await pool.query(
-        `SELECT 
+      projectsRes = await db.execute<any>(sql`
+        SELECT 
           p.id,
           p.name,
           p.code,
@@ -324,7 +323,7 @@ export const myWorkController = {
           d.color as "departmentColor",
           COUNT(DISTINCT t.id)::int as "totalTasks",
           COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasks",
-          COUNT(DISTINCT t.id) FILTER (WHERE t.assignee_id = $1)::int as "myTasksCount",
+          COUNT(DISTINCT t.id) FILTER (WHERE t.assignee_id = ${targetUserId})::int as "myTasksCount",
           COUNT(DISTINCT sp.id)::int as "subProjectsCount"
         FROM projects p
         LEFT JOIN users lead ON p.lead_id = lead.id
@@ -332,10 +331,10 @@ export const myWorkController = {
         LEFT JOIN sub_projects sp ON sp.project_id = p.id
         LEFT JOIN tasks t ON t.project_id = p.id
         WHERE (
-          p.lead_id = $1 
-          OR p.created_by_id = $1
-          OR p.id IN (SELECT DISTINCT project_id FROM tasks WHERE (assignee_id = $1 OR reporter_id = $1) AND project_id IS NOT NULL)
-          OR p.id IN (SELECT DISTINCT project_id FROM sub_projects WHERE lead_id = $1)
+          p.lead_id = ${targetUserId} 
+          OR p.created_by_id = ${targetUserId}
+          OR p.id IN (SELECT DISTINCT project_id FROM tasks WHERE (assignee_id = ${targetUserId} OR reporter_id = ${targetUserId}) AND project_id IS NOT NULL)
+          OR p.id IN (SELECT DISTINCT project_id FROM sub_projects WHERE lead_id = ${targetUserId})
         )
         AND (p.is_hidden = FALSE OR p.is_hidden IS NULL)
         GROUP BY p.id, lead.name, lead.phone, lead.role, lead.designation, d.name, d.color
@@ -346,16 +345,16 @@ export const myWorkController = {
             WHEN p.priority = 'MEDIUM' THEN 3 
             ELSE 4 
           END,
-          p.created_at DESC`,
-        [targetUserId]
-      );
+          p.created_at DESC
+      `);
     }
 
-    const projectIds = projectsRes.rows.map((p: any) => p.id);
+    const projectRows = ((projectsRes.rows || projectsRes) as any[]);
+    const projectIds = projectRows.map((p: any) => p.id);
     const subProjectsByProjectId: Record<string, any[]> = {};
     if (projectIds.length > 0) {
-      const spRes = await pool.query(
-        `SELECT 
+      const spRes = await db.execute<any>(sql`
+        SELECT 
           sp.id,
           sp.project_id as "projectId",
           sp.name,
@@ -368,12 +367,12 @@ export const myWorkController = {
         FROM sub_projects sp
         LEFT JOIN users lead ON sp.lead_id = lead.id
         LEFT JOIN tasks t ON t.sub_project_id = sp.id
-        WHERE sp.project_id = ANY($1::text[])
+        WHERE sp.project_id IN (${sql.join(projectIds.map(id => sql`${id}`), sql`, `)})
         GROUP BY sp.id, lead.name
-        ORDER BY sp.order_index ASC, sp.created_at ASC`,
-        [projectIds]
-      );
-      for (const sp of spRes.rows) {
+        ORDER BY sp.order_index ASC, sp.created_at ASC
+      `);
+      const spRows = (spRes.rows || spRes) as any[];
+      for (const sp of spRows) {
         if (!subProjectsByProjectId[sp.projectId]) {
           subProjectsByProjectId[sp.projectId] = [];
         }
@@ -381,7 +380,7 @@ export const myWorkController = {
       }
     }
 
-    const myProjects = projectsRes.rows.map((proj: any) => {
+    const myProjects = projectRows.map((proj: any) => {
       const total = proj.totalTasks || 0;
       const done = proj.completedTasks || 0;
       const progressPercentage = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -404,8 +403,8 @@ export const myWorkController = {
     // 3. Fetch CRM Leads & Callbacks
     let leadsRes;
     if (!isFilteredToUser) {
-      leadsRes = await pool.query(
-        `SELECT 
+      leadsRes = await db.execute<any>(sql`
+        SELECT 
           l.id,
           l.name,
           l.phone,
@@ -439,11 +438,11 @@ export const myWorkController = {
           END,
           l.next_call_at ASC NULLS LAST,
           l.updated_at DESC
-        LIMIT 200`
-      );
+        LIMIT 200
+      `);
     } else {
-      leadsRes = await pool.query(
-        `SELECT 
+      leadsRes = await db.execute<any>(sql`
+        SELECT 
           l.id,
           l.name,
           l.phone,
@@ -468,7 +467,7 @@ export const myWorkController = {
           l.created_at as "createdAt",
           l.updated_at as "updatedAt"
         FROM leads l
-        WHERE l.assigned_to_user_id = $1
+        WHERE l.assigned_to_user_id = ${targetUserId}
         ORDER BY 
           CASE 
             WHEN l.next_call_at IS NOT NULL AND l.next_call_at <= NOW() + INTERVAL '24 hours' THEN 1 
@@ -478,15 +477,17 @@ export const myWorkController = {
           END,
           l.next_call_at ASC NULLS LAST,
           l.updated_at DESC
-        LIMIT 100`,
-        [targetUserId]
-      );
+        LIMIT 100
+      `);
     }
+
+    const allLeads = (leadsRes.rows || leadsRes) as any[];
 
     // 4. Fetch Today's Daily EOD Standup Log
     const today = new Date().toISOString().split("T")[0];
-    const eodRes = await pool.query(
-      `SELECT 
+    const eodUserId = isFilteredToUser ? targetUserId : currentUserId;
+    const eodRes = await db.execute<any>(sql`
+      SELECT 
         id,
         user_id as "userId",
         log_date as "logDate",
@@ -496,15 +497,15 @@ export const myWorkController = {
         hours_spent as "hoursSpent",
         created_at as "createdAt"
       FROM daily_eod_logs
-      WHERE user_id = $1 AND log_date = $2
+      WHERE user_id = ${eodUserId} AND log_date = ${today}
       ORDER BY created_at DESC
-      LIMIT 1`,
-      [isFilteredToUser ? targetUserId : currentUserId, today]
-    );
+      LIMIT 1
+    `);
+    const eodRows = (eodRes.rows || eodRes) as any[];
 
     // 5. Recent EOD logs history (last 7 days)
-    const eodHistoryRes = await pool.query(
-      `SELECT 
+    const eodHistoryRes = await db.execute<any>(sql`
+      SELECT 
         id,
         log_date as "logDate",
         completed_summary as "completedSummary",
@@ -513,17 +514,17 @@ export const myWorkController = {
         hours_spent as "hoursSpent",
         created_at as "createdAt"
       FROM daily_eod_logs
-      WHERE user_id = $1
+      WHERE user_id = ${eodUserId}
       ORDER BY log_date DESC
-      LIMIT 7`,
-      [isFilteredToUser ? targetUserId : currentUserId]
-    );
+      LIMIT 7
+    `);
+    const eodHistoryRows = (eodHistoryRes.rows || eodHistoryRes) as any[];
 
     // 6. If caller is Admin or Super Admin, fetch Team Members for workspace switcher
     let teamMembers: any[] = [];
     if (isAdminOrSuperAdmin) {
-      const teamRes = await pool.query(
-        `SELECT 
+      const teamRes = await db.execute<any>(sql`
+        SELECT 
           u.id,
           u.name,
           u.username,
@@ -532,40 +533,59 @@ export const myWorkController = {
           u.designation,
           d.name as "departmentName",
           d.color as "departmentColor",
-          COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED', 'CHANGES_REQUESTED', 'SUBMITTED_FOR_REVIEW'))::int as "activeTasksCount",
+          COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED', 'CHANGES_REQUESTED', 'SUBMITTED_FOR_REVIEW') OR (t.status IS NOT NULL AND t.status != 'COMPLETED'))::int as "activeTasksCount",
           COUNT(DISTINCT l.id)::int as "assignedLeadsCount"
         FROM users u
         LEFT JOIN team_departments d ON u.department_id = d.id
-        LEFT JOIN tasks t ON (t.assignee_id = u.id OR t.project_id IN (SELECT id FROM projects WHERE lead_id = u.id))
+        LEFT JOIN (
+          SELECT 
+            t.id, 
+            t.status,
+            t.assignee_id,
+            t.reporter_id,
+            t.project_id,
+            t.sub_project_id,
+            p.lead_id as project_lead_id,
+            p.created_by_id as project_created_by_id,
+            sp.lead_id as sub_project_lead_id
+          FROM tasks t
+          LEFT JOIN projects p ON t.project_id = p.id
+          LEFT JOIN sub_projects sp ON t.sub_project_id = sp.id
+          WHERE (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
+        ) t ON (
+          t.assignee_id = u.id 
+          OR t.reporter_id = u.id 
+          OR t.project_lead_id = u.id 
+          OR t.project_created_by_id = u.id 
+          OR t.sub_project_lead_id = u.id
+        )
         LEFT JOIN leads l ON l.assigned_to_user_id = u.id
         WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
         GROUP BY u.id, d.name, d.color
         ORDER BY 
           CASE WHEN u.role = 'SUPER_ADMIN' THEN 1 WHEN u.role = 'ADMIN' THEN 2 ELSE 3 END,
-          u.name ASC`
-      );
-      teamMembers = teamRes.rows;
+          u.name ASC
+      `);
+      teamMembers = (teamRes.rows || teamRes) as any[];
     }
 
     // 7. Calculate Aggregated Metrics
-    const allLeads = leadsRes.rows;
-
-    const activeTasks = allTasks.filter((t) =>
+    const activeTasks = allTasks.filter((t: any) =>
       ["TODO", "IN_PROGRESS", "BLOCKED", "CHANGES_REQUESTED", "SUBMITTED_FOR_REVIEW"].includes(t.status)
     );
-    const blockedTasks = allTasks.filter((t) => t.status === "BLOCKED");
-    const completedTasks = allTasks.filter((t) => t.status === "COMPLETED");
+    const blockedTasks = allTasks.filter((t: any) => t.status === "BLOCKED");
+    const completedTasks = allTasks.filter((t: any) => t.status === "COMPLETED");
 
     const now = new Date();
     const overdueTasks = allTasks.filter(
-      (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== "COMPLETED"
+      (t: any) => t.dueDate && new Date(t.dueDate) < now && t.status !== "COMPLETED"
     );
 
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
     const callbacksDueToday = allLeads.filter(
-      (l) =>
+      (l: any) =>
         l.nextCallAt &&
         new Date(l.nextCallAt) <= endOfToday &&
         !["CONVERTED", "LOST", "JUNK", "NOT_A_LEAD"].includes(l.status)
@@ -574,7 +594,7 @@ export const myWorkController = {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const completedThisWeek = allTasks.filter(
-      (t) => t.completedAt && new Date(t.completedAt) >= sevenDaysAgo
+      (t: any) => t.completedAt && new Date(t.completedAt) >= sevenDaysAgo
     );
 
     res.json({
@@ -593,14 +613,14 @@ export const myWorkController = {
           completedThisWeekCount: completedThisWeek.length,
           assignedLeadsCount: allLeads.length,
           callbacksDueTodayCount: callbacksDueToday.length,
-          hasSubmittedTodayEod: eodRes.rows.length > 0,
+          hasSubmittedTodayEod: eodRows.length > 0,
           projectsCount: myProjects.length,
         },
         projects: myProjects,
         tasks: allTasks,
         leads: allLeads,
-        todayEod: eodRes.rows[0] || null,
-        eodHistory: eodHistoryRes.rows,
+        todayEod: eodRows[0] || null,
+        eodHistory: eodHistoryRows,
         teamMembers,
       },
     });

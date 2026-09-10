@@ -1,5 +1,5 @@
-import { db, pool } from "../db";
-import { eq, and, desc, asc, ilike, sql, or, inArray } from "drizzle-orm";
+import { db } from "../db";
+import { eq, and, desc, asc, ilike, sql, or, inArray, count } from "drizzle-orm";
 import {
   tasks,
   taskSubtasks,
@@ -149,16 +149,16 @@ export const tasksService = {
     let subtaskStats: Record<string, { total: number; completed: number }> = {};
 
     if (taskIds.length > 0) {
-      const subRes = await pool.query(
-        `SELECT task_id, 
+      const subRes = await db.execute<any>(sql`
+        SELECT task_id, 
                 COUNT(*)::int as total, 
                 COUNT(*) FILTER (WHERE is_completed = TRUE)::int as completed 
          FROM task_subtasks 
-         WHERE task_id = ANY($1::varchar[])
-         GROUP BY task_id`,
-        [taskIds]
-      );
-      for (const s of subRes.rows) {
+         WHERE task_id IN (${sql.join(taskIds.map(id => sql`${id}`), sql`, `)})
+         GROUP BY task_id
+      `);
+      const subRows = (subRes.rows || subRes) as any[];
+      for (const s of subRows) {
         subtaskStats[s.task_id] = {
           total: Number(s.total),
           completed: Number(s.completed),
@@ -418,11 +418,11 @@ export const tasksService = {
   async addSubtask(taskId: string, title: string): Promise<any> {
     if (!title || !title.trim()) throw new ValidationError("Subtask title is required");
 
-    const countRes = await pool.query(
-      "SELECT COUNT(*) FROM task_subtasks WHERE task_id = $1",
-      [taskId]
-    );
-    const orderIndex = Number(countRes.rows[0].count) + 1;
+    const countRes = await db
+      .select({ count: count(taskSubtasks.id) })
+      .from(taskSubtasks)
+      .where(eq(taskSubtasks.taskId, taskId));
+    const orderIndex = Number(countRes[0]?.count || 0) + 1;
 
     await db.insert(taskSubtasks).values({
       taskId,
@@ -566,7 +566,7 @@ export const tasksService = {
     totalActiveCount: number;
     completedTodayCount: number;
   }> {
-    const countsRes = await pool.query(`
+    const countsRes = await db.execute<any>(sql`
       SELECT 
         COUNT(*) FILTER (WHERE status = 'SUBMITTED_FOR_REVIEW')::int as review_queue,
         COUNT(*) FILTER (WHERE status = 'BLOCKED')::int as blocked,
@@ -577,7 +577,7 @@ export const tasksService = {
     `);
 
     // Calculate idle members (staff/members with 0 tasks currently in progress/todo)
-    const idleRes = await pool.query(`
+    const idleRes = await db.execute<any>(sql`
       SELECT COUNT(*)::int as idle_count
       FROM users u
       WHERE u.role IN ('MEMBER', 'ADMIN') 
@@ -589,14 +589,16 @@ export const tasksService = {
         );
     `);
 
-    const row = countsRes.rows[0];
+    const cRows = (countsRes.rows || countsRes) as any[];
+    const iRows = (idleRes.rows || idleRes) as any[];
+    const row = cRows[0];
     return {
-      reviewQueueCount: Number(row.review_queue) || 0,
-      blockedCount: Number(row.blocked) || 0,
-      overdueCount: Number(row.overdue) || 0,
-      totalActiveCount: Number(row.total_active) || 0,
-      completedTodayCount: Number(row.completed_today) || 0,
-      idleMembersCount: Number(idleRes.rows[0]?.idle_count) || 0,
+      reviewQueueCount: Number(row?.review_queue) || 0,
+      blockedCount: Number(row?.blocked) || 0,
+      overdueCount: Number(row?.overdue) || 0,
+      totalActiveCount: Number(row?.total_active) || 0,
+      completedTodayCount: Number(row?.completed_today) || 0,
+      idleMembersCount: Number(iRows[0]?.idle_count) || 0,
     };
   },
 };
