@@ -4,6 +4,9 @@ import { projectsService } from "../services/projects.service";
 export const projectsController = {
   async listProjects(req: Request, res: Response) {
     try {
+      const user = (req as any).user;
+      const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+
       const { departmentId, leadId, status, priority, search, limit, offset, includeHidden, onlyHidden } = req.query;
       const data = await projectsService.listProjects({
         departmentId: departmentId as string,
@@ -11,8 +14,8 @@ export const projectsController = {
         status: status as any,
         priority: priority as any,
         search: search as string,
-        includeHidden: includeHidden === "true" || includeHidden === "1",
-        onlyHidden: onlyHidden === "true" || onlyHidden === "1",
+        includeHidden: isAdmin && (includeHidden === "true" || includeHidden === "1"),
+        onlyHidden: isAdmin && (onlyHidden === "true" || onlyHidden === "1"),
         limit: limit ? Number(limit) : undefined,
         offset: offset ? Number(offset) : undefined,
       });
@@ -26,8 +29,14 @@ export const projectsController = {
   async getProjectById(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const user = (req as any).user;
+      const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+
       const data = await projectsService.getProjectById(id);
       if (!data) {
+        return res.status(404).json({ success: false, error: "Project not found" });
+      }
+      if (data.isHidden && !isAdmin) {
         return res.status(404).json({ success: false, error: "Project not found" });
       }
       return res.json({ success: true, data });
@@ -40,8 +49,14 @@ export const projectsController = {
   async getProjectHierarchy(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const user = (req as any).user;
+      const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+
       const data = await projectsService.getProjectHierarchy(id);
       if (!data) {
+        return res.status(404).json({ success: false, error: "Project not found" });
+      }
+      if (data.project?.isHidden && !isAdmin) {
         return res.status(404).json({ success: false, error: "Project not found" });
       }
       return res.json({ success: true, data });
