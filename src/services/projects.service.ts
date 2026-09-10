@@ -279,6 +279,7 @@ export const projectsService = {
     createdById?: string;
     status?: any;
     priority?: any;
+    isHidden?: boolean;
     startDate?: string;
     targetEndDate?: string;
     color?: string;
@@ -303,6 +304,7 @@ export const projectsService = {
         createdById: data.createdById || null,
         status: data.status || "ACTIVE",
         priority: data.priority || "MEDIUM",
+        isHidden: data.isHidden !== undefined ? Boolean(data.isHidden) : false,
         startDate: data.startDate && String(data.startDate).trim() ? new Date(data.startDate).toISOString() : null,
         targetEndDate: data.targetEndDate && String(data.targetEndDate).trim() ? new Date(data.targetEndDate).toISOString() : null,
         color: data.color || "#6366f1",
@@ -338,6 +340,7 @@ export const projectsService = {
       leadId?: string;
       status?: any;
       priority?: any;
+      isHidden?: boolean;
       startDate?: string;
       targetEndDate?: string;
       completedAt?: string;
@@ -361,6 +364,7 @@ export const projectsService = {
       }
     }
     if (data.priority !== undefined) updatePayload.priority = data.priority;
+    if (data.isHidden !== undefined) updatePayload.isHidden = Boolean(data.isHidden);
     if (data.startDate !== undefined) updatePayload.startDate = data.startDate || null;
     if (data.targetEndDate !== undefined) updatePayload.targetEndDate = data.targetEndDate || null;
     if (data.completedAt !== undefined) updatePayload.completedAt = data.completedAt || null;
