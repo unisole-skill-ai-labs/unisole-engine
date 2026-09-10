@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
-import { db, pool } from "../db";
-import { eq, desc, asc, and, ilike } from "drizzle-orm";
+import { db } from "../db";
+import { eq, desc, asc, and, ilike, sql } from "drizzle-orm";
 import {
   users,
   tasks,
@@ -20,8 +20,13 @@ import { usersRepository } from "../repositories/users.repository";
 export const teamService = {
   // ==================== TEAM DIRECTORY & MEMBERS ====================
   async listMembers(search?: string): Promise<any[]> {
-    const res = await pool.query(
-      `SELECT 
+    const searchTerm = search && search.trim() ? `%${search.trim()}%` : null;
+    const searchFilter = searchTerm
+      ? sql`AND (${users.name} ILIKE ${searchTerm} OR ${users.username} ILIKE ${searchTerm} OR ${users.phone} ILIKE ${searchTerm})`
+      : sql``;
+
+    const res = await db.execute<any>(sql`
+      SELECT 
         u.id,
         u.name,
         u.username,
@@ -65,15 +70,15 @@ export const teamService = {
       )
       LEFT JOIN leads l ON l.assigned_to_user_id = u.id
       WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES')
-        AND ($1::text IS NULL OR u.name ILIKE $1 OR u.username ILIKE $1 OR u.phone ILIKE $1)
+        ${searchFilter}
       GROUP BY u.id, d.name, d.color
       ORDER BY 
         CASE WHEN u.role = 'SUPER_ADMIN' THEN 1 WHEN u.role = 'ADMIN' THEN 2 WHEN u.role = 'SALES' THEN 3 ELSE 4 END,
-        u.name ASC`,
-      [search ? `%${search.trim()}%` : null]
-    );
+        u.name ASC
+    `);
 
-    return res.rows.map((row) => ({
+    const rows = (res.rows || res) as any[];
+    return rows.map((row) => ({
       ...row,
       permissions: (row.metadata && Array.isArray(row.metadata.permissions)) ? row.metadata.permissions : [],
     }));
@@ -98,11 +103,13 @@ export const teamService = {
     }
 
     const cleanUsername = data.username.trim().toLowerCase();
-    const existingUser = await pool.query(
-      "SELECT id FROM users WHERE LOWER(username) = $1 LIMIT 1",
-      [cleanUsername]
-    );
-    if (existingUser.rows && existingUser.rows.length > 0) {
+    const existingUser = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`LOWER(${users.username}) = ${cleanUsername}`)
+      .limit(1);
+
+    if (existingUser.length > 0) {
       throw new ConflictError(`Username "${cleanUsername}" is already in use`);
     }
 
@@ -122,22 +129,18 @@ export const teamService = {
     };
 
     const newId = `usr_staff_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    await pool.query(
-      `INSERT INTO users (id, username, password, phone, name, role, department_id, designation, metadata, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [
-        newId,
-        cleanUsername,
-        hashedPassword,
-        cleanPhone,
-        data.name.trim(),
-        (data.role as any) || "MEMBER",
-        data.departmentId || null,
-        data.designation ? data.designation.trim() : null,
-        JSON.stringify(metadataObj),
-        data.isActive !== false,
-      ]
-    );
+    await db.insert(users).values({
+      id: newId,
+      username: cleanUsername,
+      password: hashedPassword,
+      phone: cleanPhone,
+      name: data.name.trim(),
+      role: (data.role as any) || "MEMBER",
+      departmentId: data.departmentId || null,
+      designation: data.designation ? data.designation.trim() : null,
+      metadata: metadataObj,
+      isActive: data.isActive !== false,
+    });
 
     const members = await this.listMembers();
     return members.find((m) => m.id === newId) || { id: newId, username: cleanUsername, name: data.name };
@@ -163,11 +166,13 @@ export const teamService = {
 
     if (data.username && data.username.trim()) {
       const cleanUsername = data.username.trim().toLowerCase();
-      const existingUser = await pool.query(
-        "SELECT id FROM users WHERE LOWER(username) = $1 AND id != $2 LIMIT 1",
-        [cleanUsername, userId]
-      );
-      if (existingUser.rows && existingUser.rows.length > 0) {
+      const existingUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(sql`LOWER(${users.username}) = ${cleanUsername}`, sql`${users.id} != ${userId}`))
+        .limit(1);
+
+      if (existingUser.length > 0) {
         throw new ConflictError(`Username "${cleanUsername}" is already in use`);
       }
     }
@@ -235,7 +240,7 @@ export const teamService = {
 
   // ==================== DEPARTMENTS ====================
   async listDepartments(): Promise<any[]> {
-    const res = await pool.query(`
+    const res = await db.execute<any>(sql`
       SELECT 
         d.id,
         d.name,
@@ -254,7 +259,8 @@ export const teamService = {
       GROUP BY d.id, u.name
       ORDER BY d.name ASC;
     `);
-    return res.rows;
+    const rows = (res.rows || res) as any[];
+    return rows;
   },
 
   async createDepartment(data: {
@@ -436,10 +442,12 @@ export const teamService = {
     const logDate = data.logDate || new Date().toISOString().split("T")[0];
 
     // Delete existing log for same user and date to allow update
-    await pool.query("DELETE FROM daily_eod_logs WHERE user_id = $1 AND log_date = $2", [
-      userId,
-      logDate,
-    ]);
+    await db.delete(dailyEodLogs).where(
+      and(
+        eq(dailyEodLogs.userId, userId),
+        sql`${dailyEodLogs.logDate} = ${logDate}`
+      )
+    );
 
     const [created] = await db
       .insert(dailyEodLogs)
@@ -457,9 +465,10 @@ export const teamService = {
 
   async listDailyEodLogs(date?: string, userId?: string): Promise<any[]> {
     const targetDate = date || new Date().toISOString().split("T")[0];
+    const userFilter = userId ? sql`AND e.user_id = ${userId}` : sql``;
 
-    const res = await pool.query(
-      `SELECT 
+    const res = await db.execute<any>(sql`
+      SELECT 
         e.id,
         e.user_id as "userId",
         u.name as "userName",
@@ -475,19 +484,19 @@ export const teamService = {
       FROM daily_eod_logs e
       JOIN users u ON e.user_id = u.id
       LEFT JOIN team_departments d ON u.department_id = d.id
-      WHERE e.log_date = $1
-        AND ($2::varchar IS NULL OR e.user_id = $2)
-      ORDER BY e.created_at DESC`,
-      [targetDate, userId || null]
-    );
+      WHERE e.log_date = ${targetDate}
+        ${userFilter}
+      ORDER BY e.created_at DESC
+    `);
 
-    return res.rows;
+    const rows = (res.rows || res) as any[];
+    return rows;
   },
 
   // ==================== EXECUTIVE COMPANY PROGRESS TELEMETRY ====================
   async getCompanyProgress(): Promise<any> {
     // 1. Overall Company Task Velocity Metrics
-    const companyStatsRes = await pool.query(`
+    const companyStatsRes = await db.execute<any>(sql`
       SELECT 
         COUNT(*)::int as total_tasks,
         COUNT(*) FILTER (WHERE status = 'COMPLETED')::int as completed_tasks,
@@ -500,7 +509,7 @@ export const teamService = {
         COUNT(*) FILTER (WHERE status = 'COMPLETED' AND completed_at >= NOW() - INTERVAL '30 days')::int as completed_this_month
       FROM tasks;
     `);
-    const cStats = companyStatsRes.rows[0];
+    const cStats = (companyStatsRes.rows || companyStatsRes)[0];
 
     const totalTasks = Number(cStats.total_tasks) || 0;
     const completedTasks = Number(cStats.completed_tasks) || 0;
@@ -516,7 +525,7 @@ export const teamService = {
     const companyCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     // 2. Department-by-Department Breakdown
-    const deptRes = await pool.query(`
+    const deptRes = await db.execute<any>(sql`
       SELECT 
         d.id,
         d.name,
@@ -539,7 +548,8 @@ export const teamService = {
       ORDER BY d.name ASC;
     `);
 
-    const departments = deptRes.rows.map((d: any) => {
+    const deptRows = (deptRes.rows || deptRes) as any[];
+    const departments = deptRows.map((d: any) => {
       const tot = Number(d.totalTasks) || 0;
       const comp = Number(d.completedTasks) || 0;
       const rate = tot > 0 ? Math.round((comp / tot) * 100) : 0;
@@ -557,7 +567,7 @@ export const teamService = {
     });
 
     // 3. Active Company Blockers (Fire-Drill List)
-    const blockersRes = await pool.query(`
+    const blockersRes = await db.execute<any>(sql`
       SELECT 
         t.id,
         t.title,
@@ -581,19 +591,26 @@ export const teamService = {
         CASE WHEN t.priority = 'URGENT' THEN 1 WHEN t.priority = 'HIGH' THEN 2 ELSE 3 END,
         t.updated_at DESC;
     `);
+    const activeBlockers = (blockersRes.rows || blockersRes) as any[];
 
     // 4. Standup Pulse for Today
     const today = new Date().toISOString().split("T")[0];
-    const totalStaffRes = await pool.query(
-      `SELECT id, name, phone, role, department_id as "departmentId" FROM users WHERE role IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES') AND is_active = TRUE`
-    );
-    const allStaff = totalStaffRes.rows;
+    const allStaff = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        phone: users.phone,
+        role: users.role,
+        departmentId: users.departmentId,
+      })
+      .from(users)
+      .where(and(sql`${users.role} IN ('MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES')`, eq(users.isActive, true)));
 
-    const submittedLogsRes = await pool.query(
-      `SELECT DISTINCT user_id FROM daily_eod_logs WHERE log_date = $1`,
-      [today]
-    );
-    const submittedUserIds = new Set(submittedLogsRes.rows.map((r: any) => r.user_id));
+    const submittedLogsRes = await db.execute<any>(sql`
+      SELECT DISTINCT user_id FROM daily_eod_logs WHERE log_date = ${today}
+    `);
+    const submittedUserRows = (submittedLogsRes.rows || submittedLogsRes) as any[];
+    const submittedUserIds = new Set(submittedUserRows.map((r: any) => r.user_id));
 
     const submittedCount = submittedUserIds.size;
     const totalStaffCount = allStaff.length;
@@ -635,14 +652,14 @@ export const teamService = {
         missingStaff,
       },
       departments,
-      activeBlockers: blockersRes.rows,
+      activeBlockers,
     };
   },
 
   // ==================== 360° MEMBER PERFORMANCE DOSSIER ====================
   async getMemberPerformance(memberId: string): Promise<any> {
-    const userRes = await pool.query(
-      `SELECT 
+    const userRes = await db.execute<any>(sql`
+      SELECT 
         u.id,
         u.name,
         u.phone,
@@ -656,19 +673,19 @@ export const teamService = {
         u.created_at as "createdAt"
       FROM users u
       LEFT JOIN team_departments d ON u.department_id = d.id
-      WHERE u.id = $1`,
-      [memberId]
-    );
+      WHERE u.id = ${memberId}
+    `);
+    const userRows = (userRes.rows || userRes) as any[];
 
-    if (userRes.rows.length === 0) {
+    if (userRows.length === 0) {
       throw new NotFoundError("Team member not found");
     }
 
-    const member = userRes.rows[0];
+    const member = userRows[0];
 
     // Task counts and SLA metrics
-    const statsRes = await pool.query(
-      `SELECT 
+    const statsRes = await db.execute<any>(sql`
+      SELECT 
         COUNT(DISTINCT t.id)::int as total_assigned,
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as completed_count,
         COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED', 'CHANGES_REQUESTED', 'SUBMITTED_FOR_REVIEW') OR (t.status IS NOT NULL AND t.status != 'COMPLETED'))::int as active_count,
@@ -682,11 +699,10 @@ export const teamService = {
       FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id
       LEFT JOIN sub_projects sp ON t.sub_project_id = sp.id
-      WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR p.created_by_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
-        AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)`,
-      [memberId]
-    );
-    const stats = statsRes.rows[0];
+      WHERE (t.assignee_id = ${memberId} OR p.lead_id = ${memberId} OR p.created_by_id = ${memberId} OR sp.lead_id = ${memberId} OR t.reporter_id = ${memberId})
+        AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
+    `);
+    const stats = (statsRes.rows || statsRes)[0];
 
     const totalAssigned = Number(stats.total_assigned) || 0;
     const completedCount = Number(stats.completed_count) || 0;
@@ -705,8 +721,8 @@ export const teamService = {
       : 100;
 
     // Daily Standup history (Last 30 days)
-    const eodRes = await pool.query(
-      `SELECT 
+    const eodRes = await db.execute<any>(sql`
+      SELECT 
         id,
         log_date as "logDate",
         completed_summary as "completedSummary",
@@ -715,13 +731,12 @@ export const teamService = {
         hours_spent as "hoursSpent",
         created_at as "createdAt"
       FROM daily_eod_logs
-      WHERE user_id = $1
+      WHERE user_id = ${memberId}
       ORDER BY log_date DESC
-      LIMIT 30`,
-      [memberId]
-    );
+      LIMIT 30
+    `);
 
-    const standupLogs = eodRes.rows;
+    const standupLogs = (eodRes.rows || eodRes) as any[];
     const standupCount = standupLogs.length;
 
     // Calculate Velocity Score (0 - 100)
@@ -744,8 +759,8 @@ export const teamService = {
     }
 
     // Recent Tasks
-    const tasksRes = await pool.query(
-      `SELECT 
+    const tasksRes = await db.execute<any>(sql`
+      SELECT 
         t.id,
         t.title,
         t.description,
@@ -767,15 +782,15 @@ export const teamService = {
       LEFT JOIN sub_projects sp ON t.sub_project_id = sp.id
       LEFT JOIN team_departments d ON t.department_id = d.id
       LEFT JOIN task_subtasks s ON s.task_id = t.id
-      WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR p.created_by_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
+      WHERE (t.assignee_id = ${memberId} OR p.lead_id = ${memberId} OR p.created_by_id = ${memberId} OR sp.lead_id = ${memberId} OR t.reporter_id = ${memberId})
         AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
       GROUP BY t.id, d.name, d.color
       ORDER BY 
         CASE WHEN t.status = 'BLOCKED' THEN 1 WHEN t.status = 'SUBMITTED_FOR_REVIEW' THEN 2 WHEN t.status IN ('TODO', 'IN_PROGRESS') THEN 3 ELSE 4 END,
         t.created_at DESC
-      LIMIT 25`,
-      [memberId]
-    );
+      LIMIT 25
+    `);
+    const tasksList = (tasksRes.rows || tasksRes) as any[];
 
     return {
       member,
@@ -795,14 +810,14 @@ export const teamService = {
         completedEstimatedHours,
         standupCount,
       },
-      tasks: tasksRes.rows,
+      tasks: tasksList,
       standupLogs,
     };
   },
 
   // ==================== PERFORMANCE LEADERBOARD & WORKLOAD MATRIX ====================
   async getLeaderboard(): Promise<any[]> {
-    const res = await pool.query(`
+    const res = await db.execute<any>(sql`
       SELECT 
         u.id,
         u.name,
@@ -829,7 +844,8 @@ export const teamService = {
       ORDER BY u.name ASC;
     `);
 
-    const membersWithScores = res.rows.map((m: any) => {
+    const rows = (res.rows || res) as any[];
+    const membersWithScores = rows.map((m: any) => {
       const completed = Number(m.completedTasks) || 0;
       const active = Number(m.activeTasks) || 0;
       const onTime = Number(m.onTimeTasks) || 0;
@@ -872,9 +888,9 @@ export const teamService = {
     });
 
     // Sort by Velocity Score descending
-    membersWithScores.sort((a, b) => b.velocityScore - a.velocityScore);
+    membersWithScores.sort((a: any, b: any) => b.velocityScore - a.velocityScore);
 
-    return membersWithScores.map((m, index) => ({
+    return membersWithScores.map((m: any, index: number) => ({
       ...m,
       rank: index + 1,
     }));
@@ -887,7 +903,7 @@ export const teamService = {
     const logs = await this.listDailyEodLogs(targetDate);
     const submittedUserIds = new Set(logs.map((l: any) => l.userId));
 
-    const staffRes = await pool.query(`
+    const staffRes = await db.execute<any>(sql`
       SELECT 
         u.id, 
         u.name, 
@@ -901,7 +917,7 @@ export const teamService = {
       WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
       ORDER BY u.name ASC
     `);
-    const allStaff = staffRes.rows;
+    const allStaff = (staffRes.rows || staffRes) as any[];
 
     const submitted = logs;
     const missing = allStaff.filter((s: any) => !submittedUserIds.has(s.id));
@@ -922,10 +938,15 @@ export const teamService = {
   },
 
   async nudgeMember(memberId: string, message?: string): Promise<any> {
-    const userRes = await pool.query(`SELECT id, name, phone FROM users WHERE id = $1`, [memberId]);
-    if (userRes.rows.length === 0) throw new NotFoundError("Member not found");
+    const userRes = await db
+      .select({ id: users.id, name: users.name, phone: users.phone })
+      .from(users)
+      .where(eq(users.id, memberId))
+      .limit(1);
 
-    const member = userRes.rows[0];
+    if (userRes.length === 0) throw new NotFoundError("Member not found");
+
+    const member = userRes[0];
     // In production, this can send SMS/WhatsApp or Socket alert. For now, we return receipt confirmation
     return {
       success: true,
