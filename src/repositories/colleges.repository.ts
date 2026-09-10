@@ -1,5 +1,5 @@
 import { eq, or, inArray, desc } from "drizzle-orm";
-import { db, pool } from "../db";
+import { db } from "../db";
 import {
   colleges,
   College,

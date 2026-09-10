@@ -1,4 +1,4 @@
-import { db, pool } from "../db";
+import { db } from "../db";
 import {
   projects,
   subProjects,
@@ -6,7 +6,7 @@ import {
   taskSubtasks,
   users,
 } from "../db/schema";
-import { eq, and, sql, asc } from "drizzle-orm";
+import { eq, and, sql, asc, count } from "drizzle-orm";
 import { NotFoundError, ValidationError } from "../errors";
 
 export const hierarchyService = {
@@ -69,11 +69,11 @@ export const hierarchyService = {
       .orderBy(asc(taskSubtasks.orderIndex));
 
     // Get order index for target task
-    const countRes = await pool.query(
-      "SELECT COUNT(*) FROM task_subtasks WHERE task_id = $1",
-      [targetTaskId]
-    );
-    let nextIndex = Number(countRes.rows[0].count) + 1;
+    const countRes = await db
+      .select({ count: count(taskSubtasks.id) })
+      .from(taskSubtasks)
+      .where(eq(taskSubtasks.taskId, targetTaskId));
+    let nextIndex = Number(countRes[0]?.count || 0) + 1;
 
     // Insert main task as subtask
     await db.insert(taskSubtasks).values({
