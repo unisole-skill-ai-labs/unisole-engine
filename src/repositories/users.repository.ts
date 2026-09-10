@@ -94,8 +94,8 @@ export const usersRepository = {
       const [user] = await tx.select().from(users).where(eq(users.id, id));
       if (!user) return null;
 
-      // 1. Delete payments belonging to this user
-      await tx.execute(sql`DELETE FROM payments WHERE user_id = ${id}`);
+      // 1. Delete payments belonging to this user or orders belonging to this user
+      await tx.execute(sql`DELETE FROM payments WHERE user_id = ${id} OR order_id IN (SELECT id FROM orders WHERE user_id = ${id})`);
 
       // 2. Delete enrollments belonging to this user
       await tx.execute(sql`DELETE FROM enrollments WHERE user_id = ${id}`);
@@ -128,8 +128,9 @@ export const usersRepository = {
       // 10. Clean up coupons created_by_id
       await tx.execute(sql`UPDATE coupons SET created_by_id = NULL WHERE created_by_id = ${id}`);
 
-      // 11. Clean up orders user_id
-      await tx.execute(sql`UPDATE orders SET user_id = NULL WHERE user_id = ${id}`);
+      // 11. Clean up orders and order items belonging to this user
+      await tx.execute(sql`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = ${id})`);
+      await tx.execute(sql`DELETE FROM orders WHERE user_id = ${id}`);
 
       // 12. Clean up leads references & call logs
       await tx.execute(sql`DELETE FROM lead_call_logs WHERE caller_user_id = ${id}`);

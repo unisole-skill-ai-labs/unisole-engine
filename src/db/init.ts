@@ -334,6 +334,10 @@ export async function initializeDatabase() {
         ALTER TABLE "public"."orders" ALTER COLUMN "discount_amount_paise" DROP NOT NULL;
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
+      DO $$ BEGIN
+        ALTER TABLE "public"."orders" ALTER COLUMN "user_id" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
       -- Ensure id and order_id columns are varchar(50) with correct defaults
       DO $$ BEGIN
         ALTER TABLE "public"."orders" ALTER COLUMN "id" TYPE varchar(50) USING id::varchar(50);
