@@ -17,14 +17,14 @@ export const myWorkController = {
     const requestedUserId = req.query.userId as string | undefined;
 
     // Scope determination:
-    // - Regular Member: always strictly filtered to current user.
+    // - Regular Member / Non-Admin: ALWAYS strictly filtered to current user (cannot view others or organization all).
     // - Admin / Super Admin:
-    //     - requestedUserId === "ALL": Organization-wide deliverables across all projects and members
-    //     - requestedUserId && requestedUserId !== "ALL": Specific member or admin workspace inspection
-    //     - !requestedUserId: Current admin's personal workspace
-    const isAllOrgMode = Boolean(isAdminOrSuperAdmin && requestedUserId === "ALL");
-    const isSpecificOtherMemberMode = Boolean(isAdminOrSuperAdmin && requestedUserId && requestedUserId !== "ALL");
-    const isFilteredToUser = !isAllOrgMode;
+    //     - If requestedUserId is a specific user ID (and not "ALL"): view that member's personal assigned workspace.
+    //     - If requestedUserId is "ALL" OR not provided / empty: view company-wide deliverables across all projects and members.
+    const isSpecificOtherMemberMode = Boolean(
+      isAdminOrSuperAdmin && requestedUserId && requestedUserId !== "ALL"
+    );
+    const isFilteredToUser = !isAdminOrSuperAdmin || isSpecificOtherMemberMode;
     const targetUserId = isSpecificOtherMemberMode ? requestedUserId! : currentUserId;
 
     // 1. Fetch Target User Profile
@@ -191,7 +191,7 @@ export const myWorkController = {
         LEFT JOIN users rep ON t.reporter_id = rep.id
         LEFT JOIN team_departments d ON t.department_id = d.id
         LEFT JOIN task_subtasks s ON s.task_id = t.id
-        WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
+        WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR p.created_by_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
           AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
         GROUP BY 
           t.id, 
@@ -359,9 +359,8 @@ export const myWorkController = {
           sp.id,
           sp.project_id as "projectId",
           sp.name,
-          sp.code,
+          sp.description,
           sp.status,
-          sp.priority,
           sp.lead_id as "leadId",
           lead.name as "leadName",
           COUNT(DISTINCT t.id)::int as "totalTasks",
@@ -371,7 +370,7 @@ export const myWorkController = {
         LEFT JOIN tasks t ON t.sub_project_id = sp.id
         WHERE sp.project_id = ANY($1::text[])
         GROUP BY sp.id, lead.name
-        ORDER BY sp.created_at ASC`,
+        ORDER BY sp.order_index ASC, sp.created_at ASC`,
         [projectIds]
       );
       for (const sp of spRes.rows) {
