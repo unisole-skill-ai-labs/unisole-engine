@@ -7,15 +7,18 @@ export const projectsController = {
       const user = (req as any).user;
       const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
 
-      const { departmentId, leadId, status, priority, search, limit, offset, includeHidden, onlyHidden } = req.query;
+      const { departmentId, leadId, memberId, status, priority, search, limit, offset, includeHidden, onlyHidden } = req.query;
       const data = await projectsService.listProjects({
         departmentId: departmentId as string,
         leadId: leadId as string,
+        memberId: (memberId || req.query.userId) as string,
         status: status as any,
         priority: priority as any,
         search: search as string,
         includeHidden: isAdmin && (includeHidden === "true" || includeHidden === "1"),
         onlyHidden: isAdmin && (onlyHidden === "true" || onlyHidden === "1"),
+        userId: user?.id,
+        userRole: user?.role,
         limit: limit ? Number(limit) : undefined,
         offset: offset ? Number(offset) : undefined,
       });
@@ -32,7 +35,7 @@ export const projectsController = {
       const user = (req as any).user;
       const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
 
-      const data = await projectsService.getProjectById(id);
+      const data = await projectsService.getProjectById(id, user?.id, user?.role);
       if (!data) {
         return res.status(404).json({ success: false, error: "Project not found" });
       }
@@ -51,8 +54,14 @@ export const projectsController = {
       const { id } = req.params;
       const user = (req as any).user;
       const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+      const { memberId, userId: queryUserId } = req.query;
 
-      const data = await projectsService.getProjectHierarchy(id);
+      const data = await projectsService.getProjectHierarchy(
+        id,
+        user?.id,
+        user?.role,
+        (memberId || queryUserId) as string
+      );
       if (!data) {
         return res.status(404).json({ success: false, error: "Project not found" });
       }

@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { db, pool } from "../db";
 import {
   projects,
   subProjects,
@@ -16,11 +16,14 @@ import { eq, desc, and, ilike, count, sql, asc, inArray } from "drizzle-orm";
 export interface ProjectListFilter {
   departmentId?: string;
   leadId?: string;
+  memberId?: string;
   status?: any;
   priority?: any;
   search?: string;
   includeHidden?: boolean;
   onlyHidden?: boolean;
+  userId?: string;
+  userRole?: string;
   limit?: number;
   offset?: number;
 }
@@ -28,12 +31,34 @@ export interface ProjectListFilter {
 export const projectsService = {
   async listProjects(filter: ProjectListFilter = {}) {
     const conditions = [];
+    const isAdmin = filter.userRole === "SUPER_ADMIN" || filter.userRole === "ADMIN";
 
-    // Filter hidden projects (Unless includeHidden or onlyHidden is explicitly requested)
+    // Filter hidden projects (Unless includeHidden or onlyHidden is explicitly requested by admin)
     if (filter.onlyHidden) {
       conditions.push(eq(projects.isHidden, true));
     } else if (!filter.includeHidden) {
       conditions.push(sql`(${projects.isHidden} = false OR ${projects.isHidden} IS NULL)`);
+    }
+
+    // Role-based visibility & Member filtering:
+    // If non-admin, strictly restrict to projects assigned to the user (lead, createdBy, or task assignee/reporter, or subproject lead)
+    if (!isAdmin && filter.userId) {
+      conditions.push(
+        sql`(${projects.leadId} = ${filter.userId} 
+          OR ${projects.createdById} = ${filter.userId}
+          OR ${projects.id} IN (SELECT DISTINCT project_id FROM tasks WHERE (assignee_id = ${filter.userId} OR reporter_id = ${filter.userId}) AND project_id IS NOT NULL)
+          OR ${projects.id} IN (SELECT DISTINCT project_id FROM sub_projects WHERE lead_id = ${filter.userId})
+        )`
+      );
+    } else if (isAdmin && filter.memberId && filter.memberId !== "ALL") {
+      // Admin filtering to a specific member/admin's assigned projects
+      conditions.push(
+        sql`(${projects.leadId} = ${filter.memberId} 
+          OR ${projects.createdById} = ${filter.memberId}
+          OR ${projects.id} IN (SELECT DISTINCT project_id FROM tasks WHERE (assignee_id = ${filter.memberId} OR reporter_id = ${filter.memberId}) AND project_id IS NOT NULL)
+          OR ${projects.id} IN (SELECT DISTINCT project_id FROM sub_projects WHERE lead_id = ${filter.memberId})
+        )`
+      );
     }
 
     if (filter.departmentId) {
@@ -151,7 +176,9 @@ export const projectsService = {
     });
   },
 
-  async getProjectById(id: string) {
+  async getProjectById(id: string, userId?: string, userRole?: string) {
+    const isAdmin = userRole === "SUPER_ADMIN" || userRole === "ADMIN";
+
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, id),
       with: {
@@ -190,6 +217,23 @@ export const projectsService = {
 
     if (!project) return null;
 
+    // Check if non-admin is authorized to view this project
+    if (!isAdmin && userId) {
+      const isLead = project.leadId === userId || project.createdById === userId;
+      const isSubProjectLead = (project.subProjects || []).some((sp: any) => sp.leadId === userId);
+      
+      if (!isLead && !isSubProjectLead) {
+        // Check if user has any assigned or reported tasks in this project
+        const assignedTaskRes = await pool.query(
+          `SELECT id FROM tasks WHERE project_id = $1 AND (assignee_id = $2 OR reporter_id = $2) LIMIT 1`,
+          [id, userId]
+        );
+        if (assignedTaskRes.rows.length === 0) {
+          return null; // Not authorized to access this project
+        }
+      }
+    }
+
     const taskStats = await db
       .select({
         totalTasks: count(tasks.id),
@@ -214,11 +258,13 @@ export const projectsService = {
     };
   },
 
-  async getProjectHierarchy(id: string) {
-    const project = await this.getProjectById(id);
+  async getProjectHierarchy(id: string, userId?: string, userRole?: string, memberId?: string) {
+    const project = await this.getProjectById(id, userId, userRole);
     if (!project) return null;
 
-    const projectTasks = await db.query.tasks.findMany({
+    const isAdmin = userRole === "SUPER_ADMIN" || userRole === "ADMIN";
+
+    let projectTasks = await db.query.tasks.findMany({
       where: eq(tasks.projectId, id),
       orderBy: [desc(tasks.createdAt)],
       with: {
@@ -228,6 +274,13 @@ export const projectsService = {
             name: true,
             phone: true,
             role: true,
+            designation: true,
+          },
+        },
+        reporter: {
+          columns: {
+            id: true,
+            name: true,
           },
         },
         subtasks: {
@@ -236,7 +289,57 @@ export const projectsService = {
       },
     });
 
-    const subProjectsEnriched = (project.subProjects || []).map((sp: any) => {
+    // Filter tasks based on role and member filter:
+    if (!isAdmin && userId) {
+      const isProjectLead = project.leadId === userId || project.createdById === userId;
+      if (!isProjectLead) {
+        // Non-admin who is not project lead only sees their assigned tasks or tasks in subprojects they lead
+        const ledSubProjectIds = new Set(
+          (project.subProjects || [])
+            .filter((sp: any) => sp.leadId === userId)
+            .map((sp: any) => sp.id)
+        );
+
+        projectTasks = projectTasks.filter(
+          (t: any) =>
+            t.assigneeId === userId ||
+            t.reporterId === userId ||
+            (t.subProjectId && ledSubProjectIds.has(t.subProjectId))
+        );
+      }
+    } else if (isAdmin && memberId && memberId !== "ALL") {
+      // Admin filtering to a specific team member
+      const ledSubProjectIds = new Set(
+        (project.subProjects || [])
+          .filter((sp: any) => sp.leadId === memberId)
+          .map((sp: any) => sp.id)
+      );
+
+      projectTasks = projectTasks.filter(
+        (t: any) =>
+          t.assigneeId === memberId ||
+          t.reporterId === memberId ||
+          (t.subProjectId && ledSubProjectIds.has(t.subProjectId))
+      );
+    }
+
+    let subProjectsList = project.subProjects || [];
+    if (!isAdmin && userId && project.leadId !== userId && project.createdById !== userId) {
+      // For non-admin, filter subprojects to only those they lead or have tasks in
+      subProjectsList = subProjectsList.filter((sp: any) => {
+        const isSpLead = sp.leadId === userId;
+        const hasTask = projectTasks.some((t: any) => t.subProjectId === sp.id);
+        return isSpLead || hasTask;
+      });
+    } else if (isAdmin && memberId && memberId !== "ALL") {
+      subProjectsList = subProjectsList.filter((sp: any) => {
+        const isSpLead = sp.leadId === memberId;
+        const hasTask = projectTasks.some((t: any) => t.subProjectId === sp.id);
+        return isSpLead || hasTask;
+      });
+    }
+
+    const subProjectsEnriched = subProjectsList.map((sp: any) => {
       const spTasks = projectTasks.filter((t: any) => t.subProjectId === sp.id);
       const totalSpTasks = spTasks.length;
       const completedSpTasks = spTasks.filter((t: any) => t.status === "COMPLETED").length;
@@ -246,6 +349,7 @@ export const projectsService = {
         ...sp,
         tasks: spTasks.map((t: any) => ({
           ...t,
+          subtasks: t.subtasks || [],
           subtasksCount: t.subtasks?.length || 0,
           subtasksCompleted: t.subtasks?.filter((st: any) => st.isCompleted).length || 0,
         })),
@@ -259,6 +363,7 @@ export const projectsService = {
       .filter((t: any) => !t.subProjectId)
       .map((t: any) => ({
         ...t,
+        subtasks: t.subtasks || [],
         subtasksCount: t.subtasks?.length || 0,
         subtasksCompleted: t.subtasks?.filter((st: any) => st.isCompleted).length || 0,
       }));
