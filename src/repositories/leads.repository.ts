@@ -580,6 +580,10 @@ export const leadsRepository = {
       updatedAt: new Date().toISOString(),
     };
 
+    if (data.notes && data.notes.trim()) {
+      updatePayload.notes = data.notes.trim();
+    }
+
     if (data.scheduledNextCallAt) {
       updatePayload.nextCallAt = data.scheduledNextCallAt;
     }
