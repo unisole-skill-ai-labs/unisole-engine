@@ -413,6 +413,7 @@ export async function initializeDatabase() {
         "created_by_id" varchar(50),
         "status" "public"."project_status" DEFAULT 'ACTIVE' NOT NULL,
         "priority" "public"."task_priority" DEFAULT 'MEDIUM' NOT NULL,
+        "is_hidden" boolean DEFAULT false NOT NULL,
         "start_date" timestamp with time zone,
         "target_end_date" timestamp with time zone,
         "completed_at" timestamp with time zone,
@@ -422,6 +423,9 @@ export async function initializeDatabase() {
         "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
         CONSTRAINT "uq_projects_code" UNIQUE("code")
       );
+
+      ALTER TABLE "public"."projects" ADD COLUMN IF NOT EXISTS "is_hidden" boolean DEFAULT false NOT NULL;
+      CREATE INDEX IF NOT EXISTS "idx_projects_is_hidden" ON "public"."projects" ("is_hidden");
 
       CREATE TABLE IF NOT EXISTS "public"."sub_projects" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('sproj_'::text || nextval('public.sub_projects_id_seq'::regclass)) NOT NULL,

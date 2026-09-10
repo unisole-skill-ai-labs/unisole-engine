@@ -19,6 +19,8 @@ export interface ProjectListFilter {
   status?: any;
   priority?: any;
   search?: string;
+  includeHidden?: boolean;
+  onlyHidden?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -26,6 +28,13 @@ export interface ProjectListFilter {
 export const projectsService = {
   async listProjects(filter: ProjectListFilter = {}) {
     const conditions = [];
+
+    // Filter hidden projects (Unless includeHidden or onlyHidden is explicitly requested)
+    if (filter.onlyHidden) {
+      conditions.push(eq(projects.isHidden, true));
+    } else if (!filter.includeHidden) {
+      conditions.push(sql`(${projects.isHidden} = false OR ${projects.isHidden} IS NULL)`);
+    }
 
     if (filter.departmentId) {
       conditions.push(eq(projects.departmentId, filter.departmentId));
@@ -49,7 +58,17 @@ export const projectsService = {
 
     const projectRecords = await db.query.projects.findMany({
       where: whereClause,
-      orderBy: [desc(projects.createdAt)],
+      orderBy: [
+        // Priority-wise sorting: URGENT (1) > HIGH (2) > MEDIUM (3) > LOW (4)
+        sql`CASE 
+          WHEN ${projects.priority} = 'URGENT' THEN 1 
+          WHEN ${projects.priority} = 'HIGH' THEN 2 
+          WHEN ${projects.priority} = 'MEDIUM' THEN 3 
+          WHEN ${projects.priority} = 'LOW' THEN 4 
+          ELSE 5 
+        END ASC`,
+        desc(projects.createdAt),
+      ],
       with: {
         department: true,
         lead: {

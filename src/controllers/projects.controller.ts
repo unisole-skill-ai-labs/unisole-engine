@@ -4,13 +4,15 @@ import { projectsService } from "../services/projects.service";
 export const projectsController = {
   async listProjects(req: Request, res: Response) {
     try {
-      const { departmentId, leadId, status, priority, search, limit, offset } = req.query;
+      const { departmentId, leadId, status, priority, search, limit, offset, includeHidden, onlyHidden } = req.query;
       const data = await projectsService.listProjects({
         departmentId: departmentId as string,
         leadId: leadId as string,
         status: status as any,
         priority: priority as any,
         search: search as string,
+        includeHidden: includeHidden === "true" || includeHidden === "1",
+        onlyHidden: onlyHidden === "true" || onlyHidden === "1",
         limit: limit ? Number(limit) : undefined,
         offset: offset ? Number(offset) : undefined,
       });
@@ -66,6 +68,19 @@ export const projectsController = {
   async updateProject(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const user = (req as any).user;
+      
+      // Admin-only check for toggling isHidden
+      if (req.body.isHidden !== undefined) {
+        const userRole = user?.role;
+        if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+          return res.status(403).json({
+            success: false,
+            error: "Only administrators can change project visibility / hide projects in WorkSole",
+          });
+        }
+      }
+
       const data = await projectsService.updateProject(id, req.body);
       return res.json({ success: true, data });
     } catch (error: any) {
