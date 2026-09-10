@@ -11,29 +11,30 @@ export const myWorkController = {
     }
 
     const currentUserId = req.user.id;
-    const isSuperAdmin = req.user.role === "SUPER_ADMIN";
-    const isAdminOrSuperAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
+    const userRole = String(req.user.role || "").toUpperCase();
+    const isSuperAdmin = userRole === "SUPER_ADMIN";
+    const isAdminOrSuperAdmin = userRole === "SUPER_ADMIN" || userRole === "ADMIN";
     const requestedUserId = req.query.userId as string | undefined;
 
-    // Both Super Admin & Admin can inspect other team members or view company-wide "ALL" mode
-    const isAllMode = isAdminOrSuperAdmin && requestedUserId === "ALL";
-    const effectiveUserId =
-      isAdminOrSuperAdmin && requestedUserId && requestedUserId !== "ALL"
-        ? requestedUserId
-        : currentUserId;
+    // For Admins: Default workspace (or 'ALL') shows full company deliverables across all active projects.
+    // If Admin selects a specific team member, filter to that member.
+    const isSpecificMemberMode = Boolean(isAdminOrSuperAdmin && requestedUserId && requestedUserId !== "ALL");
+    const isRegularMember = !isAdminOrSuperAdmin;
+    const isFilteredToUser = isSpecificMemberMode || isRegularMember;
+    const targetUserId = isSpecificMemberMode ? requestedUserId! : currentUserId;
 
     // 1. Fetch Target User Profile
     let targetUser: any;
     let targetUserPermissions: string[] = [];
 
-    if (isAllMode) {
+    if (!isFilteredToUser) {
       targetUser = {
         id: "ALL",
-        name: "All Team Members (Company-Wide)",
-        username: "all_team",
-        phone: "",
-        role: "ADMIN",
-        designation: "Full Organization Operations",
+        name: isAdminOrSuperAdmin ? `${req.user.name || "Admin"} (Full Operations)` : "Organization Operations",
+        username: req.user.username || "admin",
+        phone: req.user.phone || "",
+        role: req.user.role || "ADMIN",
+        designation: req.user.designation || "Operations & Project Deliverables",
         departmentId: null,
         departmentName: "All Departments",
         departmentColor: "#6366f1",
@@ -55,7 +56,7 @@ export const myWorkController = {
         FROM users u
         LEFT JOIN team_departments d ON u.department_id = d.id
         WHERE u.id = $1`,
-        [effectiveUserId]
+        [targetUserId]
       );
 
       if (userRes.rows.length === 0) {
@@ -71,7 +72,7 @@ export const myWorkController = {
 
     // 2. Fetch Tasks (with project, subproject, assignee, reporter)
     let tasksRes;
-    if (isAllMode) {
+    if (!isFilteredToUser) {
       tasksRes = await pool.query(
         `SELECT 
           t.id,
@@ -186,7 +187,7 @@ export const myWorkController = {
         LEFT JOIN users rep ON t.reporter_id = rep.id
         LEFT JOIN team_departments d ON t.department_id = d.id
         LEFT JOIN task_subtasks s ON s.task_id = t.id
-        WHERE (t.assignee_id = $1 OR p.lead_id = $1)
+        WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
           AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
         GROUP BY 
           t.id, 
@@ -213,7 +214,7 @@ export const myWorkController = {
           t.due_date ASC NULLS LAST,
           t.created_at DESC
         LIMIT 100`,
-        [effectiveUserId]
+        [targetUserId]
       );
     }
 
@@ -264,7 +265,7 @@ export const myWorkController = {
 
     // 2.5 Fetch Projects (Admins see ALL active projects; regular members see their assigned/led projects)
     let projectsRes;
-    if (isAdminOrSuperAdmin) {
+    if (!isFilteredToUser) {
       projectsRes = await pool.query(
         `SELECT 
           p.id,
@@ -299,7 +300,7 @@ export const myWorkController = {
             ELSE 4 
           END,
           p.created_at DESC`,
-        [isAllMode ? currentUserId : effectiveUserId]
+        [currentUserId]
       );
     } else {
       projectsRes = await pool.query(
@@ -326,8 +327,13 @@ export const myWorkController = {
         LEFT JOIN team_departments d ON p.department_id = d.id
         LEFT JOIN sub_projects sp ON sp.project_id = p.id
         LEFT JOIN tasks t ON t.project_id = p.id
-        WHERE (p.lead_id = $1 OR p.id IN (SELECT DISTINCT project_id FROM tasks WHERE assignee_id = $1 AND project_id IS NOT NULL))
-          AND (p.is_hidden = FALSE OR p.is_hidden IS NULL)
+        WHERE (
+          p.lead_id = $1 
+          OR p.created_by_id = $1
+          OR p.id IN (SELECT DISTINCT project_id FROM tasks WHERE (assignee_id = $1 OR reporter_id = $1) AND project_id IS NOT NULL)
+          OR p.id IN (SELECT DISTINCT project_id FROM sub_projects WHERE lead_id = $1)
+        )
+        AND (p.is_hidden = FALSE OR p.is_hidden IS NULL)
         GROUP BY p.id, lead.name, lead.phone, lead.role, lead.designation, d.name, d.color
         ORDER BY 
           CASE 
@@ -337,7 +343,7 @@ export const myWorkController = {
             ELSE 4 
           END,
           p.created_at DESC`,
-        [effectiveUserId]
+        [targetUserId]
       );
     }
 
@@ -394,7 +400,7 @@ export const myWorkController = {
 
     // 3. Fetch CRM Leads & Callbacks
     let leadsRes;
-    if (isAllMode) {
+    if (!isFilteredToUser) {
       leadsRes = await pool.query(
         `SELECT 
           l.id,
@@ -470,7 +476,7 @@ export const myWorkController = {
           l.next_call_at ASC NULLS LAST,
           l.updated_at DESC
         LIMIT 100`,
-        [effectiveUserId]
+        [targetUserId]
       );
     }
 
@@ -490,7 +496,7 @@ export const myWorkController = {
       WHERE user_id = $1 AND log_date = $2
       ORDER BY created_at DESC
       LIMIT 1`,
-      [isAllMode ? currentUserId : effectiveUserId, today]
+      [isFilteredToUser ? targetUserId : currentUserId, today]
     );
 
     // 5. Recent EOD logs history (last 7 days)
@@ -507,7 +513,7 @@ export const myWorkController = {
       WHERE user_id = $1
       ORDER BY log_date DESC
       LIMIT 7`,
-      [isAllMode ? currentUserId : effectiveUserId]
+      [isFilteredToUser ? targetUserId : currentUserId]
     );
 
     // 6. If caller is Admin or Super Admin, fetch Team Members for workspace switcher
@@ -527,7 +533,7 @@ export const myWorkController = {
           COUNT(DISTINCT l.id)::int as "assignedLeadsCount"
         FROM users u
         LEFT JOIN team_departments d ON u.department_id = d.id
-        LEFT JOIN tasks t ON t.assignee_id = u.id
+        LEFT JOIN tasks t ON (t.assignee_id = u.id OR t.project_id IN (SELECT id FROM projects WHERE lead_id = u.id))
         LEFT JOIN leads l ON l.assigned_to_user_id = u.id
         WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
         GROUP BY u.id, d.name, d.color
@@ -575,7 +581,7 @@ export const myWorkController = {
           ...targetUser,
           permissions: targetUserPermissions,
         },
-        isViewingOtherMember: effectiveUserId !== currentUserId,
+        isViewingOtherMember: isFilteredToUser && targetUserId !== currentUserId,
         metrics: {
           activeTasksCount: activeTasks.length,
           blockedTasksCount: blockedTasks.length,
