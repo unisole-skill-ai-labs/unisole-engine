@@ -411,6 +411,63 @@ export async function seedSystemData() {
     }
     console.log(`[Seed:System] Synchronized ${foundationalCourses.length} foundational courses across Groups 1-4 and AI Masterclass.`);
 
+    // 5. Seed Starter Promotional Discount Coupons
+    await pool.query(`
+      ALTER TABLE coupons ADD COLUMN IF NOT EXISTS applicable_item_ids jsonb DEFAULT '[]'::jsonb NOT NULL;
+    `);
+
+    const starterCoupons = [
+      {
+        code: "UNISOLE20",
+        description: "Official Campus Launch 20% Discount (All Courses)",
+        discountType: "PERCENTAGE",
+        discountValue: 20,
+        minOrderPaise: 0,
+        maxDiscountPaise: 200000,
+        maxUses: 1000,
+        applicableItemIds: [],
+        isActive: true,
+      },
+      {
+        code: "EARLYBIRD500",
+        description: "Early Bird Flat ₹500 Discount on Flagship Engineering & Analytics Tracks",
+        discountType: "FLAT",
+        discountValue: 50000,
+        minOrderPaise: 100000,
+        maxDiscountPaise: null,
+        maxUses: 500,
+        applicableItemIds: ["cs-p1", "cs-p2", "cs-p3", "mgmt-p1", "mgmt-p3"],
+        isActive: true,
+      },
+    ];
+
+    for (const cp of starterCoupons) {
+      await pool.query(
+        `INSERT INTO coupons (code, description, discount_type, discount_value, min_order_paise, max_discount_paise, max_uses, applicable_item_ids, is_active)
+         VALUES ($1, $2, $3::discount_type, $4, $5, $6, $7, $8, TRUE)
+         ON CONFLICT (code) DO UPDATE
+         SET description = EXCLUDED.description,
+             discount_type = EXCLUDED.discount_type,
+             discount_value = EXCLUDED.discount_value,
+             min_order_paise = EXCLUDED.min_order_paise,
+             max_discount_paise = EXCLUDED.max_discount_paise,
+             max_uses = EXCLUDED.max_uses,
+             applicable_item_ids = EXCLUDED.applicable_item_ids,
+             is_active = TRUE`,
+        [
+          cp.code,
+          cp.description,
+          cp.discountType,
+          cp.discountValue,
+          cp.minOrderPaise,
+          cp.maxDiscountPaise,
+          cp.maxUses,
+          JSON.stringify(cp.applicableItemIds),
+        ]
+      );
+    }
+    console.log(`[Seed:System] Synchronized ${starterCoupons.length} promotional discount coupons.`);
+
     console.log("[Seed:System] Foundational system data synchronization completed successfully.");
   } catch (err) {
     console.error("[Seed:System] Error seeding system data:", err);
