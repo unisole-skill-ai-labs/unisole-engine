@@ -359,9 +359,8 @@ export const myWorkController = {
           sp.id,
           sp.project_id as "projectId",
           sp.name,
-          sp.code,
+          sp.description,
           sp.status,
-          sp.priority,
           sp.lead_id as "leadId",
           lead.name as "leadName",
           COUNT(DISTINCT t.id)::int as "totalTasks",
@@ -371,7 +370,7 @@ export const myWorkController = {
         LEFT JOIN tasks t ON t.sub_project_id = sp.id
         WHERE sp.project_id = ANY($1::text[])
         GROUP BY sp.id, lead.name
-        ORDER BY sp.created_at ASC`,
+        ORDER BY sp.order_index ASC, sp.created_at ASC`,
         [projectIds]
       );
       for (const sp of spRes.rows) {
