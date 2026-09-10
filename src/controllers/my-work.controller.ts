@@ -235,7 +235,7 @@ export const myWorkController = {
           s.order_index as "orderIndex",
           s.created_at as "createdAt"
         FROM task_subtasks s
-        WHERE s.task_id = ANY(${taskIds}::text[])
+        WHERE s.task_id IN (${sql.join(taskIds.map(id => sql`${id}`), sql`, `)})
         ORDER BY s.order_index ASC, s.created_at ASC
       `);
       const subtaskRows = (subtasksRes.rows || subtasksRes) as any[];
@@ -367,7 +367,7 @@ export const myWorkController = {
         FROM sub_projects sp
         LEFT JOIN users lead ON sp.lead_id = lead.id
         LEFT JOIN tasks t ON t.sub_project_id = sp.id
-        WHERE sp.project_id = ANY(${projectIds}::text[])
+        WHERE sp.project_id IN (${sql.join(projectIds.map(id => sql`${id}`), sql`, `)})
         GROUP BY sp.id, lead.name
         ORDER BY sp.order_index ASC, sp.created_at ASC
       `);

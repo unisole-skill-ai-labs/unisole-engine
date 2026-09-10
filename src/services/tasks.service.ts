@@ -154,7 +154,7 @@ export const tasksService = {
                 COUNT(*)::int as total, 
                 COUNT(*) FILTER (WHERE is_completed = TRUE)::int as completed 
          FROM task_subtasks 
-         WHERE task_id = ANY(${taskIds}::varchar[])
+         WHERE task_id IN (${sql.join(taskIds.map(id => sql`${id}`), sql`, `)})
          GROUP BY task_id
       `);
       const subRows = (subRes.rows || subRes) as any[];
