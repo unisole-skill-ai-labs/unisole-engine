@@ -616,7 +616,29 @@ export async function initializeDatabase() {
       ON CONFLICT ("item_type", "item_id") DO UPDATE SET "title" = EXCLUDED."title", "description" = EXCLUDED."description", "price_paise" = EXCLUDED."price_paise", "mrp_paise" = EXCLUDED."mrp_paise";
     `);
 
-    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, and Polymorphic Enrollment tables verified successfully.");
+    // 9. Foundational Flagship Courses Sync & Legacy Clean
+    await execSqlSafe("seed_foundational_courses", `
+      DELETE FROM "public"."pathway_courses" WHERE "course_id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6');
+      DELETE FROM "public"."course_modules" WHERE "course_id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6');
+      DELETE FROM "public"."courses" WHERE "id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6');
+
+      INSERT INTO "public"."courses" ("id", "title", "slug", "short_description", "price_paise", "mrp_paise", "status", "metadata", "is_active")
+      VALUES 
+        ('crs_cs_ai', 'Computer Science & IT: Machine Learning & AI Engineering', 'cs-ai-engineering', 'BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT — Production AI engineering, full stack web systems, and MLOps deployment.', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "badge": "GROUP 01", "shortName": "CS & IT"}'::jsonb, TRUE),
+        ('crs_sci_math', 'Science & Mathematics: Scientific ML & Computational Intelligence', 'sciml-computational-math', 'Physics • Mathematics • Chemistry • Biology • Applied Science — Scientific computing, PINNs, and computational research.', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-2", "badge": "GROUP 02", "shortName": "Science & Math"}'::jsonb, TRUE),
+        ('crs_commerce_mgmt', 'Commerce, BBA & Management: Business Analytics & FinTech AI', 'business-analytics-fintech-ai', 'B.Com • BBA • M.Com • MBA • Economics • Finance — Business analytics, SQL, modern data engineering, FinTech systems, and AI-driven decisions.', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-3", "badge": "GROUP 03", "shortName": "Commerce & Finance"}'::jsonb, TRUE),
+        ('crs_humanities_arts', 'BA & Humanities: Applied AI for Professional Careers', 'applied-ai-humanities-careers', 'BA • Fine Arts • Education • Law • All Non-Tech Majors — Prompt engineering, AI research methods, automated content, executive communication.', 99900, 399900, 'PUBLISHED'::content_status, '{"group": "group-4", "badge": "GROUP 04", "shortName": "Humanities & Non-Tech"}'::jsonb, TRUE),
+        ('crs_ai_masterclass', 'AI Revolution & Agentic Engineering Masterclass (2-Hour Intensive)', 'ai-masterclass', 'Live 2-Hour Intensive Masterclass on Advanced AI Prompting & Context Engineering.', 3900, 99900, 'PUBLISHED'::content_status, '{"group": "workshop", "badge": "MASTERCLASS", "shortName": "AI Masterclass"}'::jsonb, TRUE)
+      ON CONFLICT ("slug") DO UPDATE SET
+        "title" = EXCLUDED."title",
+        "short_description" = EXCLUDED."short_description",
+        "price_paise" = EXCLUDED."price_paise",
+        "mrp_paise" = EXCLUDED."mrp_paise",
+        "status" = EXCLUDED."status",
+        "is_active" = TRUE;
+    `);
+
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses and Polymorphic Enrollment tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }
