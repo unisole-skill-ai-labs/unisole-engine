@@ -278,6 +278,7 @@ export async function initializeDatabase() {
         "max_uses" integer,
         "used_count" integer DEFAULT 0 NOT NULL,
         "applicable_item_types" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "applicable_item_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
         "valid_from" timestamp with time zone,
         "valid_until" timestamp with time zone,
         "is_active" boolean DEFAULT true NOT NULL,
@@ -285,6 +286,8 @@ export async function initializeDatabase() {
         "created_at" timestamp with time zone DEFAULT now() NOT NULL,
         "updated_at" timestamp with time zone DEFAULT now() NOT NULL
       );
+
+      ALTER TABLE "public"."coupons" ADD COLUMN IF NOT EXISTS "applicable_item_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;
 
       -- Ensure columns on existing offerings_pricing table if created in earlier runs
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "slug" varchar(220);

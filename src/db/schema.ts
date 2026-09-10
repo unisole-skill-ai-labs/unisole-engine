@@ -991,6 +991,7 @@ export const coupons = pgTable(
     maxUses: integer("max_uses"),
     usedCount: integer("used_count").default(0).notNull(),
     applicableItemTypes: jsonb("applicable_item_types").default(sql`'[]'::jsonb`).notNull(),
+    applicableItemIds: jsonb("applicable_item_ids").default(sql`'[]'::jsonb`).notNull(),
     validFrom: timestamp("valid_from", { withTimezone: true, mode: "string" }),
     validUntil: timestamp("valid_until", { withTimezone: true, mode: "string" }),
     isActive: boolean("is_active").default(true).notNull(),

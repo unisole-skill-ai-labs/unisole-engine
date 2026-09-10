@@ -164,18 +164,16 @@ export const pricingService = {
       };
     }
 
-    // Check item restrictions
+    // Check item restrictions (Type and specific Course/Item IDs)
     const applicableTypes = Array.isArray(coupon.applicableItemTypes) ? (coupon.applicableItemTypes as string[]) : [];
+    const applicableIds = Array.isArray((coupon as any).applicableItemIds) ? ((coupon as any).applicableItemIds as string[]) : [];
 
     let eligibleAmountPaise = 0;
-    if (applicableTypes.length === 0) {
-      eligibleAmountPaise = totalAmountPaise;
-    } else {
-      for (const item of items) {
-        const typeMatch = applicableTypes.includes(item.itemType);
-        if (typeMatch) {
-          eligibleAmountPaise += item.pricePaise;
-        }
+    for (const item of items) {
+      const typeMatch = applicableTypes.length === 0 || applicableTypes.includes(item.itemType);
+      const idMatch = applicableIds.length === 0 || applicableIds.includes(item.itemId);
+      if (typeMatch && idMatch) {
+        eligibleAmountPaise += item.pricePaise;
       }
     }
 
@@ -183,7 +181,9 @@ export const pricingService = {
       return {
         valid: false,
         discountAmountPaise: 0,
-        message: "This coupon is not applicable to the items in your cart",
+        message: applicableIds.length > 0
+          ? "This coupon is not valid for the selected course"
+          : "This coupon is not applicable to the items in your cart",
       };
     }
 
