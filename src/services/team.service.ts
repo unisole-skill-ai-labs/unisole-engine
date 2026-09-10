@@ -34,14 +34,35 @@ export const teamService = {
         d.color as "departmentColor",
         u.is_active as "isActive",
         u.created_at as "createdAt",
-        COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED', 'CHANGES_REQUESTED', 'SUBMITTED_FOR_REVIEW'))::int as "activeTasksCount",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED', 'CHANGES_REQUESTED', 'SUBMITTED_FOR_REVIEW') OR (t.status IS NOT NULL AND t.status != 'COMPLETED'))::int as "activeTasksCount",
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'BLOCKED')::int as "blockedTasksCount",
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'SUBMITTED_FOR_REVIEW')::int as "reviewTasksCount",
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasksCount",
         COUNT(DISTINCT l.id)::int as "assignedLeadsCount"
       FROM users u
       LEFT JOIN team_departments d ON u.department_id = d.id
-      LEFT JOIN tasks t ON (t.assignee_id = u.id OR t.project_id IN (SELECT id FROM projects WHERE lead_id = u.id))
+      LEFT JOIN (
+        SELECT 
+          t.id, 
+          t.status,
+          t.assignee_id,
+          t.reporter_id,
+          t.project_id,
+          t.sub_project_id,
+          p.lead_id as project_lead_id,
+          p.created_by_id as project_created_by_id,
+          sp.lead_id as sub_project_lead_id
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        LEFT JOIN sub_projects sp ON t.sub_project_id = sp.id
+        WHERE (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
+      ) t ON (
+        t.assignee_id = u.id 
+        OR t.reporter_id = u.id 
+        OR t.project_lead_id = u.id 
+        OR t.project_created_by_id = u.id 
+        OR t.sub_project_lead_id = u.id
+      )
       LEFT JOIN leads l ON l.assigned_to_user_id = u.id
       WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES')
         AND ($1::text IS NULL OR u.name ILIKE $1 OR u.username ILIKE $1 OR u.phone ILIKE $1)
@@ -648,18 +669,21 @@ export const teamService = {
     // Task counts and SLA metrics
     const statsRes = await pool.query(
       `SELECT 
-        COUNT(*)::int as total_assigned,
-        COUNT(*) FILTER (WHERE status = 'COMPLETED')::int as completed_count,
-        COUNT(*) FILTER (WHERE status IN ('TODO', 'IN_PROGRESS'))::int as active_count,
-        COUNT(*) FILTER (WHERE status = 'SUBMITTED_FOR_REVIEW')::int as review_count,
-        COUNT(*) FILTER (WHERE status = 'BLOCKED')::int as blocked_count,
-        COUNT(*) FILTER (WHERE status = 'CHANGES_REQUESTED')::int as changes_requested_count,
-        COUNT(*) FILTER (WHERE due_date < NOW() AND status NOT IN ('COMPLETED'))::int as overdue_count,
-        COUNT(*) FILTER (WHERE status = 'COMPLETED' AND (due_date IS NULL OR completed_at <= due_date + INTERVAL '4 hours'))::int as on_time_count,
-        COALESCE(SUM(estimated_hours), 0)::int as total_estimated_hours,
-        COALESCE(SUM(estimated_hours) FILTER (WHERE status = 'COMPLETED'), 0)::int as completed_estimated_hours
-      FROM tasks
-      WHERE assignee_id = $1`,
+        COUNT(DISTINCT t.id)::int as total_assigned,
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as completed_count,
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED', 'CHANGES_REQUESTED', 'SUBMITTED_FOR_REVIEW') OR (t.status IS NOT NULL AND t.status != 'COMPLETED'))::int as active_count,
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'SUBMITTED_FOR_REVIEW')::int as review_count,
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'BLOCKED')::int as blocked_count,
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'CHANGES_REQUESTED')::int as changes_requested_count,
+        COUNT(DISTINCT t.id) FILTER (WHERE t.due_date < NOW() AND t.status NOT IN ('COMPLETED'))::int as overdue_count,
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED' AND (t.due_date IS NULL OR t.completed_at <= t.due_date + INTERVAL '4 hours'))::int as on_time_count,
+        COALESCE(SUM(t.estimated_hours), 0)::int as total_estimated_hours,
+        COALESCE(SUM(t.estimated_hours) FILTER (WHERE t.status = 'COMPLETED'), 0)::int as completed_estimated_hours
+      FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      LEFT JOIN sub_projects sp ON t.sub_project_id = sp.id
+      WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR p.created_by_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
+        AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)`,
       [memberId]
     );
     const stats = statsRes.rows[0];
@@ -739,9 +763,12 @@ export const teamService = {
         COUNT(s.id)::int as "subtasksCount",
         COUNT(s.id) FILTER (WHERE s.is_completed = TRUE)::int as "subtasksCompleted"
       FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      LEFT JOIN sub_projects sp ON t.sub_project_id = sp.id
       LEFT JOIN team_departments d ON t.department_id = d.id
       LEFT JOIN task_subtasks s ON s.task_id = t.id
-      WHERE t.assignee_id = $1
+      WHERE (t.assignee_id = $1 OR p.lead_id = $1 OR p.created_by_id = $1 OR sp.lead_id = $1 OR t.reporter_id = $1)
+        AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
       GROUP BY t.id, d.name, d.color
       ORDER BY 
         CASE WHEN t.status = 'BLOCKED' THEN 1 WHEN t.status = 'SUBMITTED_FOR_REVIEW' THEN 2 WHEN t.status IN ('TODO', 'IN_PROGRESS') THEN 3 ELSE 4 END,
