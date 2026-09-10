@@ -1441,6 +1441,7 @@ export const projects = pgTable(
     createdById: varchar("created_by_id", { length: 50 }),
     status: projectStatus().default("ACTIVE").notNull(),
     priority: taskPriority().default("MEDIUM").notNull(),
+    isHidden: boolean("is_hidden").default(false).notNull(),
     startDate: timestamp("start_date", { withTimezone: true, mode: "string" }),
     targetEndDate: timestamp("target_end_date", { withTimezone: true, mode: "string" }),
     completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
@@ -1456,6 +1457,7 @@ export const projects = pgTable(
   (table) => [
     index("idx_projects_dept").using("btree", table.departmentId.asc().nullsLast()),
     index("idx_projects_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_projects_is_hidden").using("btree", table.isHidden.asc().nullsLast()),
     index("idx_projects_lead").using("btree", table.leadId.asc().nullsLast()),
     foreignKey({
       columns: [table.departmentId],

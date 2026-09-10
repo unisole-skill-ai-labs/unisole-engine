@@ -19,6 +19,8 @@ export interface ProjectListFilter {
   status?: any;
   priority?: any;
   search?: string;
+  includeHidden?: boolean;
+  onlyHidden?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -26,6 +28,13 @@ export interface ProjectListFilter {
 export const projectsService = {
   async listProjects(filter: ProjectListFilter = {}) {
     const conditions = [];
+
+    // Filter hidden projects (Unless includeHidden or onlyHidden is explicitly requested)
+    if (filter.onlyHidden) {
+      conditions.push(eq(projects.isHidden, true));
+    } else if (!filter.includeHidden) {
+      conditions.push(sql`(${projects.isHidden} = false OR ${projects.isHidden} IS NULL)`);
+    }
 
     if (filter.departmentId) {
       conditions.push(eq(projects.departmentId, filter.departmentId));
@@ -49,7 +58,17 @@ export const projectsService = {
 
     const projectRecords = await db.query.projects.findMany({
       where: whereClause,
-      orderBy: [desc(projects.createdAt)],
+      orderBy: [
+        // Priority-wise sorting: URGENT (1) > HIGH (2) > MEDIUM (3) > LOW (4)
+        sql`CASE 
+          WHEN ${projects.priority} = 'URGENT' THEN 1 
+          WHEN ${projects.priority} = 'HIGH' THEN 2 
+          WHEN ${projects.priority} = 'MEDIUM' THEN 3 
+          WHEN ${projects.priority} = 'LOW' THEN 4 
+          ELSE 5 
+        END ASC`,
+        desc(projects.createdAt),
+      ],
       with: {
         department: true,
         lead: {
@@ -260,6 +279,7 @@ export const projectsService = {
     createdById?: string;
     status?: any;
     priority?: any;
+    isHidden?: boolean;
     startDate?: string;
     targetEndDate?: string;
     color?: string;
@@ -284,6 +304,7 @@ export const projectsService = {
         createdById: data.createdById || null,
         status: data.status || "ACTIVE",
         priority: data.priority || "MEDIUM",
+        isHidden: data.isHidden !== undefined ? Boolean(data.isHidden) : false,
         startDate: data.startDate && String(data.startDate).trim() ? new Date(data.startDate).toISOString() : null,
         targetEndDate: data.targetEndDate && String(data.targetEndDate).trim() ? new Date(data.targetEndDate).toISOString() : null,
         color: data.color || "#6366f1",
@@ -319,6 +340,7 @@ export const projectsService = {
       leadId?: string;
       status?: any;
       priority?: any;
+      isHidden?: boolean;
       startDate?: string;
       targetEndDate?: string;
       completedAt?: string;
@@ -342,6 +364,7 @@ export const projectsService = {
       }
     }
     if (data.priority !== undefined) updatePayload.priority = data.priority;
+    if (data.isHidden !== undefined) updatePayload.isHidden = Boolean(data.isHidden);
     if (data.startDate !== undefined) updatePayload.startDate = data.startDate || null;
     if (data.targetEndDate !== undefined) updatePayload.targetEndDate = data.targetEndDate || null;
     if (data.completedAt !== undefined) updatePayload.completedAt = data.completedAt || null;
