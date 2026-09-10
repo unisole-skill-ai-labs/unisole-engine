@@ -16,14 +16,39 @@ export const pricingController = {
 
   // Public Coupon Validation
   validateCoupon: asyncHandler(async (req: Request, res: Response) => {
-    const { code, items, totalAmountPaise } = req.body;
+    const { code, items, totalAmountPaise, itemType, itemId, pricePaise } = req.body;
     if (!code) {
       throw new ValidationError("Coupon code is required");
     }
+
+    let itemsList = Array.isArray(items) ? [...items] : [];
+    let calcTotalPaise = totalAmountPaise || 0;
+
+    if (itemsList.length === 0 && (itemId || itemType)) {
+      const parsedItemType = (itemType || "course").toLowerCase();
+      let resolvedPricePaise = pricePaise || 0;
+      if (!resolvedPricePaise && itemId) {
+        try {
+          const effPricing = await pricingService.resolveItemPrice(parsedItemType as any, itemId);
+          resolvedPricePaise = effPricing.pricePaise;
+        } catch {
+          resolvedPricePaise = 0;
+        }
+      }
+      itemsList.push({
+        itemType: parsedItemType as any,
+        itemId: itemId || "",
+        pricePaise: resolvedPricePaise,
+      });
+      if (!calcTotalPaise) {
+        calcTotalPaise = resolvedPricePaise;
+      }
+    }
+
     const result = await pricingService.evaluateCoupon(
       code,
-      Array.isArray(items) ? items : [],
-      totalAmountPaise || 0
+      itemsList,
+      calcTotalPaise
     );
     res.json({
       success: true,

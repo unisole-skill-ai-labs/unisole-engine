@@ -168,10 +168,18 @@ export const pricingService = {
     const applicableTypes = Array.isArray(coupon.applicableItemTypes) ? (coupon.applicableItemTypes as string[]) : [];
     const applicableIds = Array.isArray((coupon as any).applicableItemIds) ? ((coupon as any).applicableItemIds as string[]) : [];
 
+    const itemTypesMatch = (couponType: string, itemType: string) => {
+      const c = (couponType || "").toLowerCase();
+      const i = (itemType || "").toLowerCase();
+      if (c === i) return true;
+      if ((c === "course" || c === "pathway") && (i === "course" || i === "pathway")) return true;
+      return false;
+    };
+
     let eligibleAmountPaise = 0;
     for (const item of items) {
-      const typeMatch = applicableTypes.length === 0 || applicableTypes.includes(item.itemType);
-      const idMatch = applicableIds.length === 0 || applicableIds.includes(item.itemId);
+      const typeMatch = applicableTypes.length === 0 || applicableTypes.some((t) => itemTypesMatch(t, item.itemType));
+      const idMatch = applicableIds.length === 0 || (item.itemId && applicableIds.includes(item.itemId));
       if (typeMatch && idMatch) {
         eligibleAmountPaise += item.pricePaise;
       }
