@@ -6,8 +6,14 @@ export const coursesController = {
   list: asyncHandler(async (_req: Request, res: Response) => {
     res.json(await coursesService.list());
   }),
+  listPublished: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await coursesService.listPublished());
+  }),
   getById: asyncHandler(async (req: Request, res: Response) => {
     res.json(await coursesService.getById(req.params.id));
+  }),
+  getBySlug: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await coursesService.getBySlug(req.params.slug || req.params.id));
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
     const created = await coursesService.create(req.body);
@@ -15,6 +21,9 @@ export const coursesController = {
   }),
   update: asyncHandler(async (req: Request, res: Response) => {
     res.json(await coursesService.update(req.params.id, req.body));
+  }),
+  delete: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await coursesService.delete(req.params.id));
   }),
   attachModule: asyncHandler(async (req: Request, res: Response) => {
     await coursesService.attachModule(req.params.id, req.body.moduleId, req.body.position);

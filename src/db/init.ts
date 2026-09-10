@@ -207,6 +207,12 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_payments_order" ON "public"."payments" ("order_id");
     `);
 
+    await execSqlSafe("courses_alterations", `
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "price_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "mrp_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+    `);
+
     // 5. Commercial Orders, Pricing Catalog & Coupons Tables
     await execSqlSafe("orders_tables", `
       CREATE TABLE IF NOT EXISTS "public"."orders" (
@@ -272,6 +278,7 @@ export async function initializeDatabase() {
         "max_uses" integer,
         "used_count" integer DEFAULT 0 NOT NULL,
         "applicable_item_types" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "applicable_item_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
         "valid_from" timestamp with time zone,
         "valid_until" timestamp with time zone,
         "is_active" boolean DEFAULT true NOT NULL,
@@ -279,6 +286,8 @@ export async function initializeDatabase() {
         "created_at" timestamp with time zone DEFAULT now() NOT NULL,
         "updated_at" timestamp with time zone DEFAULT now() NOT NULL
       );
+
+      ALTER TABLE "public"."coupons" ADD COLUMN IF NOT EXISTS "applicable_item_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;
 
       -- Ensure columns on existing offerings_pricing table if created in earlier runs
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "slug" varchar(220);
@@ -610,7 +619,48 @@ export async function initializeDatabase() {
       ON CONFLICT ("item_type", "item_id") DO UPDATE SET "title" = EXCLUDED."title", "description" = EXCLUDED."description", "price_paise" = EXCLUDED."price_paise", "mrp_paise" = EXCLUDED."mrp_paise";
     `);
 
-    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, and Polymorphic Enrollment tables verified successfully.");
+    // 9. Foundational Flagship Courses Sync & Legacy Clean
+    await execSqlSafe("seed_foundational_courses", `
+      DELETE FROM "public"."pathway_courses" WHERE "course_id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts');
+      DELETE FROM "public"."course_modules" WHERE "course_id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts');
+      DELETE FROM "public"."courses" WHERE "id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts');
+
+      INSERT INTO "public"."courses" ("id", "title", "slug", "short_description", "price_paise", "mrp_paise", "status", "metadata", "is_active")
+      VALUES 
+        ('cs-p1', 'Machine Learning Engineering in Production', 'cs-p1', 'End-to-end ML engineering: data pipelines, deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG architectures.', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-p1", "badge": "GROUP 01 • PATHWAY 01", "shortName": "CS & IT: ML Engineering"}'::jsonb, TRUE),
+        ('cs-p2', 'Full Stack Web Development (AI-Powered)', 'cs-p2', 'Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI capabilities like document Q&A and chatbots.', 149900, 699900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-p2", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Full Stack Web"}'::jsonb, TRUE),
+        ('cs-p3', 'Complete Machine Learning + Full Stack', 'cs-p3', 'Comprehensive dual curriculum merging Machine Learning, Deep Learning, and MLOps with full-stack React, Node.js, and cloud systems.', 399900, 1499900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-p3", "badge": "GROUP 01 • PATHWAY 03", "shortName": "CS & IT: Dual Track ML + Web"}'::jsonb, TRUE),
+        ('cs-common', 'AI Entrepreneurship & Innovation', 'cs-common', 'Structured incubator track teaching students how to convert AI technical capability into validated commercial products and startups.', 59900, 299900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-common", "badge": "GROUP 01 • WEEKEND", "shortName": "CS & IT: AI Entrepreneurship"}'::jsonb, TRUE),
+        ('sci-p1', 'Scientific Machine Learning & AI for Science', 'sci-p1', 'Combines mathematical principles with modern scientific computing, differential equations, and Physics-Informed Neural Networks (PINNs).', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-2", "pathwayId": "sci-p1", "badge": "GROUP 02 • PATHWAY 01", "shortName": "Science & Math: SciML & AI"}'::jsonb, TRUE),
+        ('sci-p2', 'Mathematics + AI / Computational Intelligence', 'sci-p2', 'Rigorous mathematics-oriented pathway focusing on mathematical proofs, optimization theory, statistical learning, and computational algorithms.', 150000, 599900, 'PUBLISHED'::content_status, '{"group": "group-2", "pathwayId": "sci-p2", "badge": "GROUP 02 • PATHWAY 02", "shortName": "Science & Math: Computational Math"}'::jsonb, TRUE),
+        ('mgmt-p1', 'Business Analytics & Data Engineering', 'mgmt-p1', 'Equips business students with advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-3", "pathwayId": "mgmt-p1", "badge": "GROUP 03 • PATHWAY 01", "shortName": "Commerce: Business Analytics"}'::jsonb, TRUE),
+        ('mgmt-p2', 'AI in Finance & FinTech Systems', 'mgmt-p2', 'Explores digital banking, financial modeling, credit risk scoring, fraud detection algorithms, and responsible AI in finance.', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-3", "pathwayId": "mgmt-p2", "badge": "GROUP 03 • PATHWAY 02", "shortName": "Commerce: FinTech & Finance AI"}'::jsonb, TRUE),
+        ('mgmt-p3', 'Complete Business AI Pathway', 'mgmt-p3', 'Comprehensive dual-track program merging Business Analytics, SQL & modern Data Engineering with FinTech AI, credit scoring, fraud risk intelligence, and executive BI dashboards.', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-3", "pathwayId": "mgmt-p3", "badge": "GROUP 03 • PATHWAY 03", "shortName": "Commerce: Dual Track Business AI"}'::jsonb, TRUE),
+        ('mgmt-common', 'AI Entrepreneurship & Business Innovation', 'mgmt-common', 'Learn how to launch AI-enabled business services, SaaS tools, SME automation platforms, and investor pitch decks.', 59900, 299900, 'PUBLISHED'::content_status, '{"group": "group-3", "pathwayId": "mgmt-common", "badge": "GROUP 03 • WEEKEND", "shortName": "Commerce: AI Entrepreneurship"}'::jsonb, TRUE),
+        ('arts-p1', 'Applied AI for Humanities, Research & Careers', 'arts-p1', 'Elite professional program: prompt engineering, AI research methods, automated content, executive communication, and career mastery.', 99900, 399900, 'PUBLISHED'::content_status, '{"group": "group-4", "pathwayId": "arts-p1", "badge": "GROUP 04 • PATHWAY 01", "shortName": "Humanities: Applied AI"}'::jsonb, TRUE),
+        ('ai-masterclass', 'AI Revolution & Agentic Engineering Masterclass (2-Hour Intensive)', 'ai-masterclass', 'Live 2-Hour Intensive Masterclass on Advanced AI Prompting & Context Engineering.', 3900, 99900, 'PUBLISHED'::content_status, '{"group": "workshop", "pathwayId": "ai-masterclass", "badge": "MASTERCLASS", "shortName": "AI Masterclass"}'::jsonb, TRUE)
+      ON CONFLICT ("slug") DO UPDATE SET
+        "title" = EXCLUDED."title",
+        "short_description" = EXCLUDED."short_description",
+        "price_paise" = EXCLUDED."price_paise",
+        "mrp_paise" = EXCLUDED."mrp_paise",
+        "status" = EXCLUDED."status",
+        "metadata" = EXCLUDED."metadata",
+        "is_active" = TRUE;
+
+      INSERT INTO "public"."coupons" ("code", "description", "discount_type", "discount_value", "min_order_paise", "max_discount_paise", "max_uses", "applicable_item_ids", "is_active")
+      VALUES 
+        ('UNISOLE20', 'Official Campus Launch 20% Discount (All Courses)', 'PERCENTAGE'::discount_type, 20, 0, 200000, 1000, '[]'::jsonb, TRUE),
+        ('EARLYBIRD500', 'Early Bird Flat ₹500 Discount on Flagship Engineering & Analytics Tracks', 'FLAT'::discount_type, 50000, 100000, NULL, 500, '["cs-p1", "cs-p2", "cs-p3", "mgmt-p1", "mgmt-p3"]'::jsonb, TRUE)
+      ON CONFLICT ("code") DO UPDATE SET
+        "description" = EXCLUDED."description",
+        "discount_type" = EXCLUDED."discount_type",
+        "discount_value" = EXCLUDED."discount_value",
+        "applicable_item_ids" = EXCLUDED."applicable_item_ids",
+        "is_active" = TRUE;
+    `);
+
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses, Promotional Coupons and Polymorphic Enrollment tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }

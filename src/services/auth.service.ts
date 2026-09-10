@@ -437,7 +437,19 @@ export const authService = {
     sessionId?: string;
     metadata?: Record<string, any>;
   }) {
-    // Seamlessly forward to login without requiring or checking OTP
+    const { phone, otp } = body;
+    if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
+      throw new ValidationError("Mobile number is required");
+    }
+    if (!otp || typeof otp !== "string" || otp.trim().length === 0) {
+      throw new ValidationError("Verification code is required");
+    }
+
+    const isValid = await otpService.verifyOtp(phone, otp);
+    if (!isValid) {
+      throw new ValidationError("Invalid or expired verification code. Please check and try again.");
+    }
+
     return this.login(body);
   },
 

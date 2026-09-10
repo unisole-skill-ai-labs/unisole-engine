@@ -8,6 +8,8 @@ adminCoursesRouter.get("/", coursesController.list);
 adminCoursesRouter.get("/:id", coursesController.getById);
 adminCoursesRouter.post("/", validateBody({ required: ["title", "slug"] }), coursesController.create);
 adminCoursesRouter.put("/:id", coursesController.update);
+adminCoursesRouter.patch("/:id", coursesController.update);
+adminCoursesRouter.delete("/:id", coursesController.delete);
 
 // Modules
 adminCoursesRouter.post("/:id/modules", validateBody({ required: ["moduleId", "position"] }), coursesController.attachModule);

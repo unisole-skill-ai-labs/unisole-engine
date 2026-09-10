@@ -114,7 +114,7 @@ export class HttpWebhookDeliveryProvider implements OtpDeliveryProvider {
 }
 
 /**
- * 3. Fast2SMS Provider (Plug & Play Indian DLT SMS Gateway)
+ * 3. Fast2SMS Provider (WhatsApp & SMS OTP Gateway)
  */
 export class Fast2SMSDeliveryProvider implements OtpDeliveryProvider {
   name = "FAST2SMS";
@@ -127,6 +127,50 @@ export class Fast2SMSDeliveryProvider implements OtpDeliveryProvider {
   async deliver(payload: OtpDeliveryPayload): Promise<OtpDeliveryResult> {
     try {
       const cleanPhone = payload.phone.replace(/\D/g, "").slice(-10);
+
+      // 1. WhatsApp Delivery Attempt if requested
+      if (payload.channel === "WHATSAPP") {
+        try {
+          const messageId = process.env.FAST2SMS_WHATSAPP_MESSAGE_ID;
+          const waPayload: any = {
+            numbers: cleanPhone,
+            variables_values: payload.otp,
+          };
+          if (messageId) {
+            waPayload.message_id = parseInt(messageId, 10) || messageId;
+          } else {
+            waPayload.message = `Your Unisole verification code is ${payload.otp}. Valid for 10 minutes.`;
+          }
+
+          const waRes = await fetch("https://www.fast2sms.com/dev/whatsapp", {
+            method: "POST",
+            headers: {
+              authorization: this.apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(waPayload),
+          });
+
+          const waData: any = await waRes.json().catch(() => ({}));
+          if (
+            waData.return === true ||
+            waData.status_code === 200 ||
+            (Array.isArray(waData.message) && waData.message.length > 0)
+          ) {
+            return {
+              success: true,
+              provider: "FAST2SMS_WHATSAPP",
+              messageId: waData.request_id || waData.id || `wa_${Date.now()}`,
+              rawResponse: waData,
+            };
+          }
+          console.warn("[Fast2SMS] WhatsApp response notice, falling back to SMS:", waData);
+        } catch (waErr) {
+          console.warn("[Fast2SMS] WhatsApp error, falling back to SMS OTP:", waErr);
+        }
+      }
+
+      // 2. Fast2SMS Bulk V2 OTP Route (SMS Fallback / Native OTP Route)
       const res = await fetch("https://www.fast2sms.com/dev/bulkV2", {
         method: "POST",
         headers: {
@@ -140,8 +184,8 @@ export class Fast2SMSDeliveryProvider implements OtpDeliveryProvider {
         }),
       });
 
-      const data: any = await res.json();
-      if (!data.return) {
+      const data: any = await res.json().catch(() => ({}));
+      if (!data.return && data.status_code !== 200) {
         return {
           success: false,
           provider: this.name,
@@ -153,7 +197,7 @@ export class Fast2SMSDeliveryProvider implements OtpDeliveryProvider {
       return {
         success: true,
         provider: this.name,
-        messageId: data.request_id,
+        messageId: data.request_id || `sms_${Date.now()}`,
         rawResponse: data,
       };
     } catch (err: any) {
@@ -177,17 +221,18 @@ class OtpDeliveryManager {
   }
 
   private resolveProvider(): OtpDeliveryProvider {
-    const providerName = (process.env.OTP_PROVIDER || "MOCK").toUpperCase();
+    const fast2smsKey = process.env.FAST2SMS_API_KEY;
+    const providerName = (process.env.OTP_PROVIDER || "").toUpperCase();
+
+    if (fast2smsKey || providerName === "FAST2SMS") {
+      return new Fast2SMSDeliveryProvider(fast2smsKey || "");
+    }
 
     if (providerName === "WEBHOOK" && process.env.OTP_WEBHOOK_URL) {
       return new HttpWebhookDeliveryProvider(
         process.env.OTP_WEBHOOK_URL,
         process.env.OTP_WEBHOOK_KEY
       );
-    }
-
-    if (providerName === "FAST2SMS" && process.env.FAST2SMS_API_KEY) {
-      return new Fast2SMSDeliveryProvider(process.env.FAST2SMS_API_KEY);
     }
 
     // Default Mock Provider

@@ -1,6 +1,7 @@
 import { pricingRepository } from "../repositories/pricing.repository";
 import { couponsRepository } from "../repositories/coupons.repository";
 import { pathwaysRepository } from "../repositories/pathways.repository";
+import { coursesRepository } from "../repositories/courses.repository";
 import { OfferingPricing, Coupon, ItemType, DiscountType, NewOfferingPricing, NewCoupon } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 
@@ -23,7 +24,7 @@ export interface CouponEvaluation {
 export const pricingService = {
   /**
    * Resolve live pricing for a specific item.
-   * Checks dynamic offerings_pricing first, then falls back to catalog tables (e.g. pathways).
+   * Checks dynamic offerings_pricing first, then falls back to catalog tables (courses / pathways).
    */
   async resolveItemPrice(itemType: ItemType, itemId: string): Promise<ResolvedPrice> {
     // 1. Check dynamic offerings pricing table
@@ -39,7 +40,22 @@ export const pricingService = {
       };
     }
 
-    // 2. Fallbacks based on itemType
+    // 2. Check courses table directly
+    if (itemType === "COURSE" || itemType === "WORKSHOP" || itemType === "PROGRAM") {
+      const course = await coursesRepository.getBySlugOrId(itemId);
+      if (course && course.isActive && course.pricePaise > 0) {
+        return {
+          itemType: (itemType as ItemType),
+          itemId: course.id,
+          title: course.title,
+          pricePaise: course.pricePaise,
+          mrpPaise: course.mrpPaise || course.pricePaise * 3 || 99900,
+          currency: "INR",
+        };
+      }
+    }
+
+    // 3. Fallbacks based on itemType
     if (itemType === "PATHWAY") {
       const pathway = await pathwaysRepository.getById(itemId);
       if (pathway && pathway.isActive && pathway.pricePaise > 0) {
@@ -80,7 +96,20 @@ export const pricingService = {
       }
     }
 
-    if (itemType === "WORKSHOP" && (itemId === "AI_MASTERCLASS_2026" || itemId === "DEFAULT")) {
+    if (itemType === "WORKSHOP" && (itemId === "AI_MASTERCLASS_2026" || itemId === "DEFAULT" || itemId === "ai-masterclass")) {
+      // Check if ai-masterclass is in courses table
+      const mcCourse = await coursesRepository.getBySlugOrId("ai-masterclass");
+      if (mcCourse && mcCourse.isActive && mcCourse.pricePaise > 0) {
+        return {
+          itemType: "WORKSHOP",
+          itemId: "AI_MASTERCLASS_2026",
+          title: mcCourse.title,
+          pricePaise: mcCourse.pricePaise,
+          mrpPaise: mcCourse.mrpPaise || 99900,
+          currency: "INR",
+        };
+      }
+
       return {
         itemType: "WORKSHOP",
         itemId: "AI_MASTERCLASS_2026",
@@ -135,18 +164,24 @@ export const pricingService = {
       };
     }
 
-    // Check item restrictions
+    // Check item restrictions (Type and specific Course/Item IDs)
     const applicableTypes = Array.isArray(coupon.applicableItemTypes) ? (coupon.applicableItemTypes as string[]) : [];
+    const applicableIds = Array.isArray((coupon as any).applicableItemIds) ? ((coupon as any).applicableItemIds as string[]) : [];
+
+    const itemTypesMatch = (couponType: string, itemType: string) => {
+      const c = (couponType || "").toLowerCase();
+      const i = (itemType || "").toLowerCase();
+      if (c === i) return true;
+      if ((c === "course" || c === "pathway") && (i === "course" || i === "pathway")) return true;
+      return false;
+    };
 
     let eligibleAmountPaise = 0;
-    if (applicableTypes.length === 0) {
-      eligibleAmountPaise = totalAmountPaise;
-    } else {
-      for (const item of items) {
-        const typeMatch = applicableTypes.includes(item.itemType);
-        if (typeMatch) {
-          eligibleAmountPaise += item.pricePaise;
-        }
+    for (const item of items) {
+      const typeMatch = applicableTypes.length === 0 || applicableTypes.some((t) => itemTypesMatch(t, item.itemType));
+      const idMatch = applicableIds.length === 0 || (item.itemId && applicableIds.includes(item.itemId));
+      if (typeMatch && idMatch) {
+        eligibleAmountPaise += item.pricePaise;
       }
     }
 
@@ -154,7 +189,9 @@ export const pricingService = {
       return {
         valid: false,
         discountAmountPaise: 0,
-        message: "This coupon is not applicable to the items in your cart",
+        message: applicableIds.length > 0
+          ? "This coupon is not valid for the selected course"
+          : "This coupon is not applicable to the items in your cart",
       };
     }
 
