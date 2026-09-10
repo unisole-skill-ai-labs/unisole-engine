@@ -20,6 +20,8 @@ export interface ProjectListFilter {
   status?: any;
   priority?: any;
   search?: string;
+  hasBlockers?: boolean;
+  hasReview?: boolean;
   includeHidden?: boolean;
   onlyHidden?: boolean;
   userId?: string;
@@ -72,6 +74,16 @@ export const projectsService = {
     }
     if (filter.priority) {
       conditions.push(eq(projects.priority, filter.priority));
+    }
+    if (filter.hasBlockers) {
+      conditions.push(
+        sql`${projects.id} IN (SELECT DISTINCT project_id FROM tasks WHERE status = 'BLOCKED' AND project_id IS NOT NULL)`
+      );
+    }
+    if (filter.hasReview) {
+      conditions.push(
+        sql`${projects.id} IN (SELECT DISTINCT project_id FROM tasks WHERE status = 'SUBMITTED_FOR_REVIEW' AND project_id IS NOT NULL)`
+      );
     }
     if (filter.search) {
       conditions.push(

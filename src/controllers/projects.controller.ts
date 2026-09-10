@@ -7,7 +7,7 @@ export const projectsController = {
       const user = (req as any).user;
       const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
 
-      const { departmentId, leadId, memberId, status, priority, search, limit, offset, includeHidden, onlyHidden } = req.query;
+      const { departmentId, leadId, memberId, status, priority, search, hasBlockers, hasReview, limit, offset, includeHidden, onlyHidden } = req.query;
       const data = await projectsService.listProjects({
         departmentId: departmentId as string,
         leadId: leadId as string,
@@ -15,6 +15,8 @@ export const projectsController = {
         status: status as any,
         priority: priority as any,
         search: search as string,
+        hasBlockers: hasBlockers === "true" || hasBlockers === "1",
+        hasReview: hasReview === "true" || hasReview === "1",
         includeHidden: isAdmin && (includeHidden === "true" || includeHidden === "1"),
         onlyHidden: isAdmin && (onlyHidden === "true" || onlyHidden === "1"),
         userId: user?.id,
