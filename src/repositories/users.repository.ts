@@ -106,9 +106,10 @@ export const usersRepository = {
       // 4. Delete task comments
       await tx.execute(sql`DELETE FROM task_comments WHERE user_id = ${id}`);
 
-      // 5. Clean up tasks assignee / reporter
+      // 5. Clean up tasks assignee / reporter / subtasks
       await tx.execute(sql`UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ${id}`);
       await tx.execute(sql`UPDATE tasks SET reporter_id = NULL WHERE reporter_id = ${id}`);
+      await tx.execute(sql`UPDATE task_subtasks SET completed_by_id = NULL WHERE completed_by_id = ${id}`);
 
       // 6. Clean up task templates created_by
       await tx.execute(sql`UPDATE task_templates SET created_by_id = NULL WHERE created_by_id = ${id}`);
@@ -116,10 +117,30 @@ export const usersRepository = {
       // 7. Clean up team departments lead_id
       await tx.execute(sql`UPDATE team_departments SET lead_id = NULL WHERE lead_id = ${id}`);
 
-      // 8. Clean up presentations created_by_id
+      // 8. Clean up projects & sub-projects
+      await tx.execute(sql`UPDATE projects SET lead_id = NULL WHERE lead_id = ${id}`);
+      await tx.execute(sql`UPDATE projects SET created_by_id = NULL WHERE created_by_id = ${id}`);
+      await tx.execute(sql`UPDATE sub_projects SET lead_id = NULL WHERE lead_id = ${id}`);
+
+      // 9. Clean up presentations created_by_id
       await tx.execute(sql`UPDATE presentations SET created_by_id = NULL WHERE created_by_id = ${id}`);
 
-      // 9. Clean up presentation leads and OTP verifications
+      // 10. Clean up coupons created_by_id
+      await tx.execute(sql`UPDATE coupons SET created_by_id = NULL WHERE created_by_id = ${id}`);
+
+      // 11. Clean up orders user_id
+      await tx.execute(sql`UPDATE orders SET user_id = NULL WHERE user_id = ${id}`);
+
+      // 12. Clean up leads references & call logs
+      await tx.execute(sql`DELETE FROM lead_call_logs WHERE caller_user_id = ${id}`);
+      await tx.execute(sql`UPDATE leads SET user_id = NULL WHERE user_id = ${id}`);
+      await tx.execute(sql`UPDATE leads SET assigned_to_user_id = NULL WHERE assigned_to_user_id = ${id}`);
+      await tx.execute(sql`UPDATE leads SET created_by_id = NULL WHERE created_by_id = ${id}`);
+
+      // 13. Clean up IAPT registrations
+      await tx.execute(sql`DELETE FROM iapt_nain_registrations WHERE user_id = ${id}`);
+
+      // 14. Clean up presentation leads and OTP verifications
       if (user.phone) {
         await tx.execute(sql`DELETE FROM presentation_leads WHERE user_id = ${id} OR phone = ${user.phone}`);
         await tx.execute(sql`DELETE FROM otp_verifications WHERE phone = ${user.phone}`);
@@ -127,7 +148,7 @@ export const usersRepository = {
         await tx.execute(sql`DELETE FROM presentation_leads WHERE user_id = ${id}`);
       }
 
-      // 10. Delete the user record
+      // 15. Delete the user record
       const [deleted] = await tx.delete(users).where(eq(users.id, id)).returning();
       return deleted ?? null;
     });
