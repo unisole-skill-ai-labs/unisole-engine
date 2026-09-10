@@ -7,14 +7,24 @@ export const coursesService = {
     return coursesRepository.list();
   },
 
+  async listPublished(): Promise<Course[]> {
+    return coursesRepository.listPublished();
+  },
+
   async getById(id: string): Promise<Course> {
     const course = await coursesRepository.getById(id);
     if (!course) throw new NotFoundError("Course not found");
     return course;
   },
 
+  async getBySlug(slug: string): Promise<Course> {
+    const course = await coursesRepository.getBySlugOrId(slug);
+    if (!course) throw new NotFoundError("Course not found");
+    return course;
+  },
+
   async create(body: Record<string, unknown>): Promise<Course> {
-    const { title, slug, shortDescription, description } = body as any;
+    const { title, slug, shortDescription, description, pricePaise, mrpPaise, metadata, status, isActive } = body as any;
     if (!title || !slug) throw new ValidationError("title and slug are required");
 
     const existing = await coursesRepository.getBySlug(slug);
@@ -25,7 +35,11 @@ export const coursesService = {
       slug,
       shortDescription: shortDescription || null,
       description: description || null,
-      status: "DRAFT",
+      pricePaise: Number(pricePaise) || 0,
+      mrpPaise: Number(mrpPaise) || 0,
+      metadata: metadata || {},
+      status: (status as any) || "PUBLISHED",
+      isActive: isActive !== undefined ? Boolean(isActive) : true,
     });
   },
 
@@ -38,6 +52,9 @@ export const coursesService = {
     if (body.slug !== undefined) data.slug = body.slug as string;
     if (body.shortDescription !== undefined) data.shortDescription = body.shortDescription as string;
     if (body.description !== undefined) data.description = body.description as string;
+    if (body.pricePaise !== undefined) data.pricePaise = Number(body.pricePaise);
+    if (body.mrpPaise !== undefined) data.mrpPaise = Number(body.mrpPaise);
+    if (body.metadata !== undefined) data.metadata = body.metadata as Record<string, unknown>;
     if (body.status !== undefined) {
       const status = body.status as string;
       if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");
@@ -51,6 +68,14 @@ export const coursesService = {
     const updated = await coursesRepository.update(id, data);
     if (!updated) throw new NotFoundError("Course not found");
     return updated;
+  },
+
+  async delete(id: string): Promise<Course> {
+    const existing = await coursesRepository.getById(id);
+    if (!existing) throw new NotFoundError("Course not found");
+    const removed = await coursesRepository.remove(id);
+    if (!removed) throw new NotFoundError("Course not found");
+    return removed;
   },
 
   async attachModule(courseId: string, moduleId: string, position: number): Promise<void> {

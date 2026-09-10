@@ -125,6 +125,130 @@ export async function seedSystemData() {
     );
     console.log(`[Seed:System] Synchronized flagship deck: AI Campus Deck (${UNISOLE_AI_CAMPUS_DECK_SLIDES.length} slides)`);
 
+    // 4. Seed / Sync Foundational Courses (4 Stream Tracks + AI Masterclass)
+    const foundationalCourses = [
+      {
+        id: "crs_cs_ai",
+        title: "Computer Science & IT: Machine Learning & AI Engineering",
+        slug: "cs-ai-engineering",
+        short_description: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT — Production AI engineering, full stack web systems, and MLOps deployment.",
+        price_paise: 299900,
+        mrp_paise: 999900,
+        status: "PUBLISHED",
+        metadata: {
+          group: "group-1",
+          badge: "GROUP 01",
+          shortName: "CS & IT",
+          target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
+          duration: "3-6 Months",
+          level: "Intermediate",
+          roles: ["Machine Learning Engineer", "Full Stack AI Developer", "MLOps Engineer", "AI Solutions Architect"],
+          tools: ["Python", "PyTorch", "FastAPI", "Docker", "React", "MongoDB", "LangChain", "DuckDB"]
+        }
+      },
+      {
+        id: "crs_sci_math",
+        title: "Science & Mathematics: Scientific ML & Computational Intelligence",
+        slug: "sciml-computational-math",
+        short_description: "Physics • Mathematics • Chemistry • Biology • Applied Science — Scientific computing, PINNs, and computational research.",
+        price_paise: 200000,
+        mrp_paise: 699900,
+        status: "PUBLISHED",
+        metadata: {
+          group: "group-2",
+          badge: "GROUP 02",
+          shortName: "Science & Math",
+          target: "Physics • Mathematics • Chemistry • Biology • Applied Science",
+          duration: "3 Months",
+          level: "Undergraduate / Postgraduate",
+          roles: ["Scientific Computing Specialist", "Computational Data Scientist", "SciML Researcher", "Quantitative Analyst"],
+          tools: ["Python", "SciPy", "NumPy", "PINNs", "Differential Equations", "SymPy", "Matplotlib"]
+        }
+      },
+      {
+        id: "crs_commerce_mgmt",
+        title: "Commerce, BBA & Management: Business Analytics & FinTech AI",
+        slug: "business-analytics-fintech-ai",
+        short_description: "B.Com • BBA • M.Com • MBA • Economics • Finance — Business analytics, SQL, modern data engineering, FinTech systems, and AI-driven decisions.",
+        price_paise: 200000,
+        mrp_paise: 699900,
+        status: "PUBLISHED",
+        metadata: {
+          group: "group-3",
+          badge: "GROUP 03",
+          shortName: "Commerce & Finance",
+          target: "B.Com • BBA • M.Com • MBA • Economics • Finance",
+          duration: "3-6 Months",
+          level: "Undergraduate / Postgraduate",
+          roles: ["Financial AI Analyst", "Business Intelligence Developer", "FinTech Risk Specialist", "Commercial Strategist"],
+          tools: ["Advanced Excel", "PostgreSQL", "DuckDB", "Power BI", "Python", "Credit Risk ML", "Tableau"]
+        }
+      },
+      {
+        id: "crs_humanities_arts",
+        title: "BA & Humanities: Applied AI for Professional Careers",
+        slug: "applied-ai-humanities-careers",
+        short_description: "BA • Fine Arts • Education • Law • All Non-Tech Majors — Prompt engineering, AI research methods, automated content, executive communication.",
+        price_paise: 99900,
+        mrp_paise: 399900,
+        status: "PUBLISHED",
+        metadata: {
+          group: "group-4",
+          badge: "GROUP 04",
+          shortName: "Humanities & Non-Tech",
+          target: "BA • Fine Arts • Education • Law • All Non-Tech Majors",
+          duration: "3 Months",
+          level: "All Students (No Coding Required)",
+          roles: ["AI Operations Lead", "Prompt Design Consultant", "Technical Content Architect", "Executive Research Analyst"],
+          tools: ["Claude 3.5", "ChatGPT Plus", "Midjourney", "Notion AI", "Perplexity", "Make/Zapier", "Prompt Engineering"]
+        }
+      },
+      {
+        id: "crs_ai_masterclass",
+        title: "AI Revolution & Agentic Engineering Masterclass (2-Hour Intensive)",
+        slug: "ai-masterclass",
+        short_description: "Live 2-Hour Intensive Masterclass on Advanced AI Prompting & Context Engineering.",
+        price_paise: 3900,
+        mrp_paise: 99900,
+        status: "PUBLISHED",
+        metadata: {
+          group: "workshop",
+          badge: "MASTERCLASS",
+          shortName: "AI Masterclass",
+          duration: "2 Hours Live",
+          level: "All Disciplines",
+          roles: ["Prompt Engineer", "AI Workflow Designer", "Power User"],
+          tools: ["ChatGPT", "Claude 3.5", "Gemini", "Context Engineering"]
+        }
+      }
+    ];
+
+    for (const c of foundationalCourses) {
+      await pool.query(
+        `INSERT INTO courses (id, title, slug, short_description, price_paise, mrp_paise, status, metadata, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::content_status, $8, TRUE)
+         ON CONFLICT (slug) DO UPDATE
+         SET title = EXCLUDED.title,
+             short_description = EXCLUDED.short_description,
+             price_paise = EXCLUDED.price_paise,
+             mrp_paise = EXCLUDED.mrp_paise,
+             status = EXCLUDED.status,
+             metadata = EXCLUDED.metadata,
+             is_active = TRUE`,
+        [
+          c.id,
+          c.title,
+          c.slug,
+          c.short_description,
+          c.price_paise,
+          c.mrp_paise,
+          c.status,
+          JSON.stringify(c.metadata)
+        ]
+      );
+    }
+    console.log(`[Seed:System] Synchronized ${foundationalCourses.length} foundational courses (4 tracks + AI Masterclass).`);
+
     console.log("[Seed:System] Foundational system data synchronization completed successfully.");
   } catch (err) {
     console.error("[Seed:System] Error seeding system data:", err);

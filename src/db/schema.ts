@@ -693,6 +693,9 @@ export const courses = pgTable(
     slug: varchar({ length: 280 }).notNull(),
     shortDescription: varchar("short_description", { length: 500 }),
     description: text(),
+    pricePaise: bigint("price_paise", { mode: "number" }).default(0).notNull(),
+    mrpPaise: bigint("mrp_paise", { mode: "number" }).default(0).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
     status: contentStatus().default("DRAFT").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
@@ -706,6 +709,7 @@ export const courses = pgTable(
     index("idx_courses_is_active").using("btree", table.isActive.asc().nullsLast()),
     index("idx_courses_status").using("btree", table.status.asc().nullsLast()),
     unique("uq_courses_slug").on(table.slug),
+    check("chk_courses_price", sql`price_paise >= 0`),
   ]
 );
 

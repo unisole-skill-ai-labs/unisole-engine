@@ -207,6 +207,12 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_payments_order" ON "public"."payments" ("order_id");
     `);
 
+    await execSqlSafe("courses_alterations", `
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "price_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "mrp_paise" bigint DEFAULT 0 NOT NULL;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+    `);
+
     // 5. Commercial Orders, Pricing Catalog & Coupons Tables
     await execSqlSafe("orders_tables", `
       CREATE TABLE IF NOT EXISTS "public"."orders" (

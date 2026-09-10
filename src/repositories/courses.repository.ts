@@ -11,6 +11,13 @@ export const coursesRepository = {
     return db.select().from(courses);
   },
 
+  async listPublished(): Promise<Course[]> {
+    return db
+      .select()
+      .from(courses)
+      .where(and(eq(courses.isActive, true), eq(courses.status, "PUBLISHED")));
+  },
+
   async getById(id: string): Promise<Course | null> {
     const rows = await db.select().from(courses).where(eq(courses.id, id)).limit(1);
     return rows[0] ?? null;
@@ -19,6 +26,13 @@ export const coursesRepository = {
   async getBySlug(slug: string): Promise<Course | null> {
     const rows = await db.select().from(courses).where(eq(courses.slug, slug)).limit(1);
     return rows[0] ?? null;
+  },
+
+  async getBySlugOrId(identifier: string): Promise<Course | null> {
+    const byId = await db.select().from(courses).where(eq(courses.id, identifier)).limit(1);
+    if (byId[0]) return byId[0];
+    const bySlug = await db.select().from(courses).where(eq(courses.slug, identifier)).limit(1);
+    return bySlug[0] ?? null;
   },
 
   async create(data: NewCourse): Promise<Course> {
