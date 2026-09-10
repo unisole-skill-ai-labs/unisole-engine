@@ -20,6 +20,7 @@ import { NotFoundError, ValidationError, ForbiddenError } from "../errors";
 
 export interface TaskFilterQuery {
   assigneeId?: string;
+  memberId?: string;
   status?: string;
   departmentId?: string;
   projectId?: string;
@@ -76,9 +77,27 @@ export const tasksService = {
       .$dynamic();
 
     const conditions = [];
+    const isAdmin = filter.userRole === "SUPER_ADMIN" || filter.userRole === "ADMIN";
 
-    // Filter by view
-    if (filter.view === "my_focus" && filter.userId) {
+    // Non-admin can only see tasks assigned to them, reported by them, or in projects/subprojects they lead
+    if (!isAdmin && filter.userId) {
+      conditions.push(
+        sql`(${tasks.assigneeId} = ${filter.userId} 
+          OR ${tasks.reporterId} = ${filter.userId} 
+          OR ${tasks.projectId} IN (SELECT id FROM projects WHERE lead_id = ${filter.userId})
+          OR ${tasks.subProjectId} IN (SELECT id FROM sub_projects WHERE lead_id = ${filter.userId})
+        )`
+      );
+    } else if (isAdmin && filter.memberId && filter.memberId !== "ALL") {
+      // Admin filtering to a specific member/admin
+      conditions.push(
+        sql`(${tasks.assigneeId} = ${filter.memberId} 
+          OR ${tasks.reporterId} = ${filter.memberId} 
+          OR ${tasks.projectId} IN (SELECT id FROM projects WHERE lead_id = ${filter.memberId})
+          OR ${tasks.subProjectId} IN (SELECT id FROM sub_projects WHERE lead_id = ${filter.memberId})
+        )`
+      );
+    } else if (filter.view === "my_focus" && filter.userId) {
       conditions.push(eq(tasks.assigneeId, filter.userId));
     } else if (filter.assigneeId) {
       conditions.push(eq(tasks.assigneeId, filter.assigneeId));

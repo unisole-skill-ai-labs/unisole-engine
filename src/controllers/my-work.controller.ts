@@ -16,12 +16,16 @@ export const myWorkController = {
     const isAdminOrSuperAdmin = userRole === "SUPER_ADMIN" || userRole === "ADMIN";
     const requestedUserId = req.query.userId as string | undefined;
 
-    // For Admins: Default workspace (or 'ALL') shows full company deliverables across all active projects.
-    // If Admin selects a specific team member, filter to that member.
-    const isSpecificMemberMode = Boolean(isAdminOrSuperAdmin && requestedUserId && requestedUserId !== "ALL");
-    const isRegularMember = !isAdminOrSuperAdmin;
-    const isFilteredToUser = isSpecificMemberMode || isRegularMember;
-    const targetUserId = isSpecificMemberMode ? requestedUserId! : currentUserId;
+    // Scope determination:
+    // - Regular Member: always strictly filtered to current user.
+    // - Admin / Super Admin:
+    //     - requestedUserId === "ALL": Organization-wide deliverables across all projects and members
+    //     - requestedUserId && requestedUserId !== "ALL": Specific member or admin workspace inspection
+    //     - !requestedUserId: Current admin's personal workspace
+    const isAllOrgMode = Boolean(isAdminOrSuperAdmin && requestedUserId === "ALL");
+    const isSpecificOtherMemberMode = Boolean(isAdminOrSuperAdmin && requestedUserId && requestedUserId !== "ALL");
+    const isFilteredToUser = !isAllOrgMode;
+    const targetUserId = isSpecificOtherMemberMode ? requestedUserId! : currentUserId;
 
     // 1. Fetch Target User Profile
     let targetUser: any;

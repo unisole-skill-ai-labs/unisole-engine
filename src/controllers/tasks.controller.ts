@@ -7,6 +7,7 @@ export const tasksController = {
   list: asyncHandler(async (req: CustomRequest, res: Response) => {
     const filter = {
       assigneeId: req.query.assigneeId as string,
+      memberId: (req.query.memberId || req.query.userId) as string,
       status: req.query.status as string,
       departmentId: req.query.departmentId as string,
       projectId: req.query.projectId as string,
