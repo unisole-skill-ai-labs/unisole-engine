@@ -34,14 +34,14 @@ export const teamService = {
         d.color as "departmentColor",
         u.is_active as "isActive",
         u.created_at as "createdAt",
-        COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS'))::int as "activeTasksCount",
+        COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED', 'CHANGES_REQUESTED', 'SUBMITTED_FOR_REVIEW'))::int as "activeTasksCount",
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'BLOCKED')::int as "blockedTasksCount",
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'SUBMITTED_FOR_REVIEW')::int as "reviewTasksCount",
         COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasksCount",
         COUNT(DISTINCT l.id)::int as "assignedLeadsCount"
       FROM users u
       LEFT JOIN team_departments d ON u.department_id = d.id
-      LEFT JOIN tasks t ON t.assignee_id = u.id
+      LEFT JOIN tasks t ON (t.assignee_id = u.id OR t.project_id IN (SELECT id FROM projects WHERE lead_id = u.id))
       LEFT JOIN leads l ON l.assigned_to_user_id = u.id
       WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES')
         AND ($1::text IS NULL OR u.name ILIKE $1 OR u.username ILIKE $1 OR u.phone ILIKE $1)

@@ -186,7 +186,8 @@ export const myWorkController = {
         LEFT JOIN users rep ON t.reporter_id = rep.id
         LEFT JOIN team_departments d ON t.department_id = d.id
         LEFT JOIN task_subtasks s ON s.task_id = t.id
-        WHERE t.assignee_id = $1
+        WHERE (t.assignee_id = $1 OR p.lead_id = $1)
+          AND (p.id IS NULL OR p.is_hidden = FALSE OR p.is_hidden IS NULL)
         GROUP BY 
           t.id, 
           d.name, 
@@ -340,6 +341,37 @@ export const myWorkController = {
       );
     }
 
+    const projectIds = projectsRes.rows.map((p: any) => p.id);
+    const subProjectsByProjectId: Record<string, any[]> = {};
+    if (projectIds.length > 0) {
+      const spRes = await pool.query(
+        `SELECT 
+          sp.id,
+          sp.project_id as "projectId",
+          sp.name,
+          sp.code,
+          sp.status,
+          sp.priority,
+          sp.lead_id as "leadId",
+          lead.name as "leadName",
+          COUNT(DISTINCT t.id)::int as "totalTasks",
+          COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'COMPLETED')::int as "completedTasks"
+        FROM sub_projects sp
+        LEFT JOIN users lead ON sp.lead_id = lead.id
+        LEFT JOIN tasks t ON t.sub_project_id = sp.id
+        WHERE sp.project_id = ANY($1::text[])
+        GROUP BY sp.id, lead.name
+        ORDER BY sp.created_at ASC`,
+        [projectIds]
+      );
+      for (const sp of spRes.rows) {
+        if (!subProjectsByProjectId[sp.projectId]) {
+          subProjectsByProjectId[sp.projectId] = [];
+        }
+        subProjectsByProjectId[sp.projectId].push(sp);
+      }
+    }
+
     const myProjects = projectsRes.rows.map((proj: any) => {
       const total = proj.totalTasks || 0;
       const done = proj.completedTasks || 0;
@@ -347,6 +379,7 @@ export const myWorkController = {
       return {
         ...proj,
         progressPercentage,
+        subProjects: subProjectsByProjectId[proj.id] || [],
         lead: proj.leadId
           ? {
               id: proj.leadId,
