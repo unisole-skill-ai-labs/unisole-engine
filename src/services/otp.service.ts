@@ -49,6 +49,9 @@ export const otpService = {
       Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
     ).toISOString();
 
+    // Invalidate any previously generated pending OTPs for this phone
+    await otpRepository.invalidateAllPending(phone);
+
     // Store real OTP directly in PostgreSQL database table
     await otpRepository.create({
       phone,

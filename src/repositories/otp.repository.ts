@@ -54,4 +54,16 @@ export const otpRepository = {
       .set({ status: "EXPIRED" })
       .where(eq(otpVerifications.id, id));
   },
+
+  async invalidateAllPending(phone: string): Promise<void> {
+    await db
+      .update(otpVerifications)
+      .set({ status: "EXPIRED" })
+      .where(
+        and(
+          eq(otpVerifications.phone, phone),
+          eq(otpVerifications.status, "PENDING")
+        )
+      );
+  },
 };
