@@ -21,7 +21,7 @@ export interface LeadFilters {
   status?: string;
   source?: string;
   excludeNonLeads?: boolean;
-  nextCallDue?: "overdue" | "today" | "upcoming" | "all" | "none";
+  nextCallDue?: "breached" | "first_contact" | "overdue" | "today" | "upcoming" | "all" | "none";
   dateFrom?: string;
   dateTo?: string;
 }
@@ -98,8 +98,25 @@ export const leadsRepository = {
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date();
       todayEnd.setHours(23, 59, 59, 999);
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      if (filters.nextCallDue === "overdue") {
+      if (filters.nextCallDue === "breached") {
+        conditions.push(
+          and(
+            eq(leads.callCount, 0),
+            lte(leads.createdAt, twentyFourHoursAgo),
+            sql`${leads.status} NOT IN ('CONVERTED', 'LOST', 'JUNK', 'NOT_A_LEAD')`
+          )
+        );
+      } else if (filters.nextCallDue === "first_contact") {
+        conditions.push(
+          and(
+            eq(leads.callCount, 0),
+            gte(leads.createdAt, twentyFourHoursAgo),
+            sql`${leads.status} NOT IN ('CONVERTED', 'LOST', 'JUNK', 'NOT_A_LEAD')`
+          )
+        );
+      } else if (filters.nextCallDue === "overdue") {
         conditions.push(
           and(
             lte(leads.nextCallAt, nowIso),
