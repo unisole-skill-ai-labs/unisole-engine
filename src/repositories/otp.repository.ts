@@ -54,4 +54,33 @@ export const otpRepository = {
       .set({ status: "EXPIRED" })
       .where(eq(otpVerifications.id, id));
   },
+
+  async invalidateAllPending(phone: string): Promise<void> {
+    await db
+      .update(otpVerifications)
+      .set({ status: "EXPIRED" })
+      .where(
+        and(
+          eq(otpVerifications.phone, phone),
+          eq(otpVerifications.status, "PENDING")
+        )
+      );
+  },
+
+  async findRecentlyVerified(phone: string, otp: string): Promise<OtpVerification | null> {
+    const rows = await db
+      .select()
+      .from(otpVerifications)
+      .where(
+        and(
+          eq(otpVerifications.phone, phone),
+          eq(otpVerifications.otp, otp),
+          eq(otpVerifications.status, "VERIFIED"),
+          sql`${otpVerifications.verifiedAt} > NOW() - INTERVAL '2 minutes'`
+        )
+      )
+      .orderBy(desc(otpVerifications.verifiedAt))
+      .limit(1);
+    return rows[0] ?? null;
+  },
 };

@@ -49,6 +49,9 @@ export const otpService = {
       Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
     ).toISOString();
 
+    // Invalidate any previously generated pending OTPs for this phone
+    await otpRepository.invalidateAllPending(phone);
+
     // Store real OTP directly in PostgreSQL database table
     await otpRepository.create({
       phone,
@@ -86,8 +89,14 @@ export const otpService = {
 
     const trimmedInput = inputOtp.trim();
 
+    const hasFast2sms = !!process.env.FAST2SMS_API_KEY;
+    const isMock =
+      !hasFast2sms &&
+      (!process.env.OTP_PROVIDER ||
+        process.env.OTP_PROVIDER.toUpperCase() === "MOCK");
+
     // If default OTP (1234) is entered when mock mode is active
-    if (trimmedInput === DEFAULT_OTP) {
+    if (isMock && trimmedInput === DEFAULT_OTP) {
       const record = await otpRepository.findLatestPendingByPhone(phone);
       if (record) {
         await otpRepository.markVerified(record.id);
@@ -96,7 +105,15 @@ export const otpService = {
     }
 
     const record = await otpRepository.findLatestPendingByPhone(phone);
-    if (!record) return false;
+    if (!record) {
+      // Idempotency check: if this exact phone + OTP was already verified within the last 2 minutes,
+      // return true to gracefully handle concurrent / duplicate verify requests.
+      const recent = await otpRepository.findRecentlyVerified(phone, trimmedInput);
+      if (recent) {
+        return true;
+      }
+      return false;
+    }
 
     // Check attempt limit
     if (record.attempts >= record.maxAttempts) {
