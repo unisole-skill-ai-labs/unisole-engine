@@ -20,16 +20,20 @@ function cleanIsoDate(val: any): string | null {
   }
 }
 
-export function isSalesRestrictedUser(user?: { id: string; role: string; designation?: string | null; permissions?: string[] }): boolean {
+export function isLeadAssignedRestrictedUser(user?: { id: string; role: string; designation?: string | null; permissions?: string[] }): boolean {
   if (!user) return false;
-  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") return false;
   const role = (user.role || "").toUpperCase();
-  const des = (user.designation || "").toUpperCase();
-  if (role === "SALES" || des.includes("SALES") || des.includes("TELECALL") || des.includes("COUNSEL")) {
-    return true;
+  // Only SUPER_ADMIN and ADMIN can see and manage all leads
+  if (role === "SUPER_ADMIN" || role === "ADMIN") {
+    return false;
   }
-  return false;
+  // All other users (MEMBER, SALES, etc.) are strictly restricted to leads assigned to them
+  return true;
 }
+
+// Alias for backwards compatibility across call sites
+export const isSalesRestrictedUser = isLeadAssignedRestrictedUser;
+
 
 export const leadsService = {
   async list(filters?: LeadFilters, requestingUser?: any): Promise<any[]> {
@@ -138,7 +142,7 @@ export const leadsService = {
 
   async delete(id: string, requestingUser?: any): Promise<boolean> {
     if (isSalesRestrictedUser(requestingUser)) {
-      throw new ForbiddenError("Permission denied: Sales representatives cannot delete leads");
+      throw new ForbiddenError("Permission denied: Only administrators can delete leads");
     }
     const success = await leadsRepository.delete(id);
     if (!success) {
@@ -149,7 +153,7 @@ export const leadsService = {
 
   async bulkAssign(leadIds: string[], assignedToUserId: string | null, requestingUser?: any): Promise<{ updatedCount: number }> {
     if (isSalesRestrictedUser(requestingUser)) {
-      throw new ForbiddenError("Permission denied: Sales representatives cannot reassign leads");
+      throw new ForbiddenError("Permission denied: Only administrators can reassign leads");
     }
     if (!Array.isArray(leadIds) || leadIds.length === 0) {
       throw new ValidationError("leadIds array is required");
@@ -165,7 +169,7 @@ export const leadsService = {
     if (!status) {
       throw new ValidationError("status is required");
     }
-    // If sales user, only allow status update on leads assigned to them
+    // If restricted user, only allow status update on leads assigned to them
     if (isSalesRestrictedUser(requestingUser)) {
       const allowedLeads = await leadsRepository.list({ assignedToUserId: requestingUser.id });
       const allowedIds = new Set(allowedLeads.map((l) => l.id));
@@ -198,7 +202,7 @@ export const leadsService = {
     requestingUser?: any
   ): Promise<{ imported: number; updated: number; failed: number }> {
     if (isSalesRestrictedUser(requestingUser)) {
-      throw new ForbiddenError("Permission denied: Sales representatives cannot bulk import leads");
+      throw new ForbiddenError("Permission denied: Only administrators can bulk import leads");
     }
     if (!Array.isArray(leadsList) || leadsList.length === 0) {
       throw new ValidationError("A non-empty list of leads is required for import");
@@ -279,7 +283,7 @@ export const leadsService = {
 
   async syncAllUsers(requestingUser?: any): Promise<{ synced: number; existing: number; totalUsers: number }> {
     if (isSalesRestrictedUser(requestingUser)) {
-      throw new ForbiddenError("Permission denied: Sales representatives cannot sync platform users");
+      throw new ForbiddenError("Permission denied: Only administrators can sync platform users");
     }
     return leadsRepository.syncAllUsersToLeads();
   },
