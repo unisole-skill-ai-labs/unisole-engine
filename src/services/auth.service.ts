@@ -479,6 +479,15 @@ export const authService = {
   async me(id: string) {
     const user = await usersRepository.getById(id);
     if (!user) throw new NotFoundError("User not found");
-    return user;
+    if (user.isActive === false) {
+      throw new UnauthorizedError("Account has been deactivated. Please contact Super Administrator.");
+    }
+    const tokens = generateTokens(user);
+    const { password: _p, ...safeUser } = user;
+    return {
+      ...safeUser,
+      token: tokens.token,
+      accessToken: tokens.accessToken,
+    };
   },
 };
