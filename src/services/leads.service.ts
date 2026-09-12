@@ -162,7 +162,12 @@ export const leadsService = {
     return { updatedCount: count };
   },
 
-  async bulkUpdateStatus(leadIds: string[], status: string, requestingUser?: any): Promise<{ updatedCount: number }> {
+  async bulkUpdateStatus(
+    leadIds: string[],
+    status: string,
+    requestingUser?: any,
+    quality?: string
+  ): Promise<{ updatedCount: number }> {
     if (!Array.isArray(leadIds) || leadIds.length === 0) {
       throw new ValidationError("leadIds array is required");
     }
@@ -177,10 +182,10 @@ export const leadsService = {
       if (filteredLeadIds.length === 0) {
         throw new ForbiddenError("No matching assigned leads found to update");
       }
-      const count = await leadsRepository.bulkUpdateStatus(filteredLeadIds, status);
+      const count = await leadsRepository.bulkUpdateStatus(filteredLeadIds, status, quality);
       return { updatedCount: count };
     }
-    const count = await leadsRepository.bulkUpdateStatus(leadIds, status);
+    const count = await leadsRepository.bulkUpdateStatus(leadIds, status, quality);
     return { updatedCount: count };
   },
 
