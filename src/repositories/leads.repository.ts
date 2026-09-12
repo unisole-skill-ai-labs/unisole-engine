@@ -76,7 +76,14 @@ export const leadsRepository = {
     }
 
     if (filters?.status) {
-      conditions.push(eq(leads.status, filters.status as any));
+      if (filters.status.includes(",")) {
+        const arr = filters.status.split(",").map((s) => s.trim()).filter(Boolean);
+        if (arr.length > 0) {
+          conditions.push(inArray(leads.status, arr as any));
+        }
+      } else {
+        conditions.push(eq(leads.status, filters.status as any));
+      }
     } else if (filters?.excludeNonLeads) {
       conditions.push(sql`${leads.status} != 'NOT_A_LEAD'`);
     }
@@ -322,12 +329,15 @@ export const leadsRepository = {
     return res.length;
   },
 
-  async bulkUpdateStatus(leadIds: string[], status: string): Promise<number> {
+  async bulkUpdateStatus(leadIds: string[], status: string, quality?: string): Promise<number> {
     if (!leadIds || leadIds.length === 0) return 0;
     const updateData: any = {
       status: status as any,
       updatedAt: new Date().toISOString(),
     };
+    if (quality) {
+      updateData.quality = quality as any;
+    }
     if (status === "CONVERTED") {
       updateData.convertedAt = new Date().toISOString();
     }

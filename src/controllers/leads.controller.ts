@@ -63,8 +63,8 @@ export const leadsController = {
   }),
 
   bulkUpdateStatus: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const { leadIds, status } = req.body;
-    const result = await leadsService.bulkUpdateStatus(leadIds, status, req.user);
+    const { leadIds, status, quality } = req.body;
+    const result = await leadsService.bulkUpdateStatus(leadIds, status, req.user, quality);
     res.json({ success: true, ...result });
   }),
 
