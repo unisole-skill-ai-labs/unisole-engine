@@ -19,6 +19,7 @@ export interface LeadFilters {
   assignedToUserId?: string;
   quality?: string;
   status?: string;
+  subStatus?: string;
   source?: string;
   excludeNonLeads?: boolean;
   nextCallDue?: "breached" | "first_contact" | "overdue" | "today" | "upcoming" | "all" | "none";
@@ -86,6 +87,17 @@ export const leadsRepository = {
       }
     } else if (filters?.excludeNonLeads) {
       conditions.push(sql`${leads.status} != 'NOT_A_LEAD'`);
+    }
+
+    if (filters?.subStatus) {
+      if (filters.subStatus.includes(",")) {
+        const arr = filters.subStatus.split(",").map((s) => s.trim()).filter(Boolean);
+        if (arr.length > 0) {
+          conditions.push(inArray(leads.subStatus, arr));
+        }
+      } else {
+        conditions.push(eq(leads.subStatus, filters.subStatus));
+      }
     }
 
     if (filters?.source) {
@@ -185,6 +197,7 @@ export const leadsRepository = {
         nextCallAt: leads.nextCallAt,
         convertedAt: leads.convertedAt,
         conversionValuePaise: leads.conversionValuePaise,
+        subStatus: leads.subStatus,
         notes: leads.notes,
         tags: leads.tags,
         createdById: leads.createdById,
@@ -230,6 +243,7 @@ export const leadsRepository = {
         nextCallAt: leads.nextCallAt,
         convertedAt: leads.convertedAt,
         conversionValuePaise: leads.conversionValuePaise,
+        subStatus: leads.subStatus,
         notes: leads.notes,
         tags: leads.tags,
         createdById: leads.createdById,
@@ -256,6 +270,7 @@ export const leadsRepository = {
         callerName: leadCallLogs.callerName,
         callDurationSeconds: leadCallLogs.callDurationSeconds,
         outcome: leadCallLogs.outcome,
+        subStatus: leadCallLogs.subStatus,
         notes: leadCallLogs.notes,
         previousQuality: leadCallLogs.previousQuality,
         newQuality: leadCallLogs.newQuality,
@@ -558,6 +573,7 @@ export const leadsRepository = {
     callerName: string;
     callDurationSeconds?: number;
     outcome: string;
+    subStatus?: string;
     notes: string;
     newQuality?: string;
     newStatus?: string;
@@ -588,6 +604,7 @@ export const leadsRepository = {
         callerName: data.callerName,
         callDurationSeconds: data.callDurationSeconds || 0,
         outcome: data.outcome as any,
+        subStatus: data.subStatus ? String(data.subStatus).trim() : null,
         notes: data.notes,
         previousQuality: previousQuality as any,
         newQuality: resolvedQuality as any,
@@ -606,6 +623,10 @@ export const leadsRepository = {
       status: resolvedStatus,
       updatedAt: new Date().toISOString(),
     };
+
+    if (data.subStatus !== undefined) {
+      updatePayload.subStatus = data.subStatus ? String(data.subStatus).trim() : null;
+    }
 
     if (data.notes && data.notes.trim()) {
       updatePayload.notes = data.notes.trim();
@@ -636,6 +657,7 @@ export const leadsRepository = {
         callerName: leadCallLogs.callerName,
         callDurationSeconds: leadCallLogs.callDurationSeconds,
         outcome: leadCallLogs.outcome,
+        subStatus: leadCallLogs.subStatus,
         notes: leadCallLogs.notes,
         previousQuality: leadCallLogs.previousQuality,
         newQuality: leadCallLogs.newQuality,
@@ -787,6 +809,33 @@ export const leadsRepository = {
       }))
       .sort((a, b) => b.converted - a.converted || b.assigned - a.assigned);
 
+    // Objections / Sub-status breakdown
+    const objectionCounts: Record<string, number> = {};
+    const branchObjectionsMap: Record<string, Record<string, number>> = {};
+    let totalObjections = 0;
+
+    for (const lead of allLeads) {
+      if (lead.subStatus) {
+        const objKey = lead.subStatus;
+        objectionCounts[objKey] = (objectionCounts[objKey] || 0) + 1;
+        totalObjections++;
+
+        const bName = lead.branch || "Other / Unspecified";
+        if (!branchObjectionsMap[bName]) {
+          branchObjectionsMap[bName] = {};
+        }
+        branchObjectionsMap[bName][objKey] = (branchObjectionsMap[bName][objKey] || 0) + 1;
+      }
+    }
+
+    const objectionsBreakdown = Object.keys(objectionCounts)
+      .map((key) => ({
+        key,
+        count: objectionCounts[key],
+        percentage: totalObjections > 0 ? Number(((objectionCounts[key] / totalObjections) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
     return {
       kpi: {
         totalLeads,
@@ -797,6 +846,7 @@ export const leadsRepository = {
         followUpsDueToday,
         followUpsOverdue,
         hotLeadsCount: qualityCounts.HOT,
+        totalObjections,
       },
       qualityBreakdown: Object.keys(qualityCounts).map((key) => ({
         quality: key,
@@ -808,6 +858,9 @@ export const leadsRepository = {
         count: statusCounts[key],
         percentage: totalLeads > 0 ? Number(((statusCounts[key] / totalLeads) * 100).toFixed(1)) : 0,
       })),
+      objectionsBreakdown,
+      objectionsByBranch: branchObjectionsMap,
+      totalObjections,
       collegeBreakdown,
       branchBreakdown,
       counselorLeaderboard,

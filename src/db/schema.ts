@@ -1744,6 +1744,7 @@ export const leads = pgTable(
     nextCallAt: timestamp("next_call_at", { withTimezone: true, mode: "string" }),
     convertedAt: timestamp("converted_at", { withTimezone: true, mode: "string" }),
     conversionValuePaise: bigint("conversion_value_paise", { mode: "number" }).default(0).notNull(),
+    subStatus: varchar("sub_status", { length: 100 }),
     notes: text(),
     tags: jsonb().default(sql`'[]'::jsonb`).notNull(),
     createdById: varchar("created_by_id", { length: 50 }),
@@ -1762,6 +1763,7 @@ export const leads = pgTable(
     index("idx_leads_assigned_to").using("btree", table.assignedToUserId.asc().nullsLast()),
     index("idx_leads_quality").using("btree", table.quality.asc().nullsLast()),
     index("idx_leads_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_leads_sub_status").using("btree", table.subStatus.asc().nullsLast()),
     index("idx_leads_next_call").using("btree", table.nextCallAt.asc().nullsLast()),
     index("idx_leads_created_at").using("btree", table.createdAt.desc().nullsLast()),
     foreignKey({
@@ -1803,6 +1805,7 @@ export const leadCallLogs = pgTable(
     callerName: varchar("caller_name", { length: 150 }).notNull(),
     callDurationSeconds: integer("call_duration_seconds").default(0).notNull(),
     outcome: leadCallOutcome().notNull(),
+    subStatus: varchar("sub_status", { length: 100 }),
     notes: text().notNull(),
     previousQuality: leadQuality("previous_quality"),
     newQuality: leadQuality("new_quality"),

@@ -536,6 +536,8 @@ export async function initializeDatabase() {
       );
 
       ALTER TABLE "public"."leads" ADD COLUMN IF NOT EXISTS "user_id" varchar(50);
+      ALTER TABLE "public"."leads" ADD COLUMN IF NOT EXISTS "sub_status" varchar(100);
+      CREATE INDEX IF NOT EXISTS "idx_leads_sub_status" ON "public"."leads" ("sub_status");
 
       CREATE TABLE IF NOT EXISTS "public"."lead_call_logs" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('clog_'::text || nextval('public.lead_call_logs_id_seq'::regclass)) NOT NULL,
@@ -544,6 +546,7 @@ export async function initializeDatabase() {
         "caller_name" varchar(150) NOT NULL,
         "call_duration_seconds" integer DEFAULT 0 NOT NULL,
         "outcome" "public"."lead_call_outcome" NOT NULL,
+        "sub_status" varchar(100),
         "notes" text NOT NULL,
         "previous_quality" "public"."lead_quality",
         "new_quality" "public"."lead_quality",
@@ -553,6 +556,8 @@ export async function initializeDatabase() {
         "recording_url" text,
         "created_at" timestamp with time zone DEFAULT now() NOT NULL
       );
+
+      ALTER TABLE "public"."lead_call_logs" ADD COLUMN IF NOT EXISTS "sub_status" varchar(100);
 
       DO $$ BEGIN
         ALTER TABLE "public"."leads" ADD CONSTRAINT "fk_leads_user_account" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null;
