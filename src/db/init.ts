@@ -103,7 +103,7 @@ export async function initializeDatabase() {
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
       DO $$ BEGIN
-        CREATE TYPE "public"."lead_source" AS ENUM('PRESENTATION_SESSION', 'COLLEGE_DRIVE', 'PAMPHLET_SCAN', 'PAMPHLET_QR', 'SESSION_QR', 'IAPT', 'AI_WORKSHOP', 'PROFESSOR_NETWORK', 'NON_PAMPHLET', 'ORGANIC', 'DIRECT_WEB', 'WEBSITE_INQUIRY', 'REFERRAL', 'MANUAL_IMPORT', 'OTHER');
+        CREATE TYPE "public"."lead_source" AS ENUM('PRESENTATION_SESSION', 'COLLEGE_DRIVE', 'PAMPHLET_SCAN', 'PAMPHLET_QR', 'SESSION_QR', 'IAPT', 'AI_WORKSHOP', 'PROFESSOR_NETWORK', 'NON_PAMPHLET', 'ORGANIC', 'DIRECT_WEB', 'WEBSITE_INQUIRY', 'REFERRAL', 'MANUAL_IMPORT', 'OTHER', 'SURVEY');
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
       DO $$ BEGIN
@@ -112,6 +112,8 @@ export async function initializeDatabase() {
     `);
 
     // 2. Safe standalone enum additions (outside PL/pgSQL transaction blocks)
+    await addEnumValueSafely("enrollment_source", "SURVEY");
+    await addEnumValueSafely("lead_source", "SURVEY");
     await addEnumValueSafely("item_type", "PATHWAY");
     await addEnumValueSafely("item_type", "COURSE");
     await addEnumValueSafely("item_type", "WORKSHOP");
@@ -165,12 +167,18 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "branch" varchar(100);
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "department_id" varchar(50);
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "designation" varchar(150);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_source" varchar(50) DEFAULT 'NON_PAMPHLET' NOT NULL;
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_session_code" varchar(50);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_college_id" varchar(50);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_college_name" varchar(200);
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
     `);
 
     await execSqlSafe("enrollments_alterations", `
       DO $$ BEGIN
         ALTER TABLE "public"."enrollments" ALTER COLUMN "pathway_id" DROP NOT NULL;
+        ALTER TABLE "public"."enrollments" ALTER COLUMN "course_id" DROP NOT NULL;
         ALTER TABLE "public"."enrollments" DROP CONSTRAINT IF EXISTS "fk_enrollments_pathway";
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
@@ -673,7 +681,49 @@ export async function initializeDatabase() {
         "is_active" = TRUE;
     `);
 
-    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses, Promotional Coupons and Polymorphic Enrollment tables verified successfully.");
+    // 14. Surveys and Survey Responses
+    await execSqlSafe("survey_tables", `
+      CREATE TABLE IF NOT EXISTS "public"."surveys" (
+        "id" VARCHAR(50) PRIMARY KEY,
+        "slug" VARCHAR(100) UNIQUE NOT NULL,
+        "title" VARCHAR(255) NOT NULL,
+        "description" TEXT,
+        "schema" JSONB DEFAULT '{}'::jsonb NOT NULL,
+        "is_active" BOOLEAN DEFAULT true NOT NULL,
+        "metadata" JSONB DEFAULT '{}'::jsonb,
+        "created_at" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        "updated_at" TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS "public"."survey_responses" (
+        "id" VARCHAR(50) PRIMARY KEY,
+        "survey_id" VARCHAR(50) NOT NULL REFERENCES "public"."surveys"("id") ON DELETE CASCADE,
+        "user_id" VARCHAR(50),
+        "lead_id" VARCHAR(50),
+        "name" VARCHAR(255),
+        "phone" VARCHAR(50),
+        "email" VARCHAR(255),
+        "college_name" VARCHAR(255),
+        "college_id" VARCHAR(50),
+        "stream" VARCHAR(100),
+        "year_of_study" VARCHAR(50),
+        "answers" JSONB DEFAULT '{}'::jsonb NOT NULL,
+        "metadata" JSONB DEFAULT '{}'::jsonb,
+        "created_at" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        "updated_at" TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_surveys_slug ON "public"."surveys"("slug");
+      CREATE INDEX IF NOT EXISTS idx_survey_responses_survey ON "public"."survey_responses"("survey_id");
+      CREATE INDEX IF NOT EXISTS idx_survey_responses_user ON "public"."survey_responses"("user_id");
+      CREATE INDEX IF NOT EXISTS idx_survey_responses_lead ON "public"."survey_responses"("lead_id");
+      CREATE INDEX IF NOT EXISTS idx_survey_responses_phone ON "public"."survey_responses"("phone");
+      CREATE INDEX IF NOT EXISTS idx_survey_responses_college ON "public"."survey_responses"("college_name");
+      CREATE INDEX IF NOT EXISTS idx_survey_responses_stream ON "public"."survey_responses"("stream");
+      CREATE INDEX IF NOT EXISTS idx_survey_responses_created ON "public"."survey_responses"("created_at" DESC);
+    `);
+
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }

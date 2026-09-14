@@ -31,6 +31,8 @@ import {
   dailyEodLogs,
   leads,
   leadCallLogs,
+  surveys,
+  surveyResponses,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -366,6 +368,21 @@ export const leadCallLogsRelations = relations(leadCallLogs, ({ one }) => ({
   }),
   callerUser: one(users, {
     fields: [leadCallLogs.callerUserId],
+    references: [users.id],
+  }),
+}));
+
+export const surveysRelations = relations(surveys, ({ many }) => ({
+  responses: many(surveyResponses),
+}));
+
+export const surveyResponsesRelations = relations(surveyResponses, ({ one }) => ({
+  survey: one(surveys, {
+    fields: [surveyResponses.surveyId],
+    references: [surveys.id],
+  }),
+  user: one(users, {
+    fields: [surveyResponses.userId],
     references: [users.id],
   }),
 }));

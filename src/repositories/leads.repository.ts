@@ -28,8 +28,8 @@ export interface LeadFilters {
 }
 
 export function normalizeLeadSource(sourceStr?: string | null): string {
-  if (!sourceStr) return "WEBSITE_INQUIRY";
   const s = String(sourceStr).trim().toUpperCase();
+  if (s === "SURVEY" || s === "STUDENT_SURVEY") return "SURVEY";
   if (s === "AI_WORKSHOP" || s === "WORKSHOP" || s === "AI_MASTERCLASS" || s === "MASTERCLASS") return "AI_WORKSHOP";
   if (s === "PROFESSOR_NETWORK" || s === "PROFESSOR" || s === "FACULTY" || s === "PROFESSOR_CAMPAIGN") return "PROFESSOR_NETWORK";
   if (s === "IAPT") return "IAPT";
