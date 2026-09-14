@@ -751,6 +751,22 @@ export async function initializeDatabase() {
       console.warn("[DB-INIT] Warning seeding default survey:", e);
     }
 
+    // 16. Backfill existing survey responders to SURVEY acquisition source
+    try {
+      await execSqlSafe("survey_responders_sync", `
+        UPDATE "public"."users"
+        SET "signup_source" = 'SURVEY'
+        WHERE "id" IN (SELECT DISTINCT "user_id" FROM "public"."survey_responses" WHERE "user_id" IS NOT NULL)
+           OR "phone" IN (SELECT DISTINCT "phone" FROM "public"."survey_responses" WHERE "phone" IS NOT NULL);
+
+        UPDATE "public"."leads"
+        SET "source" = 'SURVEY'
+        WHERE "phone" IN (SELECT DISTINCT "phone" FROM "public"."survey_responses" WHERE "phone" IS NOT NULL);
+      `);
+    } catch (e) {
+      console.warn("[DB-INIT] Warning syncing survey responders:", e);
+    }
+
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);

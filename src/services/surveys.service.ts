@@ -94,6 +94,16 @@ export const surveysService = {
     const userId = user?.id || null;
     const collegeId = user?.collegeId || null;
 
+    // Explicitly guarantee the learner's acquisition source is stamped as SURVEY
+    if (user && user.signupSource !== "SURVEY") {
+      try {
+        await usersRepository.update(user.id, { signupSource: "SURVEY" });
+        user.signupSource = "SURVEY";
+      } catch (updErr) {
+        console.warn("[SurveysService] Note updating user signupSource to SURVEY:", updErr);
+      }
+    }
+
     // 2. Build Notes & Tags summarizing student's key interests
     const answers = dto.answers || {};
     const aimingFor = Array.isArray(answers.aiming_for) ? answers.aiming_for.join(", ") : answers.aiming_for || "";
