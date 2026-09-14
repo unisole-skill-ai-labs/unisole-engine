@@ -1,6 +1,7 @@
 import { eq, desc, and, ilike, sql, or } from "drizzle-orm";
 import { db } from "../db";
 import { surveys, surveyResponses, Survey, NewSurvey, SurveyResponse, NewSurveyResponse } from "../db/schema";
+import { studentSurveySchema } from "../constants/defaultSurvey";
 
 export interface SurveyResponseFilters {
   collegeName?: string;
@@ -33,20 +34,68 @@ export const surveysRepository = {
   },
 
   async getBySlug(slug: string): Promise<Survey | null> {
-    const [row] = await db
+    let [row] = await db
       .select()
       .from(surveys)
       .where(eq(surveys.slug, slug))
       .limit(1);
+
+    if ((!row || !row.isActive) && slug === "student-skills-survey") {
+      try {
+        if (!row) {
+          const [inserted] = await db
+            .insert(surveys)
+            .values({
+              id: "srv_student_skills_2026",
+              slug: studentSurveySchema.slug,
+              title: studentSurveySchema.title,
+              description: studentSurveySchema.description,
+              schema: studentSurveySchema,
+              isActive: true,
+              metadata: {
+                category: "CAREER_ASPIRATIONS",
+                origin: "GOOGLE_FORM_MIGRATION",
+              },
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            })
+            .onConflictDoUpdate({
+              target: surveys.slug,
+              set: {
+                isActive: true,
+                schema: studentSurveySchema,
+                updatedAt: new Date().toISOString(),
+              },
+            })
+            .returning();
+          row = inserted;
+        } else if (!row.isActive) {
+          const [updated] = await db
+            .update(surveys)
+            .set({ isActive: true, updatedAt: new Date().toISOString() })
+            .where(eq(surveys.slug, slug))
+            .returning();
+          row = updated;
+        }
+      } catch (err) {
+        console.error(`[SurveysRepository] Error auto-provisioning survey '${slug}':`, err);
+      }
+    }
+
     return row ?? null;
   },
 
   async getById(id: string): Promise<Survey | null> {
-    const [row] = await db
+    let [row] = await db
       .select()
       .from(surveys)
       .where(eq(surveys.id, id))
       .limit(1);
+
+    if (!row && id === "srv_student_skills_2026") {
+      return this.getBySlug("student-skills-survey");
+    }
+
     return row ?? null;
   },
 

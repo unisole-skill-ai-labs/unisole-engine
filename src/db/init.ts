@@ -1,6 +1,7 @@
 import { pool, db } from "../db";
 import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { studentSurveySchema } from "../constants/defaultSurvey";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -722,6 +723,33 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_survey_responses_stream ON "public"."survey_responses"("stream");
       CREATE INDEX IF NOT EXISTS idx_survey_responses_created ON "public"."survey_responses"("created_at" DESC);
     `);
+
+    // 15. Auto-seed Student Skills Survey definition
+    try {
+      const surveyJson = JSON.stringify(studentSurveySchema).replace(/'/g, "''");
+      await execSqlSafe("survey_default_seed", `
+        INSERT INTO "public"."surveys" ("id", "slug", "title", "description", "schema", "is_active", "metadata", "created_at", "updated_at")
+        VALUES (
+          'srv_student_skills_2026',
+          '${studentSurveySchema.slug}',
+          '${studentSurveySchema.title.replace(/'/g, "''")}',
+          '${studentSurveySchema.description.replace(/'/g, "''")}',
+          '${surveyJson}'::jsonb,
+          TRUE,
+          '{"category": "CAREER_ASPIRATIONS", "origin": "GOOGLE_FORM_MIGRATION"}'::jsonb,
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT ("slug") DO UPDATE SET
+          "title" = EXCLUDED."title",
+          "description" = EXCLUDED."description",
+          "schema" = EXCLUDED."schema",
+          "is_active" = TRUE,
+          "updated_at" = NOW();
+      `);
+    } catch (e) {
+      console.warn("[DB-INIT] Warning seeding default survey:", e);
+    }
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
   } catch (err) {
