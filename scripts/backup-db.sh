@@ -165,10 +165,46 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 # Off-site Cloud Backup: Cloudflare R2 (10 GB Free Forever, zero egress fees)
-if [ -f "$PROJECT_ROOT/config/r2-credentials.json" ] || [ -f "/opt/unisole/config/r2-credentials.json" ] || [ -n "$CLOUDFLARE_R2_TOKEN" ]; then
+R2_KEY_FILE=""
+if [ -f "$PROJECT_ROOT/config/r2-credentials.json" ]; then
+  R2_KEY_FILE="$PROJECT_ROOT/config/r2-credentials.json"
+elif [ -f "$HOME/unisole-staging/config/r2-credentials.json" ]; then
+  R2_KEY_FILE="$HOME/unisole-staging/config/r2-credentials.json"
+elif [ -f "/opt/unisole/config/r2-credentials.json" ]; then
+  R2_KEY_FILE="/opt/unisole/config/r2-credentials.json"
+fi
+
+if [ -f "$R2_KEY_FILE" ]; then
+  R2_ACCOUNT_ID=$(grep -o '"account_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$R2_KEY_FILE" 2>/dev/null | cut -d'"' -f4 || true)
+  R2_BUCKET=$(grep -o '"bucket_name"[[:space:]]*:[[:space:]]*"[^"]*"' "$R2_KEY_FILE" 2>/dev/null | cut -d'"' -f4 || true)
+  R2_TOKEN=$(grep -o '"api_token"[[:space:]]*:[[:space:]]*"[^"]*"' "$R2_KEY_FILE" 2>/dev/null | cut -d'"' -f4 || true)
+fi
+
+R2_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-$R2_ACCOUNT_ID}"
+R2_BUCKET="${CLOUDFLARE_R2_BUCKET:-${R2_BUCKET:-unisole-db-backups}}"
+R2_TOKEN="${CLOUDFLARE_R2_TOKEN:-$R2_TOKEN}"
+
+if [ -n "$R2_TOKEN" ] && [ -n "$R2_ACCOUNT_ID" ]; then
+  echo "☁️ Triggering Cloudflare R2 off-site upload ($R2_BUCKET)..."
+  FILE_BASENAME=$(basename "$BACKUP_FILE")
+  
   if command -v "$NODE_CMD" >/dev/null 2>&1 && [ -f "scripts/upload-r2.js" ]; then
-    echo "☁️ Triggering Cloudflare R2 off-site upload..."
-    $NODE_CMD "scripts/upload-r2.js" "$BACKUP_FILE" || echo "⚠️ Warning: Cloudflare R2 upload failed, local backup is still safe."
+    $NODE_CMD "scripts/upload-r2.js" "$BACKUP_FILE" || true
+  elif command -v curl >/dev/null 2>&1; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+      "https://api.cloudflare.com/client/v4/accounts/$R2_ACCOUNT_ID/r2/buckets/$R2_BUCKET/objects/backups/$FILE_BASENAME" \
+      -H "Authorization: Bearer $R2_TOKEN" \
+      -H "Content-Type: application/gzip" \
+      --data-binary "@$BACKUP_FILE" || echo "000")
+      
+    if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+      echo "✅ [Cloudflare R2] Successfully uploaded to backups/$FILE_BASENAME (HTTP $HTTP_CODE)"
+      echo "🔗 Dashboard: https://dash.cloudflare.com/$R2_ACCOUNT_ID/r2/default/buckets/$R2_BUCKET"
+    else
+      echo "⚠️ Warning: Cloudflare R2 upload returned HTTP $HTTP_CODE, local backup is still safe."
+    fi
+  else
+    echo "⚠️ Warning: Neither node nor curl found to upload to Cloudflare R2."
   fi
 fi
 
