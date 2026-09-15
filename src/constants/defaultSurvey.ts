@@ -22,6 +22,16 @@ export const studentSurveySchema = {
           required: true,
         },
         {
+          id: "student_college_type",
+          title: "Are you from a Degree College or an Engineering College?",
+          type: "single-select",
+          required: true,
+          options: [
+            "Degree College",
+            "Engineering College",
+          ],
+        },
+        {
           id: "student_college",
           title: "College / Institution Name",
           type: "single-select",
@@ -40,6 +50,12 @@ export const studentSurveySchema = {
             "Government College, Una",
             "Government College, Chamba",
             "Himachal Pradesh University (HPU), Shimla",
+            "Jawaharlal Nehru Government Engineering College (JNGEC) - Sundernagar, Mandi",
+            "Rajiv Gandhi Government Engineering College (RGGEC) - Kangra",
+            "Atal Bihari Vajpayee Government Institute of Engineering and Technology (ABVGIET) - Pragatinagar, Shimla",
+            "Government Hydro Engineering College - Bandla, Bilaspur",
+            "Mahatma Gandhi Government Engineering College (MGGEC) - Jeori, Rampur, Shimla",
+            "University Institute of Information Technology (UIIT), HPU - Shimla",
           ],
         },
         {
