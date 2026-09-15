@@ -17,7 +17,7 @@ export const studentSurveySchema = {
         },
         {
           id: "student_phone",
-          title: "Mobile Number (WhatsApp)",
+          title: "Mobile Number",
           type: "text",
           required: true,
         },
