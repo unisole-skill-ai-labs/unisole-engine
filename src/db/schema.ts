@@ -65,6 +65,7 @@ export const enrollmentSource = pgEnum("enrollment_source", [
   "CAMPUS_SPONSORED",
   "FREE",
   "INVITE",
+  "SURVEY",
 ]);
 export const paymentStatus = pgEnum("payment_status", [
   "CREATED",
@@ -149,6 +150,7 @@ export const leadSource = pgEnum("lead_source", [
   "REFERRAL",
   "MANUAL_IMPORT",
   "OTHER",
+  "SURVEY",
 ]);
 export const leadCallOutcome = pgEnum("lead_call_outcome", [
   "CONNECTED_INTERESTED",
@@ -1744,6 +1746,7 @@ export const leads = pgTable(
     nextCallAt: timestamp("next_call_at", { withTimezone: true, mode: "string" }),
     convertedAt: timestamp("converted_at", { withTimezone: true, mode: "string" }),
     conversionValuePaise: bigint("conversion_value_paise", { mode: "number" }).default(0).notNull(),
+    subStatus: varchar("sub_status", { length: 100 }),
     notes: text(),
     tags: jsonb().default(sql`'[]'::jsonb`).notNull(),
     createdById: varchar("created_by_id", { length: 50 }),
@@ -1762,6 +1765,7 @@ export const leads = pgTable(
     index("idx_leads_assigned_to").using("btree", table.assignedToUserId.asc().nullsLast()),
     index("idx_leads_quality").using("btree", table.quality.asc().nullsLast()),
     index("idx_leads_status").using("btree", table.status.asc().nullsLast()),
+    index("idx_leads_sub_status").using("btree", table.subStatus.asc().nullsLast()),
     index("idx_leads_next_call").using("btree", table.nextCallAt.asc().nullsLast()),
     index("idx_leads_created_at").using("btree", table.createdAt.desc().nullsLast()),
     foreignKey({
@@ -1803,6 +1807,7 @@ export const leadCallLogs = pgTable(
     callerName: varchar("caller_name", { length: 150 }).notNull(),
     callDurationSeconds: integer("call_duration_seconds").default(0).notNull(),
     outcome: leadCallOutcome().notNull(),
+    subStatus: varchar("sub_status", { length: 100 }),
     notes: text().notNull(),
     previousQuality: leadQuality("previous_quality"),
     newQuality: leadQuality("new_quality"),
@@ -1832,6 +1837,69 @@ export const leadCallLogs = pgTable(
 );
 
 // ============================================================
+// SURVEYS & RESPONSES
+// ============================================================
+
+export const surveys = pgTable(
+  "surveys",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    slug: varchar({ length: 100 }).unique().notNull(),
+    title: varchar({ length: 255 }).notNull(),
+    description: text("description"),
+    schema: jsonb("schema").default(sql`'{}'::jsonb`).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_surveys_slug").on(table.slug),
+  ]
+);
+
+export const surveyResponses = pgTable(
+  "survey_responses",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    surveyId: varchar("survey_id", { length: 50 }).notNull(),
+    userId: varchar("user_id", { length: 50 }),
+    leadId: varchar("lead_id", { length: 50 }),
+    name: varchar({ length: 255 }),
+    phone: varchar({ length: 50 }),
+    email: varchar({ length: 255 }),
+    collegeName: varchar("college_name", { length: 255 }),
+    collegeId: varchar("college_id", { length: 50 }),
+    stream: varchar({ length: 100 }),
+    yearOfStudy: varchar("year_of_study", { length: 50 }),
+    answers: jsonb("answers").default(sql`'{}'::jsonb`).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_survey_responses_survey").on(table.surveyId),
+    index("idx_survey_responses_user").on(table.userId),
+    index("idx_survey_responses_lead").on(table.leadId),
+    index("idx_survey_responses_phone").on(table.phone),
+    index("idx_survey_responses_college").on(table.collegeName),
+    index("idx_survey_responses_stream").on(table.stream),
+    foreignKey({
+      columns: [table.surveyId],
+      foreignColumns: [surveys.id],
+      name: "fk_survey_responses_survey",
+    }).onDelete("cascade"),
+  ]
+);
+
 // ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
@@ -1870,6 +1938,8 @@ export type DailyEodLog = InferSelectModel<typeof dailyEodLogs>;
 export type IaptNainRegistration = InferSelectModel<typeof iaptNainRegistrations>;
 export type Lead = InferSelectModel<typeof leads>;
 export type LeadCallLog = InferSelectModel<typeof leadCallLogs>;
+export type Survey = InferSelectModel<typeof surveys>;
+export type SurveyResponse = InferSelectModel<typeof surveyResponses>;
 
 // ============================================================
 // INSERT TYPES (write to DB)
@@ -1909,6 +1979,8 @@ export type NewDailyEodLog = InferInsertModel<typeof dailyEodLogs>;
 export type NewIaptNainRegistration = InferInsertModel<typeof iaptNainRegistrations>;
 export type NewLead = InferInsertModel<typeof leads>;
 export type NewLeadCallLog = InferInsertModel<typeof leadCallLogs>;
+export type NewSurvey = InferInsertModel<typeof surveys>;
+export type NewSurveyResponse = InferInsertModel<typeof surveyResponses>;
 
 // ============================================================
 // ENUM TYPE ALIASES
@@ -1917,6 +1989,23 @@ export type NewLeadCallLog = InferInsertModel<typeof leadCallLogs>;
 export type ItemType = "PATHWAY" | "COURSE" | "WORKSHOP" | "PROGRAM" | "EVENT" | "BUNDLE" | "MERCHANDISE";
 export type OrderStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
 export type DiscountType = "PERCENTAGE" | "FLAT";
-export type EnrollmentSource = "PURCHASE" | "ADMIN_MANUAL" | "CAMPUS_SPONSORED" | "FREE" | "INVITE";
+export type EnrollmentSource = "PURCHASE" | "ADMIN_MANUAL" | "CAMPUS_SPONSORED" | "FREE" | "INVITE" | "SURVEY";
+export type LeadSource =
+  | "PRESENTATION_SESSION"
+  | "COLLEGE_DRIVE"
+  | "PAMPHLET_SCAN"
+  | "PAMPHLET_QR"
+  | "SESSION_QR"
+  | "IAPT"
+  | "AI_WORKSHOP"
+  | "PROFESSOR_NETWORK"
+  | "NON_PAMPHLET"
+  | "ORGANIC"
+  | "DIRECT_WEB"
+  | "WEBSITE_INQUIRY"
+  | "REFERRAL"
+  | "MANUAL_IMPORT"
+  | "OTHER"
+  | "SURVEY";
 
 

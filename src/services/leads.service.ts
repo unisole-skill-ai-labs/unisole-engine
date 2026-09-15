@@ -131,6 +131,7 @@ export const leadsService = {
     if (body.nextCallAt !== undefined) updatePayload.nextCallAt = cleanIsoDate(body.nextCallAt);
     if (body.conversionValuePaise !== undefined) updatePayload.conversionValuePaise = Number(body.conversionValuePaise) || 0;
     if (body.notes !== undefined) updatePayload.notes = cleanStr(body.notes);
+    if (body.subStatus !== undefined) updatePayload.subStatus = cleanStr(body.subStatus);
     if (body.tags !== undefined) updatePayload.tags = Array.isArray(body.tags) ? body.tags : [];
 
     const updated = await leadsRepository.update(id, updatePayload);
@@ -220,6 +221,7 @@ export const leadsService = {
     body: {
       callDurationSeconds?: number;
       outcome: string;
+      subStatus?: string;
       notes: string;
       newQuality?: string;
       newStatus?: string;
@@ -249,6 +251,7 @@ export const leadsService = {
       callerName: callerUser.name || callerUser.phone || "Team Counselor",
       callDurationSeconds: Number(body.callDurationSeconds) || 0,
       outcome: body.outcome,
+      subStatus: body.subStatus ? String(body.subStatus).trim() : undefined,
       notes: String(body.notes).trim(),
       newQuality: body.newQuality,
       newStatus: body.newStatus,

@@ -16,9 +16,11 @@
     "db:seed:system": "node dist/scripts/seed-system.js",
     "db:seed:partners": "node dist/scripts/seed-partner-colleges.js",
     "db:seed:demo": "node dist/scripts/seed-demo-analytics.js",
+    "db:seed:survey": "tsx src/scripts/seed-survey.ts",
     "db:seed:dev": "tsx src/scripts/seed-system.ts"
   },
   "dependencies": {
+    "@google-cloud/storage": "^8.1.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
