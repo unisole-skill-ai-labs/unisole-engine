@@ -9,25 +9,41 @@ set -e
 # Determine directory paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
-if [ -d "/opt/unisole" ]; then
-  cd /opt/unisole
-else
-  cd "$PROJECT_ROOT"
-fi
+cd "$PROJECT_ROOT"
 
 # Load environment configuration if available (handling CRLF safely)
 if [ -f .env.production ]; then
   # shellcheck disable=SC1090
   eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env.production | tr -d '\r')" 2>/dev/null || true
+elif [ -f .env.staging ]; then
+  # shellcheck disable=SC1090
+  eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env.staging | tr -d '\r')" 2>/dev/null || true
 elif [ -f .env ]; then
   # shellcheck disable=SC1090
   eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '\r')" 2>/dev/null || true
 fi
 
+# Detect docker compose file
+COMPOSE_FILE="docker-compose.prod.yml"
+if [ ! -f "$COMPOSE_FILE" ]; then
+  if [ -f "docker-compose.staging.yml" ]; then
+    COMPOSE_FILE="docker-compose.staging.yml"
+  elif [ -f "docker-compose.yml" ]; then
+    COMPOSE_FILE="docker-compose.yml"
+  fi
+fi
+
+# Detect database service name and default database name
+DB_SERVICE="db"
+if grep -q "db-staging:" "$COMPOSE_FILE" 2>/dev/null; then
+  DB_SERVICE="db-staging"
+  DB_NAME="${DB_NAME:-unisole_staging}"
+else
+  DB_NAME="${DB_NAME:-unisole}"
+fi
+
 # Configuration & Defaults
 DB_USER="${DB_USER:-postgres}"
-DB_NAME="${DB_NAME:-unisole}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 DATE=$(date +"%Y-%m-%d_%H-%M-%S")
 BACKUP_FILE="$BACKUP_DIR/unisole_backup_$DATE.sql.gz"
@@ -39,7 +55,7 @@ mkdir -p "$BACKUP_DIR"
 # Ensure cleanup of temp files on exit
 trap 'rm -f "$TEMP_DUMP"' EXIT INT TERM
 
-echo "📦 [$(date +"%Y-%m-%d %H:%M:%S")] Starting database backup process..."
+echo "📦 [$(date +"%Y-%m-%d %H:%M:%S")] Starting database backup process ($DB_NAME via $DB_SERVICE)..."
 
 # Support automated test / mock mode for verification
 if [ -n "$MOCK_DUMP_DATA" ]; then
@@ -52,18 +68,8 @@ else
     DOCKER_COMPOSE_CMD="docker-compose"
   fi
 
-  # Detect docker compose file
-  COMPOSE_FILE="docker-compose.prod.yml"
-  if [ ! -f "$COMPOSE_FILE" ]; then
-    if [ -f "docker-compose.staging.yml" ]; then
-      COMPOSE_FILE="docker-compose.staging.yml"
-    elif [ -f "docker-compose.yml" ]; then
-      COMPOSE_FILE="docker-compose.yml"
-    fi
-  fi
-
   # Dump database excluding header comments so identical data produces identical byte stream
-  $DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" exec -T db pg_dump \
+  $DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" pg_dump \
     -U "$DB_USER" \
     -d "$DB_NAME" \
     --no-comments > "$TEMP_DUMP"
