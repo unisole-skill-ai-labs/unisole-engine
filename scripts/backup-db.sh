@@ -110,6 +110,31 @@ ls -t unisole_backup_*.sql.gz 2>/dev/null | tail -n +8 | xargs rm -f 2>/dev/null
 echo "📋 Recent backups:"
 # shellcheck disable=SC2012
 ls -lh unisole_backup_*.sql.gz 2>/dev/null | tail -5
+cd "$PROJECT_ROOT"
+
+# Detect node executable (supports Linux node and Windows node.exe)
+NODE_CMD="node"
+if ! command -v node >/dev/null 2>&1; then
+  if command -v node.exe >/dev/null 2>&1; then
+    NODE_CMD="node.exe"
+  fi
+fi
+
+# Off-site Cloud Backup: Cloudflare R2 (10 GB Free Forever, zero egress fees)
+if [ -f "$PROJECT_ROOT/config/r2-credentials.json" ] || [ -f "/opt/unisole/config/r2-credentials.json" ] || [ -n "$CLOUDFLARE_R2_TOKEN" ]; then
+  if command -v "$NODE_CMD" >/dev/null 2>&1 && [ -f "scripts/upload-r2.js" ]; then
+    echo "☁️ Triggering Cloudflare R2 off-site upload..."
+    $NODE_CMD "scripts/upload-r2.js" "$BACKUP_FILE" || echo "⚠️ Warning: Cloudflare R2 upload failed, local backup is still safe."
+  fi
+fi
+
+# Optional: Upload to Firebase Cloud Storage
+if [ -f "$PROJECT_ROOT/config/firebase-service-account.json" ] || [ -f "/opt/unisole/config/firebase-service-account.json" ] || [ -n "$FIREBASE_SERVICE_ACCOUNT_KEY" ]; then
+  if command -v "$NODE_CMD" >/dev/null 2>&1 && [ -f "scripts/upload-firebase.js" ]; then
+    echo "☁️ Triggering Firebase Cloud Storage off-site upload..."
+    $NODE_CMD "scripts/upload-firebase.js" "$BACKUP_FILE" || echo "⚠️ Warning: Firebase upload failed, local backup is still safe."
+  fi
+fi
 
 # Optional: Upload to AWS S3 if bucket is configured and aws CLI exists
 S3_BUCKET="${S3_BACKUP_BUCKET:-$AWS_BACKUP_S3_BUCKET}"
