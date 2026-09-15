@@ -14,6 +14,7 @@ import { publicRouter } from "./routes/public";
 import { webhooksRouter } from "./routes/webhooks";
 import { iaptRouter } from "./routes/iapt";
 import { workshopRouter } from "./routes/workshop";
+import { surveysPublicRouter } from "./routes/surveys";
 import { ordersRouter } from "./routes/orders";
 import { paymentsRouter } from "./routes/payments";
 import { notFound } from "./middleware/not-found";
@@ -68,6 +69,8 @@ app.use("/api/iapt", iaptRouter);
 app.use("/api/v1/iapt", iaptRouter);
 app.use("/api/workshop", workshopRouter);
 app.use("/api/public/workshop", workshopRouter);
+app.use("/api/surveys", surveysPublicRouter);
+app.use("/api/public/surveys", surveysPublicRouter);
 
 
 app.use(notFound);
