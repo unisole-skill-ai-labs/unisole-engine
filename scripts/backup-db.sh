@@ -62,9 +62,16 @@ if [ -z "$COMPOSE_FILE" ]; then
   fi
 fi
 
-# Fallback defaults if not set
+# Fallback defaults
 DB_SERVICE="${DB_SERVICE:-db}"
-DB_NAME="${DB_NAME:-unisole}"
+if [ "$DB_SERVICE" = "db-staging" ]; then
+  # In staging, the database is unisole_staging
+  if [ -z "$DB_NAME" ] || [ "$DB_NAME" = "unisole" ]; then
+    DB_NAME="unisole_staging"
+  fi
+else
+  DB_NAME="${DB_NAME:-unisole}"
+fi
 
 # Configuration & Defaults
 DB_USER="${DB_USER:-postgres}"
