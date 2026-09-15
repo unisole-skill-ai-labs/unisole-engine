@@ -71,17 +71,17 @@ export const studentSurveySchema = {
     },
     {
       id: "college_reality",
-      title: "College Realities & Career Perspective",
+      title: "College Realities & Career Goals",
       description: "Your honest input on college challenges, guidance, and career direction.",
       questions: [
         {
           id: "current_focus",
-          title: "Abhi aap kya kar rahe ho — job ki taiyari, koi course, ya kuch specific nahi?",
+          title: "What are you currently focusing on alongside your college studies?",
           type: "single-select",
           required: true,
           options: [
-            "Preparing for private / tech industry jobs & placements",
-            "Preparing for government exams (Civil Services, Banking, Defense, etc.)",
+            "Preparing for private / tech industry jobs & campus placements",
+            "Preparing for government / competitive exams (UPSC, Banking, SSC, Defense, etc.)",
             "Enrolled in an external skill course or certification",
             "Working on personal projects, coding, or freelancing",
             "Focusing strictly on regular college exams and syllabus",
@@ -90,13 +90,13 @@ export const studentSurveySchema = {
         },
         {
           id: "current_focus_reason",
-          title: "Yeh khud ki choice thi ya kisi ne suggest kiya? (agar khud ki choice thi, toh kyun?)",
+          title: "Was this your own choice or did someone suggest it? (If your own choice, why?)",
           type: "text",
           required: false,
         },
         {
           id: "career_ambition",
-          title: "Current ambition kya hai — job, higher study, business, ya govt exam?",
+          title: "What is your primary career ambition right now?",
           type: "single-select",
           required: true,
           options: [
@@ -110,13 +110,13 @@ export const studentSurveySchema = {
         },
         {
           id: "ambition_preparation",
-          title: "Uske liye abhi kya kar rahe ho?",
+          title: "What are you currently doing to prepare for this ambition?",
           type: "text",
           required: false,
         },
         {
           id: "college_problem",
-          title: "College level pe sabse badi problem kya lagti hai?",
+          title: "What feels like the biggest problem or bottleneck at the college level?",
           type: "single-select",
           hasOther: true,
           required: true,
@@ -130,7 +130,7 @@ export const studentSurveySchema = {
         },
         {
           id: "system_problem",
-          title: "Poore education system mein sabse badi problem kya lagti hai?",
+          title: "In your honest opinion, what is the biggest problem in the overall education system?",
           type: "single-select",
           hasOther: true,
           required: true,
@@ -144,7 +144,7 @@ export const studentSurveySchema = {
         },
         {
           id: "past_course_exp",
-          title: "Pehle koi offline/online course kiya hai?",
+          title: "Have you previously taken any offline or online courses?",
           type: "single-select",
           required: true,
           options: [
@@ -156,27 +156,27 @@ export const studentSurveySchema = {
         },
         {
           id: "past_course_feedback",
-          title: "Kya achha tha, kya nahi?",
+          title: "If yes, what was good about it, and what was disappointing or missing?",
           type: "text",
           required: false,
         },
         {
           id: "course_motivation",
-          title: "Course lene ka main reason kya hota hai — certification, job-skill, ya apni interest?",
+          title: "What is your main reason for enrolling in a skill course?",
           type: "single-select",
           hasOther: true,
           required: true,
           options: [
-            "To acquire practical, job-ready skills (Job-skill)",
-            "To get a verified certificate for my resume (Certification)",
-            "Genuine personal curiosity and interest in technology (Apni interest)",
+            "To acquire practical, job-ready skills",
+            "To get a verified certificate for my resume",
+            "Genuine personal curiosity and interest in technology",
             "College / internship mandatory requirement",
             "To build real projects for my GitHub / portfolio",
           ],
         },
         {
           id: "seniors_guidance",
-          title: "Seniors se sahi guidance milti hai, ya woh bhi confused hote hain?",
+          title: "Do you get useful career guidance from college seniors, or do they seem just as confused?",
           type: "single-select",
           required: true,
           options: [
@@ -188,20 +188,20 @@ export const studentSurveySchema = {
         },
         {
           id: "professors_direction",
-          title: "Professors kis taraf push karte hain — higher study, govt job, ya private job?",
+          title: "Which direction do college professors usually encourage or push students towards?",
           type: "single-select",
           hasOther: true,
           required: true,
           options: [
-            "Higher studies (Master’s, MCA, M.Tech, MBA)",
-            "Government jobs / Civil service exams",
+            "Pursuing higher studies (Master’s, MCA, M.Tech, MBA)",
+            "Preparing for government jobs / civil service exams",
             "Private sector / IT / Corporate jobs",
             "They mostly focus only on syllabus and exams, rarely discussing careers",
           ],
         },
         {
           id: "parents_expectation",
-          title: "Parents kya chahte hain, aur kya woh aapki apni pasand se match karta hai?",
+          title: "What career path do your parents want for you, and does it match your own choice?",
           type: "single-select",
           hasOther: true,
           required: true,
@@ -214,7 +214,7 @@ export const studentSurveySchema = {
         },
         {
           id: "sector_preference",
-          title: "Private sector vs government sector — honest opinion?",
+          title: "What is your honest opinion when comparing the Private Sector vs Government Sector?",
           type: "single-select",
           required: true,
           options: [
@@ -233,7 +233,7 @@ export const studentSurveySchema = {
       questions: [
         {
           id: "interested_skills",
-          title: "Skill program mein sabse zyada interest kis mein hoga?",
+          title: "Which skill programs would you be most interested in taking?",
           type: "multi-select",
           hasOther: true,
           required: true,
@@ -251,7 +251,7 @@ export const studentSurveySchema = {
         },
         {
           id: "learning_mode",
-          title: "Offline, online, ya hybrid — kya prefer karoge?",
+          title: "Which learning format do you prefer?",
           type: "single-select",
           required: true,
           options: [
@@ -262,7 +262,7 @@ export const studentSurveySchema = {
         },
         {
           id: "degree_skill_weightage",
-          title: "Core degree aur skill training ko kitna weightage dena chahiye?",
+          title: "How should time and importance be divided between your core degree and practical skill training?",
           type: "single-select",
           required: true,
           options: [
@@ -274,7 +274,7 @@ export const studentSurveySchema = {
         },
         {
           id: "credit_value",
-          title: "Agar yeh skill training aapki degree mein official academic credit ke roop mein count ho sake, toh kya woh zyada valuable lagega — ya ek separate certificate kaafi hai?",
+          title: "If this skill training counts as official academic credits in your degree, would that make it more valuable?",
           type: "single-select",
           required: true,
           options: [
@@ -286,7 +286,7 @@ export const studentSurveySchema = {
         },
         {
           id: "budget_preference",
-          title: "Ek genuinely accha 3-month skill program ke liye aap kitna realistically pay kar sakte ho — ya sirf tab lenge jab woh free/govt-subsidized ho?",
+          title: "How much can you realistically afford to pay for a high-quality 3-month skill program?",
           type: "single-select",
           required: true,
           options: [
@@ -298,7 +298,7 @@ export const studentSurveySchema = {
         },
         {
           id: "weekly_hours",
-          title: "Weekly kitne ghante nikal sakte ho aisi training ke liye, apni regular padhai ke saath?",
+          title: "How many hours per week can you realistically dedicate to skill training alongside college?",
           type: "single-select",
           required: true,
           options: [
@@ -310,7 +310,7 @@ export const studentSurveySchema = {
         },
         {
           id: "has_laptop",
-          title: "laptop hai ??",
+          title: "Do you have a personal laptop or computer for hands-on practice?",
           type: "single-select",
           required: true,
           options: [
@@ -321,7 +321,7 @@ export const studentSurveySchema = {
         },
         {
           id: "join_ai_network",
-          title: "would you like to join the national AI network of unisole",
+          title: "Would you like to join the National AI Network of Unisole?",
           type: "single-select",
           required: true,
           options: [
