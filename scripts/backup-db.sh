@@ -23,24 +23,48 @@ elif [ -f .env ]; then
   eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '\r')" 2>/dev/null || true
 fi
 
-# Detect docker compose file
-COMPOSE_FILE="docker-compose.prod.yml"
-if [ ! -f "$COMPOSE_FILE" ]; then
-  if [ -f "docker-compose.staging.yml" ]; then
+# Detect docker compose file and database service
+COMPOSE_FILE=""
+DB_SERVICE=""
+
+# 1. Check running docker containers first
+if command -v docker >/dev/null 2>&1; then
+  RUNNING_CONTAINERS=$(docker ps --format '{{.Names}}' 2>/dev/null || true)
+  if echo "$RUNNING_CONTAINERS" | grep -q "db-staging"; then
     COMPOSE_FILE="docker-compose.staging.yml"
-  elif [ -f "docker-compose.yml" ]; then
-    COMPOSE_FILE="docker-compose.yml"
+    DB_SERVICE="db-staging"
+    DB_NAME="${DB_NAME:-unisole_staging}"
+  elif echo "$RUNNING_CONTAINERS" | grep -E "(_db_1|-db-1|^db$)"; then
+    COMPOSE_FILE="docker-compose.prod.yml"
+    DB_SERVICE="db"
+    DB_NAME="${DB_NAME:-unisole}"
   fi
 fi
 
-# Detect database service name and default database name
-DB_SERVICE="db"
-if grep -q "db-staging:" "$COMPOSE_FILE" 2>/dev/null; then
-  DB_SERVICE="db-staging"
-  DB_NAME="${DB_NAME:-unisole_staging}"
-else
-  DB_NAME="${DB_NAME:-unisole}"
+# 2. Check current directory name or environment
+if [ -z "$COMPOSE_FILE" ]; then
+  if [[ "$PWD" == *"staging"* ]] && [ -f "docker-compose.staging.yml" ]; then
+    COMPOSE_FILE="docker-compose.staging.yml"
+    DB_SERVICE="db-staging"
+    DB_NAME="${DB_NAME:-unisole_staging}"
+  elif [ -f "docker-compose.prod.yml" ]; then
+    COMPOSE_FILE="docker-compose.prod.yml"
+    DB_SERVICE="db"
+    DB_NAME="${DB_NAME:-unisole}"
+  elif [ -f "docker-compose.staging.yml" ]; then
+    COMPOSE_FILE="docker-compose.staging.yml"
+    DB_SERVICE="db-staging"
+    DB_NAME="${DB_NAME:-unisole_staging}"
+  else
+    COMPOSE_FILE="docker-compose.yml"
+    DB_SERVICE="db"
+    DB_NAME="${DB_NAME:-unisole}"
+  fi
 fi
+
+# Fallback defaults if not set
+DB_SERVICE="${DB_SERVICE:-db}"
+DB_NAME="${DB_NAME:-unisole}"
 
 # Configuration & Defaults
 DB_USER="${DB_USER:-postgres}"
@@ -68,8 +92,15 @@ else
     DOCKER_COMPOSE_CMD="docker-compose"
   fi
 
+  ENV_FILE_FLAG=""
+  if [ -f ".env" ]; then
+    ENV_FILE_FLAG="--env-file .env"
+  elif [ -f ".env.staging" ]; then
+    ENV_FILE_FLAG="--env-file .env.staging"
+  fi
+
   # Dump database excluding header comments so identical data produces identical byte stream
-  $DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" pg_dump \
+  $DOCKER_COMPOSE_CMD $ENV_FILE_FLAG -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" pg_dump \
     -U "$DB_USER" \
     -d "$DB_NAME" \
     --no-comments > "$TEMP_DUMP"
