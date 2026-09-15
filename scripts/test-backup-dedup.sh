@@ -40,26 +40,26 @@ export MOCK_DUMP_DATA="CREATE TABLE test_table (id INT, name TEXT); INSERT INTO 
 bash scripts/backup-db.sh
 
 COUNT3=$(find "$BACKUP_DIR" -name "unisole_backup_*.sql.gz" | wc -l)
-if [ "$COUNT3" -ne 2 ]; then
-  echo "FAIL: New backup was not created on data change! Expected 2, got $COUNT3"
+if [ "$COUNT3" -ne 1 ]; then
+  echo "FAIL: Expected exactly 1 latest backup file retained, got $COUNT3"
   exit 1
 fi
-echo "✅ PASS Test 3: Data change correctly detected and new backup archive created."
+echo "✅ PASS Test 3: Data change correctly detected, new backup archive replaced older one (1 file kept)."
 
 echo ""
-echo "=== Test 4: Rotation Test (Create 8 backups, verify only 7 kept) ==="
-for i in 3 4 5 6 7 8 9; do
+echo "=== Test 4: Single Local File Retention Test (Verify only 1 single latest backup kept) ==="
+for i in 3 4 5; do
   sleep 1
   export MOCK_DUMP_DATA="DATA_$i"
   bash scripts/backup-db.sh >/dev/null 2>&1
 done
 
 TOTAL_KEPT=$(find "$BACKUP_DIR" -name "unisole_backup_*.sql.gz" | wc -l)
-if [ "$TOTAL_KEPT" -ne 7 ]; then
-  echo "FAIL: Expected 7 backups retained, found $TOTAL_KEPT"
+if [ "$TOTAL_KEPT" -ne 1 ]; then
+  echo "FAIL: Expected exactly 1 backup retained, found $TOTAL_KEPT"
   exit 1
 fi
-echo "✅ PASS Test 4: Rotation correctly kept exactly 7 latest backups!"
+echo "✅ PASS Test 4: Server disk correctly retains only 1 single latest backup file!"
 
 echo ""
 echo "🎉 ALL END-TO-END TESTS PASSED SUCCESSFULLY!"

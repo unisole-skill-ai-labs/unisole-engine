@@ -145,15 +145,15 @@ echo "$CURRENT_HASH" > "$HASH_FILE"
 FILE_SIZE=$(du -h "$BACKUP_FILE" 2>/dev/null | cut -f1 || ls -lh "$BACKUP_FILE" | awk '{print $5}')
 echo "✅ Backup created successfully: $BACKUP_FILE ($FILE_SIZE)"
 
-# Retain last 7 backups, purge older ones
-echo "🧹 Cleaning old backups (retaining last 7 snapshots)..."
+# Server disk cleanliness: Keep ONLY 1 single latest backup locally on EC2
+echo "🧹 Cleaning old local backups (keeping only 1 single latest snapshot on EC2)..."
 cd "$BACKUP_DIR"
 # shellcheck disable=SC2012
-ls -t unisole_backup_*.sql.gz 2>/dev/null | tail -n +8 | xargs rm -f 2>/dev/null || true
+ls -t unisole_backup_*.sql.gz 2>/dev/null | tail -n +2 | xargs rm -f 2>/dev/null || true
 
-echo "📋 Recent backups:"
+echo "📋 Local server backup (single file retained):"
 # shellcheck disable=SC2012
-ls -lh unisole_backup_*.sql.gz 2>/dev/null | tail -5
+ls -lh unisole_backup_*.sql.gz 2>/dev/null
 cd "$PROJECT_ROOT"
 
 # Detect node executable (supports Linux node and Windows node.exe)
