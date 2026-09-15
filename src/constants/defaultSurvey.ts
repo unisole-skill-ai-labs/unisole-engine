@@ -76,7 +76,7 @@ export const studentSurveySchema = {
       questions: [
         {
           id: "current_focus",
-          title: "Right now, what are you mainly focusing on alongside your college studies?",
+          title: "Abhi aap kya kar rahe ho — job ki taiyari, koi course, ya kuch specific nahi?",
           type: "single-select",
           required: true,
           options: [
@@ -90,13 +90,13 @@ export const studentSurveySchema = {
         },
         {
           id: "current_focus_reason",
-          title: "Was this your own choice or did someone suggest it? (If your own choice, why?)",
+          title: "Yeh khud ki choice thi ya kisi ne suggest kiya? (agar khud ki choice thi, toh kyun?)",
           type: "text",
           required: false,
         },
         {
           id: "career_ambition",
-          title: "What is your primary career ambition right now?",
+          title: "Current ambition kya hai — job, higher study, business, ya govt exam?",
           type: "single-select",
           required: true,
           options: [
@@ -110,13 +110,13 @@ export const studentSurveySchema = {
         },
         {
           id: "ambition_preparation",
-          title: "What are you currently doing to prepare for this ambition?",
+          title: "Uske liye abhi kya kar rahe ho?",
           type: "text",
           required: false,
         },
         {
           id: "college_problem",
-          title: "What feels like the biggest problem or bottleneck at the college level?",
+          title: "College level pe sabse badi problem kya lagti hai?",
           type: "single-select",
           hasOther: true,
           required: true,
@@ -130,7 +130,7 @@ export const studentSurveySchema = {
         },
         {
           id: "system_problem",
-          title: "In your honest opinion, what is the biggest problem in the overall education system?",
+          title: "Poore education system mein sabse badi problem kya lagti hai?",
           type: "single-select",
           hasOther: true,
           required: true,
@@ -144,7 +144,7 @@ export const studentSurveySchema = {
         },
         {
           id: "past_course_exp",
-          title: "Have you previously taken any offline or online courses?",
+          title: "Pehle koi offline/online course kiya hai?",
           type: "single-select",
           required: true,
           options: [
@@ -156,27 +156,27 @@ export const studentSurveySchema = {
         },
         {
           id: "past_course_feedback",
-          title: "If yes, what was good about it, and what was disappointing or missing?",
+          title: "Kya achha tha, kya nahi?",
           type: "text",
           required: false,
         },
         {
           id: "course_motivation",
-          title: "What is your main reason for enrolling in a skill course?",
+          title: "Course lene ka main reason kya hota hai — certification, job-skill, ya apni interest?",
           type: "single-select",
           hasOther: true,
           required: true,
           options: [
-            "To acquire practical, job-ready skills",
-            "To get a verified certificate for my resume",
-            "Genuine personal curiosity and interest in technology",
+            "To acquire practical, job-ready skills (Job-skill)",
+            "To get a verified certificate for my resume (Certification)",
+            "Genuine personal curiosity and interest in technology (Apni interest)",
             "College / internship mandatory requirement",
             "To build real projects for my GitHub / portfolio",
           ],
         },
         {
           id: "seniors_guidance",
-          title: "Do you get useful career guidance from college seniors, or do they seem just as confused?",
+          title: "Seniors se sahi guidance milti hai, ya woh bhi confused hote hain?",
           type: "single-select",
           required: true,
           options: [
@@ -188,20 +188,20 @@ export const studentSurveySchema = {
         },
         {
           id: "professors_direction",
-          title: "Which direction do college professors usually encourage or push students towards?",
+          title: "Professors kis taraf push karte hain — higher study, govt job, ya private job?",
           type: "single-select",
           hasOther: true,
           required: true,
           options: [
-            "Preparing for government jobs / civil service exams",
-            "Pursuing higher studies (Master’s, MCA, M.Tech, MBA)",
+            "Higher studies (Master’s, MCA, M.Tech, MBA)",
+            "Government jobs / Civil service exams",
             "Private sector / IT / Corporate jobs",
             "They mostly focus only on syllabus and exams, rarely discussing careers",
           ],
         },
         {
           id: "parents_expectation",
-          title: "What career path do your parents want for you, and does it match your own choice?",
+          title: "Parents kya chahte hain, aur kya woh aapki apni pasand se match karta hai?",
           type: "single-select",
           hasOther: true,
           required: true,
@@ -214,7 +214,7 @@ export const studentSurveySchema = {
         },
         {
           id: "sector_preference",
-          title: "What is your honest opinion when comparing the Private Sector vs Government Sector?",
+          title: "Private sector vs government sector — honest opinion?",
           type: "single-select",
           required: true,
           options: [
@@ -233,7 +233,7 @@ export const studentSurveySchema = {
       questions: [
         {
           id: "interested_skills",
-          title: "Which skill programs would you be most interested in taking?",
+          title: "Skill program mein sabse zyada interest kis mein hoga?",
           type: "multi-select",
           hasOther: true,
           required: true,
@@ -241,16 +241,17 @@ export const studentSurveySchema = {
             "Data Science",
             "Data Analytics",
             "Machine Learning",
-            "Generative AI & AI Tools",
+            "Generative AI",
             "Full Stack Data Science",
-            "Entrepreneurship & Startup Building",
-            "Cyber Security & Ethical Hacking",
+            "Entrepreneurship",
+            "Cyber Security",
             "Data Engineering",
+            "Finance",
           ],
         },
         {
           id: "learning_mode",
-          title: "Which learning format do you prefer?",
+          title: "Offline, online, ya hybrid — kya prefer karoge?",
           type: "single-select",
           required: true,
           options: [
@@ -261,7 +262,7 @@ export const studentSurveySchema = {
         },
         {
           id: "degree_skill_weightage",
-          title: "How should a student's time and effort ideally be divided between the college degree and practical skill training?",
+          title: "Core degree aur skill training ko kitna weightage dena chahiye?",
           type: "single-select",
           required: true,
           options: [
@@ -273,7 +274,7 @@ export const studentSurveySchema = {
         },
         {
           id: "credit_value",
-          title: "If this skill training is officially counted towards your college degree as Academic Credits (under NEP), would that make it more valuable to you?",
+          title: "Agar yeh skill training aapki degree mein official academic credit ke roop mein count ho sake, toh kya woh zyada valuable lagega — ya ek separate certificate kaafi hai?",
           type: "single-select",
           required: true,
           options: [
@@ -285,7 +286,7 @@ export const studentSurveySchema = {
         },
         {
           id: "budget_preference",
-          title: "For a genuinely high-quality 3-month skill program with live mentorship and projects, what could you realistically afford to pay?",
+          title: "Ek genuinely accha 3-month skill program ke liye aap kitna realistically pay kar sakte ho — ya sirf tab lenge jab woh free/govt-subsidized ho?",
           type: "single-select",
           required: true,
           options: [
@@ -297,7 +298,7 @@ export const studentSurveySchema = {
         },
         {
           id: "weekly_hours",
-          title: "Alongside your regular college studies, how many hours per week can you realistically dedicate to skill training?",
+          title: "Weekly kitne ghante nikal sakte ho aisi training ke liye, apni regular padhai ke saath?",
           type: "single-select",
           required: true,
           options: [
@@ -305,6 +306,27 @@ export const studentSurveySchema = {
             "6–10 hours per week (around 1–1.5 hours daily)",
             "10–15 hours per week (regular practice + weekends)",
             "15+ hours per week (intensive commitment)",
+          ],
+        },
+        {
+          id: "has_laptop",
+          title: "laptop hai ??",
+          type: "single-select",
+          required: true,
+          options: [
+            "Yes, I have my own personal laptop / PC",
+            "No, but I have regular access to college computer labs or a shared laptop",
+            "No, I currently only have a smartphone",
+          ],
+        },
+        {
+          id: "join_ai_network",
+          title: "would you like to join the national AI network of unisole",
+          type: "single-select",
+          required: true,
+          options: [
+            "Yes! I want to join the Unisole National AI Network & receive community invites",
+            "Maybe later / Still exploring options",
           ],
         },
       ],
