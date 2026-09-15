@@ -46,13 +46,13 @@ for (const p of possibleConfigPaths) {
   }
 }
 
-const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || config.account_id || '8da6e38c4bc16ee68d7c0b8784af627e';
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || config.account_id;
 const bucketName = process.env.CLOUDFLARE_R2_BUCKET || config.bucket_name || 'unisole-db-backups';
 const apiToken = process.env.CLOUDFLARE_R2_TOKEN || process.env.CLOUDFLARE_API_TOKEN || config.api_token;
 
-if (!apiToken) {
-  console.error('❌ Error: Cloudflare R2 API token not found.');
-  console.error('Please configure CLOUDFLARE_R2_TOKEN or config/r2-credentials.json');
+if (!accountId || !apiToken) {
+  console.error('❌ Error: Cloudflare R2 Account ID or API token not found.');
+  console.error('Please configure CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_R2_TOKEN or config/r2-credentials.json');
   process.exit(1);
 }
 
