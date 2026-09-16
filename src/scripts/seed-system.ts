@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { pool } from "../db";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck";
+import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck";
 
 /**
@@ -89,6 +90,44 @@ export async function seedSystemData() {
       console.log(`[Seed:System] Synchronized GDC Theog branches.`);
     }
 
+    // 1B. Sync Centre of Excellence Government College Sanjauli (gdc-sanjauli)
+    const sanjauliClgRes = await pool.query(
+      `INSERT INTO colleges (name, short_name, slug, description, is_active)
+       VALUES ('Centre of Excellence Government College, Sanjauli', 'GDC Sanjauli', 'gdc-sanjauli', 'Premier Centre of Excellence institution in Shimla offering specialized BCA and undergraduate degrees affiliated with Himachal Pradesh University.', TRUE)
+       ON CONFLICT (slug) DO UPDATE 
+       SET name = EXCLUDED.name, short_name = EXCLUDED.short_name, description = EXCLUDED.description, is_active = TRUE
+       RETURNING id, name`
+    );
+
+    const sanjauliCollegeId = sanjauliClgRes.rows[0]?.id;
+    const sanjauliCollegeName = sanjauliClgRes.rows[0]?.name ?? "Centre of Excellence Government College, Sanjauli";
+
+    if (sanjauliCollegeId) {
+      const sanjauliBranches = [
+        { name: "BCA", code: "BCA", desc: "Bachelor of Computer Applications." },
+        { name: "Others", code: "OTHERS", desc: "Other / Multidisciplinary streams." },
+      ];
+
+      for (const br of sanjauliBranches) {
+        const brCheck = await pool.query(
+          "SELECT id FROM branches WHERE college_id = $1 AND (name = $2 OR code = $3) LIMIT 1",
+          [sanjauliCollegeId, br.name, br.code]
+        );
+        if (brCheck.rows && brCheck.rows[0]) {
+          await pool.query(
+            "UPDATE branches SET name = $1, code = $2, description = $3, is_active = TRUE WHERE id = $4",
+            [br.name, br.code, br.desc, brCheck.rows[0].id]
+          );
+        } else {
+          await pool.query(
+            "INSERT INTO branches (college_id, name, code, description, is_active) VALUES ($1, $2, $3, $4, TRUE)",
+            [sanjauliCollegeId, br.name, br.code, br.desc]
+          );
+        }
+      }
+      console.log(`[Seed:System] Synchronized GDC Sanjauli branches.`);
+    }
+
     // 2. Seed / Sync Flagship Deck: Theog College PPT
     const theogPresTitle = "Theog College PPT";
     await pool.query(
@@ -108,6 +147,26 @@ export async function seedSystemData() {
       ]
     );
     console.log(`[Seed:System] Synchronized flagship deck: Theog College PPT (${THEOG_COLLEGE_PPT_SLIDES.length} slides)`);
+
+    // 2B. Seed / Sync Flagship Deck: Sanjauli College PPT
+    const sanjauliPresTitle = "Sanjauli College PPT";
+    await pool.query(
+      `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+       VALUES ('pres_sanjauli_college_ppt', $1, $2, $3, $4, 'dark', $5, TRUE)
+       ON CONFLICT (id) DO UPDATE 
+       SET slides = EXCLUDED.slides, 
+           title = EXCLUDED.title, 
+           college_id = COALESCE(EXCLUDED.college_id, presentations.college_id), 
+           college_name = COALESCE(EXCLUDED.college_name, presentations.college_name)`,
+      [
+        sanjauliCollegeId,
+        sanjauliCollegeName,
+        sanjauliPresTitle,
+        "27-slide high-energy BCA-oriented career awareness & industrial training presentation for Centre of Excellence Govt. College Sanjauli featuring the Post-Bubble Macro AI Landscape, 100-Candidate Drop-off Funnel, and 7-Step Strategic Action Playbook.",
+        JSON.stringify(SANJAULI_COLLEGE_PPT_SLIDES),
+      ]
+    );
+    console.log(`[Seed:System] Synchronized flagship deck: Sanjauli College PPT (${SANJAULI_COLLEGE_PPT_SLIDES.length} slides)`);
 
     // 3. Seed / Sync Flagship Deck: Unisole AI Campus Deck
     const aiDeckTitle = "UNISOLE AI Campus Program Presentation Deck";

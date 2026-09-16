@@ -13,6 +13,7 @@ import {
 } from "../db/schema";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
+import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck.js";
 
 function generateSessionCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -28,11 +29,72 @@ export const presentationsService = {
     return THEOG_COLLEGE_PPT_SLIDES;
   },
 
+  getSanjauliTemplateSlides(): any[] {
+    return SANJAULI_COLLEGE_PPT_SLIDES;
+  },
+
+  async ensureFlagshipDecks(): Promise<void> {
+    try {
+      const existingSanjauli = await presentationsRepository.getPresentationById("pres_sanjauli_college_ppt");
+      if (!existingSanjauli) {
+        let sanjauliCollegeId: string | null = null;
+        let sanjauliCollegeName = "Centre of Excellence Government College, Sanjauli";
+        try {
+          const collegesList = await collegesRepository.list();
+          let sanjauliCollege = collegesList.find(
+            (c) =>
+              c.slug?.includes("sanjauli") ||
+              c.name?.toLowerCase().includes("sanjauli")
+          );
+          if (!sanjauliCollege) {
+            sanjauliCollege = await collegesRepository.create({
+              name: "Centre of Excellence Government College, Sanjauli",
+              shortName: "GDC Sanjauli",
+              slug: "gdc-sanjauli",
+              description: "Premier Centre of Excellence institution in Shimla offering specialized BCA and undergraduate degrees affiliated with Himachal Pradesh University.",
+              isActive: true,
+            });
+          }
+          if (sanjauliCollege) {
+            sanjauliCollegeId = sanjauliCollege.id;
+            sanjauliCollegeName = sanjauliCollege.name;
+          }
+        } catch (colErr) {
+          // ignore
+        }
+
+        await presentationsRepository.createPresentation({
+          id: "pres_sanjauli_college_ppt",
+          collegeId: sanjauliCollegeId,
+          collegeName: sanjauliCollegeName,
+          title: "Sanjauli College PPT",
+          description: "35-slide high-energy BCA-oriented career awareness & industrial training presentation for Centre of Excellence Govt. College Sanjauli featuring the Post-Bubble Macro AI Landscape, 100-Candidate Drop-off Funnel, Flagship Capstone Blueprints, and 7-Step Strategic Action Playbook.",
+          theme: "dark",
+          slides: SANJAULI_COLLEGE_PPT_SLIDES,
+          isActive: true,
+        });
+        console.log("[Presentations] Auto-seeded flagship deck: Sanjauli College PPT");
+      } else if (Array.isArray(existingSanjauli.slides) && existingSanjauli.slides.length !== SANJAULI_COLLEGE_PPT_SLIDES.length) {
+        await presentationsRepository.updatePresentation("pres_sanjauli_college_ppt", {
+          description: "35-slide high-energy BCA-oriented career awareness & industrial training presentation for Centre of Excellence Govt. College Sanjauli featuring the Post-Bubble Macro AI Landscape, 100-Candidate Drop-off Funnel, Flagship Capstone Blueprints, and 7-Step Strategic Action Playbook.",
+          slides: SANJAULI_COLLEGE_PPT_SLIDES,
+        });
+        console.log(`[Presentations] Auto-synced Sanjauli College PPT to ${SANJAULI_COLLEGE_PPT_SLIDES.length} slides.`);
+      }
+    } catch (err) {
+      console.warn("[Presentations] Could not auto-sync flagship decks:", err);
+    }
+  },
+
   async list(collegeId?: string): Promise<Presentation[]> {
+    await this.ensureFlagshipDecks();
     return presentationsRepository.listPresentations(collegeId);
   },
 
   async getById(id: string): Promise<Presentation> {
+    if (id === "pres_sanjauli_college_ppt") {
+      await this.ensureFlagshipDecks();
+    }
     const presentation = await presentationsRepository.getPresentationById(id);
     if (!presentation) {
       throw new NotFoundError("Presentation not found");
@@ -60,6 +122,11 @@ export const presentationsService = {
       throw new NotFoundError("Selected university/college not found");
     }
 
+    const isSanjauli =
+      data.title.toLowerCase().includes("sanjauli") ||
+      college.name.toLowerCase().includes("sanjauli") ||
+      college.slug.toLowerCase().includes("sanjauli");
+
     const isTheog =
       data.title.toLowerCase().includes("theog") ||
       college.name.toLowerCase().includes("theog") ||
@@ -68,6 +135,8 @@ export const presentationsService = {
     const defaultSlides =
       data.slides && data.slides.length > 0
         ? data.slides
+        : isSanjauli
+        ? SANJAULI_COLLEGE_PPT_SLIDES
         : isTheog
         ? THEOG_COLLEGE_PPT_SLIDES
         : UNISOLE_AI_CAMPUS_DECK_SLIDES;
