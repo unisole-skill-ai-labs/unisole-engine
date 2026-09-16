@@ -13,6 +13,7 @@ import {
 } from "../db/schema";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
+import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck.js";
 
 function generateSessionCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -26,6 +27,10 @@ export const presentationsService = {
 
   getTheogTemplateSlides(): any[] {
     return THEOG_COLLEGE_PPT_SLIDES;
+  },
+
+  getSanjauliTemplateSlides(): any[] {
+    return SANJAULI_COLLEGE_PPT_SLIDES;
   },
 
   async list(collegeId?: string): Promise<Presentation[]> {
@@ -60,6 +65,11 @@ export const presentationsService = {
       throw new NotFoundError("Selected university/college not found");
     }
 
+    const isSanjauli =
+      data.title.toLowerCase().includes("sanjauli") ||
+      college.name.toLowerCase().includes("sanjauli") ||
+      college.slug.toLowerCase().includes("sanjauli");
+
     const isTheog =
       data.title.toLowerCase().includes("theog") ||
       college.name.toLowerCase().includes("theog") ||
@@ -68,6 +78,8 @@ export const presentationsService = {
     const defaultSlides =
       data.slides && data.slides.length > 0
         ? data.slides
+        : isSanjauli
+        ? SANJAULI_COLLEGE_PPT_SLIDES
         : isTheog
         ? THEOG_COLLEGE_PPT_SLIDES
         : UNISOLE_AI_CAMPUS_DECK_SLIDES;
