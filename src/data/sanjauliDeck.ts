@@ -102,9 +102,144 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Mentors from BlackRock, Tech Mahindra, NASA challenge, IIT & NIT.",
   },
 
-  // SLIDE 6 — ACT 1: BEYOND THE HYPE & PANIC TRIGGER
+  // SLIDE 6 — TRANSITION: THE REAL QUESTION
   {
     id: "sanjauli_slide_6",
+    type: "TEXT_TRANSITION",
+    badge: "A VITAL QUESTION",
+    title: "If tech opportunities are exploding globally...",
+    subtitle: "Why are so many BCA students anxious, uncertain, and struggling to break through?",
+    maxBuildSteps: 2,
+    notes: "Dark slide. Use a dramatic pause before revealing the subtitle.",
+  },
+
+  // SLIDE 7 — THE MODERN TECH ECOSYSTEM MAP
+  {
+    id: "sanjauli_slide_7",
+    type: "ECOSYSTEM_HUB",
+    badge: "THE TECH LANDSCAPE",
+    title: "Where Do Modern Software Engineers Actually Work?",
+    subtitle: "Your degree is a starting point — the global tech landscape has expanded far beyond legacy IT service desks.",
+    centerLabel: "TECH ECOSYSTEM",
+    items: [
+      "AI & Deep-Tech Labs",
+      "Global Capability Centres (GCCs)",
+      "Product Startups (Seed to Series B)",
+      "High-Growth Enterprise SaaS",
+      "Cloud & DevOps Infrastructure",
+      "FinTech & Algorithmic Systems",
+      "Remote / Global Engineering Teams",
+      "Open-Source Tooling & Developer Infrastructure",
+    ],
+    punchline: "The modern software ecosystem rewards domain depth, resilience, and verified code over pedigree.",
+    maxBuildSteps: 3,
+    notes: "Build the ecosystem around TECH ECOSYSTEM. Highlight that opportunities extend far beyond mass IT service hiring.",
+  },
+
+  // SLIDE 8 — THE INFORMATION GAP
+  {
+    id: "sanjauli_slide_8",
+    type: "THREE_CARDS",
+    badge: "INFORMATION GAP",
+    title: "Why Don't BCA Students Hear About These Roles?",
+    subtitle: "The market changed exponentially faster than academic career advice.",
+    cards: [
+      {
+        num: "01",
+        title: "Traditional College Advice",
+        items: [
+          "Parents, relatives, and general seniors",
+          "Focus on legacy government exams or mass recruiting drives",
+          "Advice rooted in the 2005–2015 tech market",
+        ],
+      },
+      {
+        num: "02",
+        title: "Academic Syllabus Lag",
+        items: [
+          "Textbook syntax without modern toolchains (Docker, Git, CI/CD)",
+          "Focus on theoretical exams rather than live deployed architectures",
+          "Zero exposure to microservices, async queues, or local LLMs",
+        ],
+      },
+      {
+        num: "03",
+        title: "The Modern Engineering Reality",
+        items: [
+          "Containerized backends, REST/gRPC contracts, and API performance",
+          "Small open-weight AI models (Ollama, vLLM) & vector embeddings",
+          "Proof-of-work hiring: live GitHub repos, Dockerfiles & public demos",
+        ],
+      },
+    ],
+    punchline: "The industry demands production builders while traditional advice remains stuck in legacy theory.",
+    maxBuildSteps: 3,
+    notes: "Three large cards showing why standard guidance lagged behind real-world engineering shifts.",
+  },
+
+  // SLIDE 9 — THE EDUCATION SURGE
+  {
+    id: "sanjauli_slide_9",
+    type: "EDUCATION_SHIFT",
+    badge: "EDUCATION SHIFT",
+    title: "The Indian Higher Education Surge",
+    subtitle: "More graduates than ever before. A degree alone is no longer enough to differentiate yourself.",
+    stat1: {
+      year: "1990–91",
+      count: "~49 LAKH",
+      label: "Higher Education Enrolment",
+      ratio: "GER ≈ 6%",
+    },
+    stat2: {
+      year: "2023–24",
+      count: "~4.5 CRORE",
+      label: "Higher Education Enrolment",
+      ratio: "GER ≈ 30% (9x surge)",
+    },
+    punchline: "When millions hold a degree, companies filter candidates by proof of execution, not certificates.",
+    maxBuildSteps: 3,
+    notes: "Large visual comparison with animated bars. Highlight that a degree alone is no longer a moat—verifiable capability is.",
+  },
+
+  // SLIDE 10 — WHAT MODERN TECH OFFERS BCA GRADUATES
+  {
+    id: "sanjauli_slide_10",
+    type: "BENEFITS_GRID",
+    badge: "CAREER ADVANTAGES",
+    title: "What Can a Modern Tech Career Offer You?",
+    subtitle: "One strong technical foundation → Multiple roles → Compounding career upside.",
+    benefits: [
+      { title: "REMOTE & HYBRID WORK", value: "Global", sub: "Build for world-class teams from Shimla" },
+      { title: "PERFORMANCE-DRIVEN PAY", value: "Compounding", sub: "Merit-based compensation that scales with impact" },
+      { title: "RAPID MERITOCRACY", value: "Fast Track", sub: "Promotions based on shipping code, not seniority" },
+      { title: "CONTINUOUS CUTTING-EDGE TECH", value: "AI & Cloud", sub: "Work with modern LLM pipelines & cloud infra" },
+      { title: "2,100+ GCC HUBS IN INDIA", value: "Enterprise", sub: "Global engineering headquarters operating in India" },
+    ],
+    maxBuildSteps: 3,
+    notes: "Highlight the immense upside of modern software engineering: remote capability, meritocracy, and 2,100+ GCCs in India.",
+  },
+
+  // SLIDE 11 — LIVE POLL 02
+  {
+    id: "sanjauli_slide_11",
+    type: "POLL",
+    badge: "LIVE POLL 02",
+    title: "What Matters Most in Modern Software Hiring?",
+    question: "What do top tech hiring managers value most when evaluating junior engineers?",
+    options: [
+      "College Tier & Degree Name",
+      "Live Deployed Projects & System Proof",
+      "Problem Solving & CS Fundamentals",
+      "Quantity of Online Course Certificates",
+      "Syntax Memorization & Typing Speed",
+    ],
+    maxBuildSteps: 1,
+    notes: "Live Poll 02. Let students vote. Transition: 'Now let\'s look at how the tech industry actually evaluated talent in 2026.'",
+  },
+
+  // SLIDE 12 — ACT 1: BEYOND THE HYPE & PANIC TRIGGER
+  {
+    id: "sanjauli_slide_12",
     type: "MYTH_REALITY_PAIRS",
     badge: "ACT 1: THE WAKE-UP CALL",
     title: "Beyond the Hype — The New Rules of Tech Careers",
@@ -127,9 +262,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Audience Question #1 (The Panic Trigger): 'Raise your hand if you’ve seen a post saying AI can write code now, software engineering is dead, don't bother learning to code. Be honest—who here is worried about this?'\n\nSpeaker Hook: 'Syntax typing is dead. Software engineering—deciding what to build, handling failure modes, and keeping systems alive—is more in demand than ever.'",
   },
 
-  // SLIDE 7 — CODING IS NO LONGER THE BOTTLENECK
+  // SLIDE 13 — CODING IS NO LONGER THE BOTTLENECK
   {
-    id: "sanjauli_slide_7",
+    id: "sanjauli_slide_13",
     type: "THREE_CARDS",
     badge: "SYSTEM COMPLEXITY",
     title: "Coding is No Longer the Bottleneck",
@@ -169,9 +304,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Speed vs. Spec: The new bottleneck is no longer 'How do I write this algorithm?' but 'Can I define a clear spec, handle user needs, and verify that the output actually works?'",
   },
 
-  // SLIDE 8 — THE 2021-2025 RESET & CREDENTIAL INSECURITY
+  // SLIDE 14 — THE 2021-2026 RESET & CREDENTIAL INSECURITY
   {
-    id: "sanjauli_slide_8",
+    id: "sanjauli_slide_14",
     type: "TIMELINE_EVOLUTION",
     badge: "THE 2021–2026 CYCLE",
     title: "Why Has Tech Hiring Shifted? (The Great Reset)",
@@ -195,9 +330,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Audience Question #2 (The Credential Insecurity): 'How many of you feel that because you are pursuing a BCA rather than a B.Tech from a top-tier university, top companies won't give you a chance?'\n\nSpeaker Hook: 'In a boom market, pedigree gets people hired into rotation pools. In a disciplined market, companies hire verified execution. A BCA student with a live, containerized, documented project beats a textbook B.Tech student with zero production experience every single day.'",
   },
 
-  // SLIDE 9 — WHAT EMPLOYERS URGENTLY NEED
+  // SLIDE 15 — WHAT EMPLOYERS URGENTLY NEED
   {
-    id: "sanjauli_slide_9",
+    id: "sanjauli_slide_15",
     type: "THREE_CARDS",
     badge: "EMPLOYER DEMAND",
     title: "Should You Worry? What Employers Urgently Need",
@@ -236,9 +371,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "What Companies Desperately Seek: Engineers who reduce cloud costs, developers who build with small open-weight models, and builders who test code against production edge cases.",
   },
 
-  // SLIDE 10 — VIBE CODING & THE REALITY CHECK
+  // SLIDE 16 — VIBE CODING & THE REALITY CHECK
   {
-    id: "sanjauli_slide_10",
+    id: "sanjauli_slide_16",
     type: "MYTH_REALITY_PAIRS",
     badge: "ACT 2: THE DOUBLE-EDGED SWORD",
     title: "Vibe Coding: Power vs. The Illusion of Competence",
@@ -261,9 +396,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Audience Question #3 (The Reality Check): 'If I took away ChatGPT, Claude, and Copilot right now and asked you to build a simple CRUD API and connect it to a database on a whiteboard, could you do it?'\n\nSpeaker Hook: 'If you can't explain the code on a whiteboard, you don't own the system—you borrowed debt.'",
   },
 
-  // SLIDE 11 — TECHNICAL DEBT: MORTGAGE VS CREDIT CARD
+  // SLIDE 17 — TECHNICAL DEBT: MORTGAGE VS CREDIT CARD
   {
-    id: "sanjauli_slide_11",
+    id: "sanjauli_slide_17",
     type: "SCENARIO_SPLIT",
     badge: "ARCHITECTURAL OWNERSHIP",
     title: "Technical Debt: The Mortgage vs. The Credit Card Trap",
@@ -294,9 +429,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The 'Mortgage' Mindset: Use AI to accelerate typing, but own every single line of code, data contract, and test suite yourself.",
   },
 
-  // SLIDE 12 — IS AI IN A MASSIVE BUBBLE?
+  // SLIDE 18 — IS AI IN A MASSIVE BUBBLE?
   {
-    id: "sanjauli_slide_12",
+    id: "sanjauli_slide_18",
     type: "THREE_CARDS",
     badge: "THE MACRO LANDSCAPE",
     title: "Is AI in a Massive Bubble Right Now?",
@@ -335,9 +470,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Audience Question #4 (The Market Bubble): 'Is AI in a massive bubble right now that is about to burst?'\n\nSpeaker Hook: 'Yes and no. The speculation and wrapper apps are in an enormous bubble. But the underlying utility is permanent. When the bubble bursts, the hype disappears, but the real engineers inherit the entire industry.'",
   },
 
-  // SLIDE 13 — WHEN BUBBLES BURST: WHO SURVIVES
+  // SLIDE 19 — WHEN BUBBLES BURST: WHO SURVIVES
   {
-    id: "sanjauli_slide_13",
+    id: "sanjauli_slide_19",
     type: "COURSE_VS_CAREER",
     badge: "MARKET FILTER",
     title: "When Bubbles Burst: The Fallout vs. Who Survives",
@@ -361,9 +496,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The shake-out separates superficial wrapper creators from disciplined systems engineers.",
   },
 
-  // SLIDE 14 — THE 100-CANDIDATE DROPOUT FUNNEL
+  // SLIDE 20 — THE 100-CANDIDATE DROPOUT FUNNEL
   {
-    id: "sanjauli_slide_14",
+    id: "sanjauli_slide_20",
     type: "DROPOUT_FUNNEL",
     badge: "ACT 3: THE STRATEGIC PLAYBOOK",
     title: "The 100-Candidate Drop-off Funnel",
@@ -405,9 +540,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Speaker Takeaway for BCA Students: 'Your degree is not your barrier—your portfolio quality and communication funnel are.' Walk through the numbers: 100 → 25 → 5 → 2 → 1-2.",
   },
 
-  // SLIDE 15 — STEP 1: MASTER INDUSTRY-GRADE SKILLS
+  // SLIDE 21 — STEP 1: MASTER INDUSTRY-GRADE SKILLS
   {
-    id: "sanjauli_slide_15",
+    id: "sanjauli_slide_21",
     type: "DEDICATED_ROADMAP",
     badge: "PLAYBOOK STEP 01",
     title: "Step 1 — Master Non-Negotiable Industry-Grade Skills",
@@ -434,9 +569,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Demystify the Stack: Stop treating LLMs like magic; treat them like probabilistic microservices with latency, rate limits, and failure modes.",
   },
 
-  // SLIDE 16 — STEP 2: BUILD PRODUCTION-GRADE SYSTEMS
+  // SLIDE 22 — STEP 2: BUILD PRODUCTION-GRADE SYSTEMS
   {
-    id: "sanjauli_slide_16",
+    id: "sanjauli_slide_22",
     type: "BUILD_VS_TUTORIAL",
     badge: "PLAYBOOK STEP 02",
     title: "Step 2 — Build Production-Grade Systems (Not Weekend Wrappers)",
@@ -456,9 +591,91 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Key Hallmarks of a Production Project: Domain utility, automated evaluation suites, cost/latency discipline, and live containerized deployment.",
   },
 
-  // SLIDE 17 — STEP 3: PROOF-DRIVEN RESUME
+  // SLIDE 23 — CAPSTONE PROJECT BLUEPRINT 1
   {
-    id: "sanjauli_slide_17",
+    id: "sanjauli_slide_23",
+    type: "THREE_CARDS",
+    badge: "FLAGSHIP BLUEPRINT 01",
+    title: "Capstone 1: Enterprise Agentic RAG & Document Intelligence",
+    subtitle: "A complete production architecture that separates you from 95% of applicants.",
+    cards: [
+      {
+        num: "01",
+        title: "Ingestion & Vector Pipeline",
+        items: [
+          "Document parsing & semantic chunking with metadata tagging",
+          "PostgreSQL with pgvector for hybrid dense/sparse retrieval",
+          "Local quantized embedding models running at zero cloud cost",
+        ],
+      },
+      {
+        num: "02",
+        title: "Deterministic Engine & APIs",
+        items: [
+          "FastAPI backend with Pydantic v2 strict schema enforcement",
+          "Local LLM fallback (Ollama Llama-3 / Mistral) when APIs timeout",
+          "Redis semantic caching for sub-50ms repeat query responses",
+        ],
+      },
+      {
+        num: "03",
+        title: "Evaluation & Deployment",
+        items: [
+          "Ragas evaluation framework: faithfulness, recall, and answer relevance",
+          "Multi-stage Dockerfile with non-root security privileges",
+          "GitHub Actions CI/CD running automated unit tests on every PR",
+        ],
+      },
+    ],
+    punchline: "Live deployed endpoint + automated eval benchmark = instant recruiter callback.",
+    maxBuildSteps: 3,
+    notes: "Walk through Capstone 1: Show how this project solves real enterprise document search with zero recurring API costs and strict schema validation.",
+  },
+
+  // SLIDE 24 — CAPSTONE PROJECT BLUEPRINT 2
+  {
+    id: "sanjauli_slide_24",
+    type: "THREE_CARDS",
+    badge: "FLAGSHIP BLUEPRINT 02",
+    title: "Capstone 2: High-Throughput Resilient Microservice",
+    subtitle: "Proving backend depth: handling async task queues, rate limits, and failure modes.",
+    cards: [
+      {
+        num: "01",
+        title: "Asynchronous Workflows",
+        items: [
+          "Decoupled job processing via Redis BullMQ / Celery worker pool",
+          "Graceful backoff, exponential jitter retries, and dead-letter queues",
+          "WebSocket / Server-Sent Events (SSE) for real-time progress streaming",
+        ],
+      },
+      {
+        num: "02",
+        title: "Database Performance & Indexing",
+        items: [
+          "Optimized relational schema in PostgreSQL with composite B-Tree indexes",
+          "Connection pooling via PgBouncer handling 1,000+ concurrent requests",
+          "Database migration management using Alembic / Prisma migrations",
+        ],
+      },
+      {
+        num: "03",
+        title: "Production Observability",
+        items: [
+          "Structured JSON logging with unique distributed correlation IDs",
+          "Prometheus metrics & Grafana latency/error rate dashboards",
+          "One-command spin-up via Docker Compose with seeded test fixtures",
+        ],
+      },
+    ],
+    punchline: "When an interviewer asks 'How do you handle system crashes?', this project gives you the complete answer.",
+    maxBuildSteps: 3,
+    notes: "Walk through Capstone 2: Highlight how distributed task queues, structured logging, and connection pooling prove senior-grade engineering discipline.",
+  },
+
+  // SLIDE 25 — STEP 3: PROOF-DRIVEN RESUME
+  {
+    id: "sanjauli_slide_25",
     type: "PROOF_HIERARCHY",
     badge: "PLAYBOOK STEP 03",
     title: "Step 3 — Construct a Proof-Driven Resume",
@@ -475,9 +692,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The 6-Second Rule: Recruiters do not read resumes; they scan for verifiable proof of work. Frame every bullet with the X-Y-Z formula.",
   },
 
-  // SLIDE 18 — STEP 4: GITHUB SHOWCASE
+  // SLIDE 26 — STEP 4: GITHUB SHOWCASE
   {
-    id: "sanjauli_slide_18",
+    id: "sanjauli_slide_26",
     type: "THREE_CARDS",
     badge: "PLAYBOOK STEP 04",
     title: "Step 4 — Turn GitHub into a Technical Showcase",
@@ -517,9 +734,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The README Anatomy: Include an architectural system design diagram, clear local setup instructions via Docker, an API schema breakdown, and a documented section on failure modes and performance trade-offs.",
   },
 
-  // SLIDE 19 — STEP 5: TARGET STRATEGICALLY
+  // SLIDE 27 — STEP 5: TARGET STRATEGICALLY
   {
-    id: "sanjauli_slide_19",
+    id: "sanjauli_slide_27",
     type: "MYTH_REALITY_PAIRS",
     badge: "PLAYBOOK STEP 05",
     title: "Step 5 — Target Companies Strategically",
@@ -542,9 +759,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The Trusted Advisor Outreach: Send low-friction, high-signal messages: 'Hey [Name], noticed your API has this rate-limit edge case on streaming endpoints. Built a quick demo showing how to handle it gracefully with deterministic retries. Here’s the repo.'",
   },
 
-  // SLIDE 20 — STEP 6: TECHNICAL INTERVIEW PREP
+  // SLIDE 28 — STEP 6: TECHNICAL INTERVIEW PREP
   {
-    id: "sanjauli_slide_20",
+    id: "sanjauli_slide_28",
     type: "PIPELINE_FLOW",
     badge: "PLAYBOOK STEP 06",
     title: "Step 6 — Technical Interview Preparation & Architecture Defense",
@@ -562,9 +779,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Whiteboard Fundamentals: Be ready to code algorithms without an AI assistant prompting syntax. System Design & Corner Cases: Explain how your system degrades gracefully.",
   },
 
-  // SLIDE 21 — STEP 7: COMMUNICATION, HUMILITY & NO JERKS RULE
+  // SLIDE 29 — STEP 7: COMMUNICATION, HUMILITY & NO JERKS RULE
   {
-    id: "sanjauli_slide_21",
+    id: "sanjauli_slide_29",
     type: "SCENARIO_SPLIT",
     badge: "PLAYBOOK STEP 07",
     title: "Step 7 — Communication, Humility & Cultural Fit",
@@ -595,9 +812,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Audience Question #5 (The Culture Check): 'If an interviewer challenges your code and says, This solution will fail when latency spikes, do you argue back and stand your ground, or do you ask questions?'\n\nSpeaker Hook: 'Lawrence Moroni mentored an elite coder who failed over 300 interview loops because he was trained to be rigid and defensive. Companies don't hire brilliant jerks; they hire teammates.'",
   },
 
-  // SLIDE 22 — A COURSE IS NOT A CAREER
+  // SLIDE 30 — A COURSE IS NOT A CAREER
   {
-    id: "sanjauli_slide_22",
+    id: "sanjauli_slide_30",
     type: "COURSE_VS_CAREER",
     badge: "PARADIGM SHIFT",
     title: "A Course Is Not a Career",
@@ -623,9 +840,53 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Two-column comparison between passive courses and active career-building programs.",
   },
 
-  // SLIDE 23 — UNISOLE SANJAULI PROGRAM
+  // SLIDE 31 — MONTH-BY-MONTH CURRICULUM
   {
-    id: "sanjauli_slide_23",
+    id: "sanjauli_slide_31",
+    type: "THREE_CARDS",
+    badge: "3-MONTH ROADMAP",
+    title: "The 3-Month Month-by-Month Technical Curriculum",
+    subtitle: "Structured progressive mastery tailored specifically for Sanjauli BCA students.",
+    cards: [
+      {
+        num: "01",
+        title: "Month 1: Systems & Core APIs",
+        items: [
+          "Modern Python / Node.js & OOP paradigms",
+          "Relational modeling in PostgreSQL & query optimization",
+          "RESTful API architectures & FastAPI backend design",
+          "Linux terminal mastery, Git branch flows & PR hygiene",
+        ],
+      },
+      {
+        num: "02",
+        title: "Month 2: AI Pipelines & Containers",
+        items: [
+          "Local open-weight models (Ollama, vLLM) & quantization",
+          "pgvector hybrid embeddings & agentic RAG workflows",
+          "Redis caching, background task queues & message brokers",
+          "Docker containerization & multi-stage build optimization",
+        ],
+      },
+      {
+        num: "03",
+        title: "Month 3: Production Defense & Career",
+        items: [
+          "Automated test suites (PyTest) & LLM evaluation benchmarks",
+          "CI/CD pipelines & live cloud deployment on production URLs",
+          "Google X-Y-Z proof resume & GitHub technical showcase",
+          "Whiteboard architecture defense & mock interview loops",
+        ],
+      },
+    ],
+    punchline: "From classroom student to production software engineer in 90 days of disciplined building.",
+    maxBuildSteps: 3,
+    notes: "Month-by-month technical roadmap breakdown: Month 1 (Core APIs & DB), Month 2 (AI Pipelines & Docker), Month 3 (Evals, Whiteboard & Deployment).",
+  },
+
+  // SLIDE 32 — UNISOLE SANJAULI PROGRAM
+  {
+    id: "sanjauli_slide_32",
     type: "PROGRAM_OVERVIEW",
     badge: "STRUCTURED PROGRAM",
     title: "UNISOLE Industrial Training cum Internship Opportunity Program",
@@ -643,9 +904,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Large visual highlight of the 3-Month Live Program structure tailored for Sanjauli BCA students.",
   },
 
-  // SLIDE 24 — JOINT CERTIFICATE
+  // SLIDE 33 — JOINT CERTIFICATE
   {
-    id: "sanjauli_slide_24",
+    id: "sanjauli_slide_33",
     type: "CERTIFICATE_SHOWCASE",
     badge: "ACCREDITATION",
     title: "JOINT CERTIFICATE",
@@ -655,9 +916,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Extremely premium and minimal. NIT Hamirpur x IAPT x UNISOLE.",
   },
 
-  // SLIDE 25 — TALENT POOL
+  // SLIDE 34 — TALENT POOL
   {
-    id: "sanjauli_slide_25",
+    id: "sanjauli_slide_34",
     type: "TALENT_POOL_PIPELINE",
     badge: "OPPORTUNITY PIPELINE",
     title: "Perform Well → Get Noticed",
@@ -673,35 +934,22 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Dark navy pipeline showing progression into the UNISOLE Talent Pool.",
   },
 
-  // SLIDE 26 — 30-DAY CHALLENGE & ENROLLMENT
+  // SLIDE 35 — 30-DAY CHALLENGE & ENROLLMENT (FINAL MESSAGE)
   {
-    id: "sanjauli_slide_26",
+    id: "sanjauli_slide_35",
     type: "ENROLLMENT_CTA",
     badge: "ACTION CHALLENGE & ENROLLMENT",
     title: "The 30-Day BCA Action Challenge",
-    subtitle: "3-Month Live Industrial Training Program · Centre of Excellence Sanjauli",
+    subtitle: "Centre of Excellence Govt. College Sanjauli · BCA Industrial Training Program",
     actions: [
-      "01. Delete or archive toy projects from your GitHub portfolio",
+      "01. Delete or archive toy projects and tutorial clones from your GitHub",
       "02. Pick one real-world domain problem and build an end-to-end containerized system",
-      "03. Ship it to a live cloud endpoint with tests and automated evals",
-      "04. Register for UNISOLE Industrial Training to accelerate your career",
+      "03. Ship it to a live cloud endpoint with tests and automated eval benchmarks",
+      "04. Register for UNISOLE Industrial Training to accelerate your engineering career",
     ],
     qrUrl: "https://unisole.org/programs",
     qrPrompt: "Scan QR Code to Register for Sanjauli College BCA Program",
     maxBuildSteps: 3,
-    notes: "Actionable 30-Day Challenge for Students: Archive toy projects, build an end-to-end containerized system with tests and evals, and deploy it live.",
-  },
-
-  // SLIDE 27 — FINAL MESSAGE
-  {
-    id: "sanjauli_slide_27",
-    type: "FINAL_MESSAGE",
-    badge: "FINAL MESSAGE",
-    title: "Your degree is not your destination.",
-    subtitle: "Your systems + projects + proof + decisions build your career.",
-    org: "UNISOLE Skill AI Labs",
-    closingQuote: "“In a disciplined market, pedigree gets people into rotation pools, but verified execution gets you hired. A BCA student who builds and deploys real systems beats a textbook graduate every single day.”",
-    maxBuildSteps: 2,
-    notes: "Closing spoken line: 'In a disciplined market, pedigree gets people into rotation pools, but verified execution gets you hired. A BCA student who builds and deploys real systems beats a textbook graduate every single day.'",
+    notes: "Closing Spoken Line: 'In a disciplined market, pedigree gets people into rotation pools, but verified execution gets you hired. A BCA student who builds and deploys real systems beats a textbook graduate every single day.'\n\nScan QR Code to Register.",
   },
 ];
