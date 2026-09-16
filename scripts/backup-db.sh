@@ -119,8 +119,8 @@ if [ ! -s "$TEMP_DUMP" ]; then
   exit 1
 fi
 
-# Compute SHA256 checksum of the current database dump
-CURRENT_HASH=$(sha256sum "$TEMP_DUMP" | awk '{print $1}')
+# Compute SHA256 checksum of pure database data (ignoring comments and random session tokens)
+CURRENT_HASH=$(grep -v -E '^--|^\\' "$TEMP_DUMP" | sha256sum | awk '{print $1}')
 LAST_HASH=""
 if [ -f "$HASH_FILE" ]; then
   LAST_HASH=$(cat "$HASH_FILE" | tr -d '[:space:]')
