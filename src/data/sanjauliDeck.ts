@@ -259,6 +259,8 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
       },
     ],
     maxBuildSteps: 3,
+    questionPrompt: "Raise your hand if you’ve seen a post saying: 'AI can write code now, software engineering is dead, don't bother learning to code.' Be honest—who here is worried about this?",
+    speakerHook: "Syntax typing is dead. Software engineering—deciding what to build, handling failure modes, and keeping systems alive—is more in demand than ever.",
     notes: "Audience Question #1 (The Panic Trigger): 'Raise your hand if you’ve seen a post saying AI can write code now, software engineering is dead, don't bother learning to code. Be honest—who here is worried about this?'\n\nSpeaker Hook: 'Syntax typing is dead. Software engineering—deciding what to build, handling failure modes, and keeping systems alive—is more in demand than ever.'",
   },
 
@@ -327,6 +329,8 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     ],
     quote: "“In a boom market, pedigree gets people hired into rotation pools. In a disciplined market, companies hire verified execution. A BCA student with a live, containerized, documented project beats a textbook B.Tech student with zero production experience every single day.”",
     maxBuildSteps: 3,
+    questionPrompt: "How many of you feel that because you are pursuing a BCA rather than a B.Tech from a top-tier university, top companies won't give you a chance?",
+    speakerHook: "In a boom market, pedigree gets people hired into rotation pools. In a disciplined market, companies hire verified execution. A BCA student with a live, containerized, documented project beats a textbook B.Tech student with zero production experience every single day.",
     notes: "Audience Question #2 (The Credential Insecurity): 'How many of you feel that because you are pursuing a BCA rather than a B.Tech from a top-tier university, top companies won't give you a chance?'\n\nSpeaker Hook: 'In a boom market, pedigree gets people hired into rotation pools. In a disciplined market, companies hire verified execution. A BCA student with a live, containerized, documented project beats a textbook B.Tech student with zero production experience every single day.'",
   },
 
@@ -393,6 +397,8 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
       },
     ],
     maxBuildSteps: 3,
+    questionPrompt: "If I took away ChatGPT, Claude, and Copilot right now and asked you to build a simple CRUD API and connect it to a database on a whiteboard, could you do it?",
+    speakerHook: "If you can't explain the code on a whiteboard, you don't own the system—you borrowed technical debt.",
     notes: "Audience Question #3 (The Reality Check): 'If I took away ChatGPT, Claude, and Copilot right now and asked you to build a simple CRUD API and connect it to a database on a whiteboard, could you do it?'\n\nSpeaker Hook: 'If you can't explain the code on a whiteboard, you don't own the system—you borrowed debt.'",
   },
 
@@ -467,6 +473,8 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     ],
     punchline: "When the bubble bursts, hype disappears, but real systems engineers inherit the industry.",
     maxBuildSteps: 3,
+    questionPrompt: "Is AI in a massive bubble right now that is about to burst?",
+    speakerHook: "Yes and no. The speculation and wrapper apps are in an enormous bubble. But the underlying utility is permanent. When the bubble bursts, the hype disappears, but the real engineers inherit the entire industry.",
     notes: "Audience Question #4 (The Market Bubble): 'Is AI in a massive bubble right now that is about to burst?'\n\nSpeaker Hook: 'Yes and no. The speculation and wrapper apps are in an enormous bubble. But the underlying utility is permanent. When the bubble bursts, the hype disappears, but the real engineers inherit the entire industry.'",
   },
 
@@ -809,6 +817,8 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
       footer: "Humility + systems rigor = Immediate offer",
     },
     maxBuildSteps: 2,
+    questionPrompt: "If an interviewer challenges your code and says, 'This solution will fail when latency spikes,' do you argue back and stand your ground, or do you ask questions?",
+    speakerHook: "Lawrence Moroni mentored an elite coder who failed over 300 interview loops because he was trained to be rigid and defensive. Companies don't hire brilliant jerks; they hire teammates.",
     notes: "Audience Question #5 (The Culture Check): 'If an interviewer challenges your code and says, This solution will fail when latency spikes, do you argue back and stand your ground, or do you ask questions?'\n\nSpeaker Hook: 'Lawrence Moroni mentored an elite coder who failed over 300 interview loops because he was trained to be rigid and defensive. Companies don't hire brilliant jerks; they hire teammates.'",
   },
 
