@@ -495,6 +495,68 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_tasks_sub_project" ON "public"."tasks" ("sub_project_id");
     `);
 
+    // 6B. Roadshow Presentations & Live Sessions DDL
+    await execSqlSafe("presentations_and_sessions", `
+      CREATE SEQUENCE IF NOT EXISTS "public"."presentations_id_seq";
+      CREATE SEQUENCE IF NOT EXISTS "public"."presentation_sessions_id_seq";
+      CREATE SEQUENCE IF NOT EXISTS "public"."presentation_leads_id_seq";
+
+      CREATE TABLE IF NOT EXISTS "public"."presentations" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('pres_'::text || nextval('public.presentations_id_seq'::regclass)) NOT NULL,
+        "college_id" varchar(50),
+        "college_name" varchar(200),
+        "title" varchar(255) NOT NULL,
+        "description" text,
+        "theme" varchar(50) DEFAULT 'dark' NOT NULL,
+        "slides" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_by_id" varchar(50),
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS "public"."presentation_sessions" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('sess_'::text || nextval('public.presentation_sessions_id_seq'::regclass)) NOT NULL,
+        "presentation_id" varchar(50) NOT NULL,
+        "college_id" varchar(50) NOT NULL,
+        "college_name" varchar(200),
+        "session_code" varchar(20) NOT NULL,
+        "status" "public"."session_status" DEFAULT 'DRAFT' NOT NULL,
+        "current_slide_index" integer DEFAULT 0 NOT NULL,
+        "is_quiz_active" boolean DEFAULT false NOT NULL,
+        "is_answer_revealed" boolean DEFAULT false NOT NULL,
+        "is_leaderboard_active" boolean DEFAULT false NOT NULL,
+        "quiz_started_at" timestamp with time zone,
+        "quiz_time_limit" integer DEFAULT 30 NOT NULL,
+        "active_attendees_count" integer DEFAULT 0 NOT NULL,
+        "started_at" timestamp with time zone,
+        "ended_at" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS "public"."presentation_leads" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('plead_'::text || nextval('public.presentation_leads_id_seq'::regclass)) NOT NULL,
+        "session_id" varchar(50) NOT NULL,
+        "presentation_id" varchar(50) NOT NULL,
+        "user_id" varchar(50),
+        "phone" varchar(20) NOT NULL,
+        "name" varchar(150),
+        "academic_branch" varchar(100),
+        "total_score" integer DEFAULT 0 NOT NULL,
+        "answers" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "submitted_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS "idx_presentations_is_active" ON "public"."presentations" ("is_active");
+      CREATE INDEX IF NOT EXISTS "idx_presentations_college" ON "public"."presentations" ("college_id");
+      CREATE INDEX IF NOT EXISTS "idx_sessions_code" ON "public"."presentation_sessions" ("session_code");
+      CREATE INDEX IF NOT EXISTS "idx_sessions_presentation" ON "public"."presentation_sessions" ("presentation_id");
+      CREATE INDEX IF NOT EXISTS "idx_sessions_college" ON "public"."presentation_sessions" ("college_id");
+      CREATE INDEX IF NOT EXISTS "idx_presentation_leads_session" ON "public"."presentation_leads" ("session_id");
+      CREATE INDEX IF NOT EXISTS "idx_presentation_leads_phone" ON "public"."presentation_leads" ("phone");
+    `);
+
     // 7. IAPT NAIN & CRM Leads
     await execSqlSafe("iapt_and_leads", `
       CREATE TABLE IF NOT EXISTS "public"."iapt_nain_registrations" (
