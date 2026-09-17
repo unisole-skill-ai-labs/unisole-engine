@@ -193,7 +193,47 @@ export async function seedSystemData() {
     `);
 
     const foundationalCourses = [
-      // --- GROUP 01: Computer Science & IT (4 Courses) ---
+      // --- GROUP 01: Computer Science & IT (6 Courses) ---
+      {
+        id: "cs-genai",
+        title: "Generative AI & LLM Systems Engineering",
+        slug: "cs-genai",
+        short_description: "Master enterprise-grade LLM architectures, production RAG pipelines, vector databases (Qdrant), PEFT/LoRA fine-tuning, and high-throughput vLLM serving.",
+        price_paise: 299900,
+        mrp_paise: 999900,
+        status: "PUBLISHED",
+        metadata: {
+          group: "group-1",
+          pathwayId: "cs-genai",
+          badge: "GROUP 01 • PATHWAY 01",
+          shortName: "CS & IT: Generative AI",
+          target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
+          duration: "3 Months",
+          level: "Intermediate to Advanced",
+          roles: ["Generative AI Engineer", "LLMOps Specialist", "AI Application Developer", "Prompt Systems Architect"],
+          tools: ["Python", "PyTorch", "Hugging Face", "LangChain", "LlamaIndex", "Qdrant", "vLLM", "LoRA / PEFT"]
+        }
+      },
+      {
+        id: "cs-agentic",
+        title: "Agentic AI & Autonomous Multi-Agent Systems",
+        slug: "cs-agentic",
+        short_description: "Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).",
+        price_paise: 299900,
+        mrp_paise: 999900,
+        status: "PUBLISHED",
+        metadata: {
+          group: "group-1",
+          pathwayId: "cs-agentic",
+          badge: "GROUP 01 • PATHWAY 02",
+          shortName: "CS & IT: Agentic AI",
+          target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
+          duration: "3 Months",
+          level: "Intermediate to Advanced",
+          roles: ["Agentic AI Engineer", "Autonomous Systems Developer", "AI Automation Architect", "Multi-Agent Systems Engineer"],
+          tools: ["LangGraph", "CrewAI", "AutoGen", "MCP", "Docker Sandboxes", "LiteLLM", "Pydantic", "Phoenix"]
+        }
+      },
       {
         id: "cs-p1",
         title: "Machine Learning Engineering in Production",
@@ -205,7 +245,7 @@ export async function seedSystemData() {
         metadata: {
           group: "group-1",
           pathwayId: "cs-p1",
-          badge: "GROUP 01 • PATHWAY 01",
+          badge: "GROUP 01 • PATHWAY 03",
           shortName: "CS & IT: ML Engineering",
           target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
           duration: "3 Months",
@@ -225,7 +265,7 @@ export async function seedSystemData() {
         metadata: {
           group: "group-1",
           pathwayId: "cs-p2",
-          badge: "GROUP 01 • PATHWAY 02",
+          badge: "GROUP 01 • PATHWAY 04",
           shortName: "CS & IT: Full Stack Web",
           target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
           duration: "3 Months",
@@ -245,7 +285,7 @@ export async function seedSystemData() {
         metadata: {
           group: "group-1",
           pathwayId: "cs-p3",
-          badge: "GROUP 01 • PATHWAY 03",
+          badge: "GROUP 01 • PATHWAY 05",
           shortName: "CS & IT: Dual Track ML + Web",
           target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
           duration: "6 Months",
