@@ -71,6 +71,8 @@ export const pricingService = {
 
       // Standard catalog static fallback lookup
       const PATHWAY_CATALOG: Record<string, { title: string; pricePaise: number; mrpPaise: number }> = {
+        "cs-genai": { title: "Generative AI & LLM Systems Engineering", pricePaise: 299900, mrpPaise: 999900 },
+        "cs-agentic": { title: "Agentic AI & Autonomous Multi-Agent Systems", pricePaise: 299900, mrpPaise: 999900 },
         "cs-p1": { title: "Machine Learning Engineering in Production", pricePaise: 299900, mrpPaise: 999900 },
         "cs-p2": { title: "Full Stack Web Development (AI-Powered)", pricePaise: 149900, mrpPaise: 699900 },
         "cs-p3": { title: "Complete Machine Learning + Full Stack (Dual Track)", pricePaise: 399900, mrpPaise: 1499900 },
