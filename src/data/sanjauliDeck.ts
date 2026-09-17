@@ -1,9 +1,9 @@
 export const SANJAULI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
-  // ACT 1 — BREAK THEIR OLD MENTAL MODEL (THE WAKE-UP CALL)
+  // HOOK & CREDIBILITY INTRODUCTION
   // =========================================================================
 
-  // SLIDE 1 — HOOK COVER
+  // SLIDE 1 — COVER
   {
     id: "sanjauli_slide_1",
     type: "COVER",
@@ -15,9 +15,71 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Welcome everyone. In the next 50 minutes, we are going to tackle the single biggest question on every student's mind: If AI can write code, build apps, and debug in seconds, where do you fit in? Today is not a lecture—it is an actionable roadmap designed to make you indispensable.",
   },
 
-  // SLIDE 2 — THE QUESTION
+  // SLIDE 2 — WHO AM I? (FOUNDER INTRODUCTION)
   {
     id: "sanjauli_slide_2",
+    type: "FOUNDER_BIO",
+    badge: "WHO AM I?",
+    title: "AJAY MOKTA",
+    subtitle: "Founder — UNISOLE",
+    initials: "AM",
+    credentials: [
+      "Founder — UNISOLE",
+      "B.Tech — NIT Hamirpur",
+      "AI Educator & Technology Mentor",
+      "Mentored Students Across India",
+    ],
+    quote: "“A degree from any college in Himachal should be backed by skills that compete globally.”",
+    maxBuildSteps: 2,
+    notes: "Short credibility introduction. 'I'm Ajay Mokta, founder of UNISOLE. I walked the journey from an engineering college in Himachal to building deep-tech and mentoring thousands of students. Today, we're here to talk about what actually matters for your career in the age of AI.'",
+  },
+
+  // SLIDE 3 — THE TEAM BEHIND UNISOLE
+  {
+    id: "sanjauli_slide_3",
+    type: "TEAM_GRID",
+    badge: "CREDIBILITY",
+    title: "THE TEAM BEHIND UNISOLE",
+    subtitle: "Built by practitioners, engineers, and researchers.",
+    pillars: ["AI SYSTEMS", "BACKEND ARCHITECTURE", "INDUSTRY RESEARCH", "ACADEMIC EXPOSURE"],
+    members: [
+      {
+        initials: "AM",
+        name: "Ajay Mokta",
+        role: "Founder — UNISOLE · B.Tech, NIT Hamirpur",
+      },
+      {
+        initials: "GG",
+        name: "Girish Gaurav Sharma",
+        role: "Head of AI · GoodSpace AI → Great Learning · 20th Rank NASA Space Apps",
+      },
+      {
+        initials: "KK",
+        name: "Kushal Kesharwani",
+        role: "IIT Patna → Tech Mahindra · Backend & Systems Engineer",
+      },
+      {
+        initials: "SP",
+        name: "Shabd Patel",
+        role: "Software Engineer, BlackRock · B.Tech, NIT Hamirpur",
+      },
+      {
+        initials: "AK",
+        name: "Aditya Kaushal",
+        role: "M.Tech, IIT Delhi · Academic & Technical Mentor",
+      },
+    ],
+    maxBuildSteps: 2,
+    notes: "The practitioners behind UNISOLE: engineers and alumni from NIT Hamirpur, IIT Delhi, IIT Patna, BlackRock, and NASA Space Apps. We build production systems and mentor the next generation of builders.\n\nTransition: 'Now, let's dive into the core question of today's session.'",
+  },
+
+  // =========================================================================
+  // ACT 1 — BREAK THEIR OLD MENTAL MODEL (THE WAKE-UP CALL)
+  // =========================================================================
+
+  // SLIDE 4 — THE QUESTION
+  {
+    id: "sanjauli_slide_4",
     type: "BIG_QUESTION",
     badge: "THE CORE QUESTION",
     title: "“If AI can code... why should a company hire YOU?”",
@@ -28,9 +90,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Don't Google the answer. Just think for 10 seconds. If I give ChatGPT a problem and it produces 500 lines of code in 30 seconds... what exactly are you bringing to the table?\n\n[PAUSE FOR 10 SECONDS. TAKE 2-3 ANSWERS FROM AUDIENCE]\n\nGood. Today we're going to answer that question properly.\n\n[ENGAGEMENT / HANDS UP]: 'Who here has thought at least once: AI is going to make my BCA degree less valuable?'",
   },
 
-  // SLIDE 3 — THE WORLD YOU ENTERED
+  // SLIDE 5 — THE WORLD YOU ENTERED
   {
-    id: "sanjauli_slide_3",
+    id: "sanjauli_slide_5",
     type: "TIMELINE_EVOLUTION",
     badge: "THE MACRO SHIFT",
     title: "The World You Entered",
@@ -50,9 +112,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "In 2020, raw syntax knowledge was a scarce economic skill. In 2026, generating boilerplate code is free and instantaneous. The tech landscape shifted from typing speed to outcome engineering.\n\nTransition: 'Before we talk about what you should learn, let's look at what is actually happening to the entry-level hiring market.'",
   },
 
-  // SLIDE 4 — THE ENTRY-LEVEL PROBLEM
+  // SLIDE 6 — THE ENTRY-LEVEL PROBLEM
   {
-    id: "sanjauli_slide_4",
+    id: "sanjauli_slide_6",
     type: "SCENARIO_SPLIT",
     badge: "MARKET MECHANICS",
     title: "The Entry-Level Squeeze",
@@ -84,9 +146,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The biggest impact of AI isn't 'everyone gets fired.' It is: 'The easiest work becomes automated, so getting your first opportunity becomes harder.'\n\n[IMPORTANT: DO NOT SCARE STUDENTS]. Immediately say: 'And that creates the biggest opportunity of your career.'",
   },
 
-  // SLIDE 5 — LIVE POLL 01
+  // SLIDE 7 — LIVE POLL 01
   {
-    id: "sanjauli_slide_5",
+    id: "sanjauli_slide_7",
     type: "POLL",
     badge: "LIVE POLL 01",
     title: "Audience Pulse: The AI Anxiety Check",
@@ -101,9 +163,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Live Poll 01. Give students 20 seconds to vote on their mobile screens. Highlight the dynamic percentages on the big screen.\n\nTransition: 'Most of you feel the anxiety. Now let's look at why the market reset is actually a massive gift for disciplined builders.'",
   },
 
-  // SLIDE 6 — THE MARKET RESET
+  // SLIDE 8 — THE MARKET RESET
   {
-    id: "sanjauli_slide_6",
+    id: "sanjauli_slide_8",
     type: "THREE_CARDS",
     badge: "THE MARKET RESET",
     title: "When Easy Work Disappears...",
@@ -146,9 +208,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
   // ACT 2 — VIBE CODING: POWER VS. PRODUCTION REALITY
   // =========================================================================
 
-  // SLIDE 7 — VIBE CODING
+  // SLIDE 9 — VIBE CODING
   {
-    id: "sanjauli_slide_7",
+    id: "sanjauli_slide_9",
     type: "BIG_QUESTION",
     badge: "ACT 2: THE MODERN TOOLKIT",
     title: "“Build Me An App.”",
@@ -157,9 +219,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Show an AI tool spinning up a full-stack application in 30 seconds from a single prompt.\n\n[ASK AUDIENCE]: 'How many of you think this is amazing?' (Hands up). 'It is.' [PAUSE]. 'But here is the dangerous part.'",
   },
 
-  // SLIDE 8 — THE VIBE-CODING ILLUSION
+  // SLIDE 10 — THE VIBE-CODING ILLUSION
   {
-    id: "sanjauli_slide_8",
+    id: "sanjauli_slide_10",
     type: "PROOF_HIERARCHY",
     badge: "THE COMPETENCE TRAP",
     title: "The Vibe-Coding Illusion",
@@ -183,9 +245,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Vibe coding is a superpower, but mistaking AI-generated syntax for personal architectural understanding is toxic. Level 1 coders get filtered out on whiteboards. Level 3 engineers become 10x more productive.\n\nTransition: 'Let's test this with a live thought experiment.'",
   },
 
-  // SLIDE 9 — LIVE DEMO & PRODUCTION TEST
+  // SLIDE 11 — LIVE DEMO & PRODUCTION TEST
   {
-    id: "sanjauli_slide_9",
+    id: "sanjauli_slide_11",
     type: "MYTH_REALITY_PAIRS",
     badge: "THE PRODUCTION TEST",
     title: "The Live Test: Would You Trust This in Production?",
@@ -210,9 +272,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Ask students: 'Give me a college problem (e.g. scholarship documents). AI generates it. Would you deploy it to 100k students? What if the API costs ₹5 per request?'\n\nSpeaker Hook: 'Generating software is becoming cheap. Engineering software is not.'",
   },
 
-  // SLIDE 10 — THE AI PRODUCTIVITY PARADOX
+  // SLIDE 12 — THE AI PRODUCTIVITY PARADOX
   {
-    id: "sanjauli_slide_10",
+    id: "sanjauli_slide_12",
     type: "SCENARIO_SPLIT",
     badge: "EMPIRICAL RESEARCH",
     title: "The AI Productivity Paradox",
@@ -248,9 +310,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
   // ACT 3 — THE AI BUBBLE & SPECULATION
   // =========================================================================
 
-  // SLIDE 11 — BUBBLE?
+  // SLIDE 13 — BUBBLE?
   {
-    id: "sanjauli_slide_11",
+    id: "sanjauli_slide_13",
     type: "THREE_CARDS",
     badge: "ACT 3: MACRO REALITY",
     title: "Are We in an AI Bubble?",
@@ -291,9 +353,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Audience Question #4: 'Is AI in a massive bubble right now?'\n\nSpeaker Hook: 'Three things exist simultaneously: Real tech + Real business value + Massive speculation. That is what makes bubbles complicated.'\n\nTransition: 'To understand how this plays out without panic, let's look at what creates a bubble.'",
   },
 
-  // SLIDE 12 — WHAT CREATES A BUBBLE?
+  // SLIDE 14 — WHAT CREATES A BUBBLE?
   {
-    id: "sanjauli_slide_12",
+    id: "sanjauli_slide_14",
     type: "PIPELINE_FLOW",
     badge: "MARKET DYNAMICS",
     title: "The Anatomy of a Technology Bubble",
@@ -315,9 +377,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
   // ACT 4 — THE 1999 DOT-COM LESSON
   // =========================================================================
 
-  // SLIDE 13 — LET'S GO BACK TO 1999
+  // SLIDE 15 — LET'S GO BACK TO 1999
   {
-    id: "sanjauli_slide_13",
+    id: "sanjauli_slide_15",
     type: "BIG_QUESTION",
     badge: "HISTORICAL PERSPECTIVE",
     title: "“Let's Go Back to 1999.”",
@@ -326,9 +388,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Dark slide. Pause. Imagine you are sitting in a college classroom in 1999. Someone tells you: 'The Internet is going to change everything.' Was that true? YES. 'Every company must go online.' True? YES. 'This company has no revenue, but its stock is up 500%.' That's where things become dangerous.",
   },
 
-  // SLIDE 14 — THE DOT-COM CRASH (1999-2000)
+  // SLIDE 16 — THE DOT-COM CRASH (1999-2000)
   {
-    id: "sanjauli_slide_14",
+    id: "sanjauli_slide_16",
     type: "TIMELINE_EVOLUTION",
     badge: "DOT-COM PARALLEL",
     title: "The 1999–2000 Dot-Com Boom & Crash",
@@ -352,9 +414,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Ask the students: 'Did the Internet die after the 2000 crash?' (Students: NO!).\n\nTransition: 'Let's see what that means for who survived and compounded.'",
   },
 
-  // SLIDE 15 — LIVE POLL 02: THE DOT-COM TEST
+  // SLIDE 17 — LIVE POLL 02: THE DOT-COM TEST
   {
-    id: "sanjauli_slide_15",
+    id: "sanjauli_slide_17",
     type: "POLL",
     badge: "LIVE POLL 02",
     title: "Prediction Check: What Survived 2000?",
@@ -369,9 +431,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Live Poll 02. Let students vote. Transition: 'Exactly. The hype and speculation died, but servers, databases, networking, e-commerce, and real systems engineers inherited the next 20 years.'",
   },
 
-  // SLIDE 16 — THIS IS THE LESSON
+  // SLIDE 18 — THIS IS THE LESSON
   {
-    id: "sanjauli_slide_16",
+    id: "sanjauli_slide_18",
     type: "MYTH_REALITY_PAIRS",
     badge: "THE LESSON OF 2000",
     title: "What Disappeared vs. What Compounded",
@@ -395,9 +457,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The crash filtered out the tourist coders and speculative wrappers. Real systems engineers inherited the entire digital economy.",
   },
 
-  // SLIDE 17 — AMAZON CASE STUDY
+  // SLIDE 19 — AMAZON CASE STUDY
   {
-    id: "sanjauli_slide_17",
+    id: "sanjauli_slide_19",
     type: "SCENARIO_SPLIT",
     badge: "CASE STUDY",
     title: "Amazon in 2000: Surviving the Downturn",
@@ -429,9 +491,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Would you have known in 1999 which AI company will win in 2026? Probably not. Don't build your identity on one AI tool; build it on engineering fundamentals.",
   },
 
-  // SLIDE 18 — BRING IT BACK TO AI
+  // SLIDE 20 — BRING IT BACK TO AI
   {
-    id: "sanjauli_slide_18",
+    id: "sanjauli_slide_20",
     type: "THREE_CARDS",
     badge: "POST-CORRECTION REALITY",
     title: "What Happens to YOU in a Correction?",
@@ -474,9 +536,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
   // ACT 5 — WHAT THIS MEANS FOR A STUDENT (THE CAREER HEDGE)
   // =========================================================================
 
-  // SLIDE 19 — THE CAREER HEDGE
+  // SLIDE 21 — THE CAREER HEDGE
   {
-    id: "sanjauli_slide_19",
+    id: "sanjauli_slide_21",
     type: "SCENARIO_SPLIT",
     badge: "THE CAREER HEDGE",
     title: "Don't Become \"AI-Proof\" — Become Valuable in BOTH Worlds",
@@ -508,9 +570,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Don't try to become 'AI-proof.' Become valuable in BOTH worlds. Notice what survives: problem solving, system design, testing, and business ROI.\n\nTransition: 'Let's look at how student profiles must evolve.'",
   },
 
-  // SLIDE 20 — THE NEW STUDENT PROFILE
+  // SLIDE 22 — THE NEW STUDENT PROFILE
   {
-    id: "sanjauli_slide_20",
+    id: "sanjauli_slide_22",
     type: "COMPARISON_STATS",
     badge: "PARADIGM SHIFT",
     title: "The Old Student Resume vs. The Modern Builder",
@@ -532,9 +594,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Would a generic resume with 'Python, Java, Machine Learning' and 7 certificates impress an engineering lead today? No. What impresses them is verified execution: 'Understands → Builds → Tests → Deploys → Measures → Communicates.'",
   },
 
-  // SLIDE 21 — THE 100-CANDIDATE DROPOUT FUNNEL
+  // SLIDE 23 — THE 100-CANDIDATE DROPOUT FUNNEL
   {
-    id: "sanjauli_slide_21",
+    id: "sanjauli_slide_23",
     type: "DROPOUT_FUNNEL",
     badge: "STRATEGIC FUNNEL",
     title: "The 100-Candidate Drop-off Funnel",
@@ -580,9 +642,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
   // ACT 6 — THE PEAK: THE 5-STEP CAREER BLUEPRINT
   // =========================================================================
 
-  // SLIDE 22 — THE 5-STEP BLUEPRINT REVEAL
+  // SLIDE 24 — THE 5-STEP BLUEPRINT REVEAL
   {
-    id: "sanjauli_slide_22",
+    id: "sanjauli_slide_24",
     type: "PIPELINE_FLOW",
     badge: "ACT 6: THE PEAK FRAMEWORK",
     title: "The 5-Step AI-Era Career Blueprint",
@@ -599,9 +661,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Here is the master formula: 1. SKILL → 2. PROJECT → 3. RESUME → 4. APPROACH → 5. INTERVIEW.\n\nTransition: 'Let's break down each step in detail.'",
   },
 
-  // SLIDE 23 — STEP 1: SKILL (THE 3-LAYER FOUNDATION)
+  // SLIDE 25 — STEP 1: SKILL (THE 3-LAYER FOUNDATION)
   {
-    id: "sanjauli_slide_23",
+    id: "sanjauli_slide_25",
     type: "THREE_CARDS",
     badge: "STEP 01 — SKILL",
     title: "Step 1 — Build the 3-Layer Foundation",
@@ -640,9 +702,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Don't jump between 25 random frameworks. Master the CS Core, the Applied AI Layer, and Engineering Discipline.",
   },
 
-  // SLIDE 24 — STEP 2: PROJECT (STOP BUILDING TOY PROJECTS)
+  // SLIDE 26 — STEP 2: PROJECT (STOP BUILDING TOY PROJECTS)
   {
-    id: "sanjauli_slide_24",
+    id: "sanjauli_slide_26",
     type: "MYTH_REALITY_PAIRS",
     badge: "STEP 02 — PROJECT",
     title: "Step 2 — Stop Building Toy Projects",
@@ -666,9 +728,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Ask the room: 'Who has built a calculator? Weather app? To-do app?' (Hands up). 'Good. You learned from them. Now it's time to graduate to production systems.'",
   },
 
-  // SLIDE 25 — STEP 3: RESUME (THE X-Y-Z IMPACT FORMULA)
+  // SLIDE 27 — STEP 3: RESUME (THE X-Y-Z IMPACT FORMULA)
   {
-    id: "sanjauli_slide_25",
+    id: "sanjauli_slide_27",
     type: "PROOF_HIERARCHY",
     badge: "STEP 03 — RESUME",
     title: "Step 3 — Outcome-Driven Resume (The X-Y-Z Formula)",
@@ -700,9 +762,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "The 6-Second Rule: Recruiters do not read resumes; they scan for verifiable proof of work. Frame every bullet with the Google X-Y-Z formula.",
   },
 
-  // SLIDE 26 — STEP 4: APPROACH (HIGH-SIGNAL OUTREACH)
+  // SLIDE 28 — STEP 4: APPROACH (HIGH-SIGNAL OUTREACH)
   {
-    id: "sanjauli_slide_26",
+    id: "sanjauli_slide_28",
     type: "SCENARIO_SPLIT",
     badge: "STEP 04 — APPROACH",
     title: "Step 4 — Stop Waiting on Job Boards (High-Signal Outreach)",
@@ -734,9 +796,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Stop spamming job portals. Audit a company's product, build a 90-second working prototype, and send it to the engineering lead. That instantly separates you from 99% of applicants.",
   },
 
-  // SLIDE 27 — LIVE POLL 03: THE WHITEBOARD CHECK
+  // SLIDE 29 — LIVE POLL 03: THE WHITEBOARD CHECK
   {
-    id: "sanjauli_slide_27",
+    id: "sanjauli_slide_29",
     type: "POLL",
     badge: "LIVE POLL 03",
     title: "The Whiteboard & Interview Reality Check",
@@ -751,9 +813,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Live Poll 03. Let students vote. Transition: 'This is the exact dividing line in 2026. Let's look at how to prepare for the technical loop.'",
   },
 
-  // SLIDE 28 — STEP 5: INTERVIEW PREPARATION
+  // SLIDE 30 — STEP 5: INTERVIEW PREPARATION
   {
-    id: "sanjauli_slide_28",
+    id: "sanjauli_slide_30",
     type: "THREE_CARDS",
     badge: "STEP 05 — INTERVIEW",
     title: "Step 5 — Technical Interview Preparation & Architecture Defense",
@@ -794,9 +856,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Audience Question #5: 'If an interviewer challenges your code, do you argue back or ask questions?'\n\nSpeaker Hook: 'Companies don't hire brilliant jerks; they hire teammates who collaborate and defend systems with humility.'",
   },
 
-  // SLIDE 29 — THE ULTIMATE INTERVIEW TEST
+  // SLIDE 31 — THE ULTIMATE INTERVIEW TEST
   {
-    id: "sanjauli_slide_29",
+    id: "sanjauli_slide_31",
     type: "BIG_QUESTION",
     badge: "THE ULTIMATE TEST",
     title: "“Never Put an AI Project on Your Resume That You Cannot Defend on a Whiteboard.”",
@@ -809,9 +871,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
   // ACT 7 — UNISOLE PROGRAM REVEAL & CALL TO ACTION
   // =========================================================================
 
-  // SLIDE 30 — THE EXECUTION GAP
+  // SLIDE 32 — THE EXECUTION GAP
   {
-    id: "sanjauli_slide_30",
+    id: "sanjauli_slide_32",
     type: "SCENARIO_SPLIT",
     badge: "ACT 7: THE EXECUTION PATHWAY",
     title: "College Teaches Knowledge. Industry Demands Execution.",
@@ -843,9 +905,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "College teaches knowledge. Industry demands execution. Between them is a massive gap: skills, projects, industry tools, mentorship, portfolio, and interview preparation. This gap is what students struggle with.\n\nTransition: 'And that is why UNISOLE exists.'",
   },
 
-  // SLIDE 31 — UNISOLE PROGRAM REVEAL (6 PILLARS)
+  // SLIDE 33 — UNISOLE PROGRAM REVEAL (6 PILLARS)
   {
-    id: "sanjauli_slide_31",
+    id: "sanjauli_slide_33",
     type: "THREE_CARDS",
     badge: "UNISOLE INDUSTRIAL TRAINING",
     title: "Industrial Training & Internship Opportunity Program",
@@ -884,9 +946,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Present the 6 pillars: Skills, Projects, AI Tooling, Portfolio, Career Outreach, and Interview Mastery.\n\nTransition: 'Let's look at the complete 9-stage transformation journey.'",
   },
 
-  // SLIDE 32 — THE 9-STAGE JOURNEY
+  // SLIDE 34 — THE 9-STAGE JOURNEY
   {
-    id: "sanjauli_slide_32",
+    id: "sanjauli_slide_34",
     type: "PIPELINE_FLOW",
     badge: "THE TRANSFORMATION PIPELINE",
     title: "The 9-Stage Execution Pipeline",
@@ -907,9 +969,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Walk through the pipeline: LEARN → BUILD → TEST → DEPLOY → DOCUMENT → PORTFOLIO → APPROACH → INTERVIEW → INTERNSHIP.\n\nThis is not a theoretical certificate. It is a systematic roadmap to capability.",
   },
 
-  // SLIDE 33 — THE BIG QUESTION
+  // SLIDE 35 — THE BIG QUESTION
   {
-    id: "sanjauli_slide_33",
+    id: "sanjauli_slide_35",
     type: "BIG_QUESTION",
     badge: "THE ACTION CHECK",
     title: "“What Will You Do Differently After Today?”",
@@ -918,9 +980,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "Dark screen. Give them 10 seconds of silence. Then: 'Don't tell me you will learn AI. That's too vague. Tell yourself: What will I build? What skill will I master? What company will I approach? What proof will I create?'",
   },
 
-  // SLIDE 34 — THE VALUE CHAIN HAS MOVED
+  // SLIDE 36 — THE VALUE CHAIN HAS MOVED
   {
-    id: "sanjauli_slide_34",
+    id: "sanjauli_slide_36",
     type: "PROOF_HIERARCHY",
     badge: "THE MOVING VALUE CHAIN",
     title: "The Value Chain Has Moved",
@@ -952,9 +1014,9 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     notes: "AI is not killing software engineering. It is moving the value chain upward: From Typing → Building → Problem Solving → Systems Architecture → Business Value.",
   },
 
-  // SLIDE 35 — FINAL MESSAGE & CALLBACK
+  // SLIDE 37 — FINAL MESSAGE & CALLBACK
   {
-    id: "sanjauli_slide_35",
+    id: "sanjauli_slide_37",
     type: "FINAL_MESSAGE",
     badge: "YOUR CAREER AFTER AI",
     title: "DON'T COMPETE WITH AI. LEARN TO DIRECT IT.",
@@ -963,5 +1025,42 @@ export const SANJAULI_COLLEGE_PPT_SLIDES = [
     punchline: "The future belongs to builders who direct AI with deep systems understanding.",
     maxBuildSteps: 3,
     notes: "Return to the opening question: 'If AI can code, why should a company hire you?'\n\nBecause companies aren't hiring syntax typers. They are hiring engineers who understand, build, verify, communicate, and create value.\n\nYour degree gets you into the conversation. Your proof gets you taken seriously.\n\nThank you, and now go build!",
+  },
+
+  // SLIDE 38 — UNISOLE TALENT POOL & INTERNSHIP OPPORTUNITY
+  {
+    id: "sanjauli_slide_38",
+    type: "TALENT_POOL_PIPELINE",
+    badge: "UNISOLE TALENT POOL",
+    title: "UNISOLE Talent Pool & Internship Opportunity",
+    subtitle: "A direct hiring pipeline from college training to verified industry placement.",
+    steps: [
+      "1. Live Industrial Training & Systems Foundations",
+      "2. Build & Deploy Flagship Production Capstone",
+      "3. Technical Code Audit & Whiteboard Defense",
+      "4. UNISOLE Talent Pool Vetting & Direct Hiring Referrals",
+    ],
+    disclaimer: "Top performers who successfully build and defend production systems receive direct interview referrals and paid internship opportunities with partner tech companies.",
+    maxBuildSteps: 2,
+    notes: "How the Talent Pool works: Students who complete their capstones and pass the architecture defense are vetted and directly recommended to hiring startups and enterprises seeking production-ready BCA engineers.",
+  },
+
+  // SLIDE 39 — REGISTRATION & ENROLLMENT (QR CODE)
+  {
+    id: "sanjauli_slide_39",
+    type: "ENROLLMENT_CTA",
+    badge: "REGISTRATION & ONBOARDING",
+    title: "Join the Industrial Training & Internship Program",
+    subtitle: "Centre of Excellence Govt. College Sanjauli · BCA Cohort 2026",
+    actions: [
+      "Choose Your Specialized Track (Applied AI / Full-Stack Systems / Cloud DevOps)",
+      "Scan QR Code or Visit unisole.org/programs to Register",
+      "Get Direct Access to Live Projects, Mentorship & Flagship Capstones",
+      "Build Your Production Proof & Fast-Track Your Career",
+    ],
+    qrUrl: "https://unisole.org/programs",
+    qrPrompt: "Scan QR Code to Explore Program Details & Reserve Your Seat",
+    maxBuildSteps: 2,
+    notes: "Scan the QR code on your mobile screens right now to view track curriculums, cohort schedules, and complete your registration. Let's build real systems together.",
   },
 ];
