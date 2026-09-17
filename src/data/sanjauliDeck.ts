@@ -1,965 +1,967 @@
 export const SANJAULI_COLLEGE_PPT_SLIDES = [
+  // =========================================================================
+  // ACT 1 — BREAK THEIR OLD MENTAL MODEL (THE WAKE-UP CALL)
+  // =========================================================================
+
   // SLIDE 1 — HOOK COVER
   {
     id: "sanjauli_slide_1",
     type: "COVER",
-    badge: "INDUSTRIAL TRAINING & INTERNSHIP PROGRAM",
-    title: "UNISOLE",
-    subtitle: "Industrial Training cum Internship Opportunity Program · Centre of Excellence Govt. College Sanjauli (BCA Department)",
+    badge: "BCA & UNDERGRADUATE CAREER BLUEPRINT",
+    title: "YOUR CAREER AFTER AI",
+    subtitle: "How to Become Valuable When AI Can Code · Centre of Excellence Govt. College Sanjauli",
     org: "UNISOLE SKILL AI LABS",
     maxBuildSteps: 2,
-    notes: "BUILD: UNISOLE → thin orange line → program name. Centre of Excellence Govt. College Sanjauli BCA orientation. Minimal dark navy background. No bullet points. No program explanation.",
+    notes: "Welcome everyone. In the next 50 minutes, we are going to tackle the single biggest question on every student's mind: If AI can write code, build apps, and debug in seconds, where do you fit in? Today is not a lecture—it is an actionable roadmap designed to make you indispensable.",
   },
 
-  // SLIDE 2 — THE HOOK QUESTION
+  // SLIDE 2 — THE QUESTION
   {
     id: "sanjauli_slide_2",
     type: "BIG_QUESTION",
-    badge: "THE HOOK QUESTION",
-    title: "आगे क्या सोचा है?",
-    subtitle: "Think honestly — what have you planned after graduation?",
+    badge: "THE CORE QUESTION",
+    title: "“If AI can code... why should a company hire YOU?”",
+    subtitle: "Think before I answer. Don't Google it.",
     maxBuildSteps: 1,
-    notes: "This is the ONLY Hindi slide. Nothing else. No English. No poll. No subtitle on screen. Pause and ask students verbally: 'Think honestly — what have you planned after graduation?'",
+    questionPrompt: "If ChatGPT and Claude can produce 500 lines of functional code in 30 seconds, what exactly are you bringing to the engineering table?",
+    speakerHook: "Syntax typing is dead. Software engineering—deciding what to build, handling failure modes, and keeping systems alive—is more in demand than ever.",
+    notes: "Don't Google the answer. Just think for 10 seconds. If I give ChatGPT a problem and it produces 500 lines of code in 30 seconds... what exactly are you bringing to the table?\n\n[PAUSE FOR 10 SECONDS. TAKE 2-3 ANSWERS FROM AUDIENCE]\n\nGood. Today we're going to answer that question properly.\n\n[ENGAGEMENT / HANDS UP]: 'Who here has thought at least once: AI is going to make my BCA degree less valuable?'",
   },
 
-  // SLIDE 3 — CAREER SURVEY
+  // SLIDE 3 — THE WORLD YOU ENTERED
   {
     id: "sanjauli_slide_3",
-    type: "POLL",
-    badge: "LIVE POLL 01",
-    title: "Career Pulse for BCA Students",
-    question: "What is your primary career target after your BCA?",
-    options: [
-      "Software Engineering & Backend APIs",
-      "AI / ML & Intelligent Systems",
-      "Cloud, DevOps & Systems Engineering",
-      "Higher Studies (MCA / Specialized MS)",
-      "Still Deciding / Exploring Options",
+    type: "TIMELINE_EVOLUTION",
+    badge: "THE MACRO SHIFT",
+    title: "The World You Entered",
+    subtitle: "You are not entering the same job market your seniors entered.",
+    timeline: [
+      {
+        year: "2020 (The Old Career Pipeline)",
+        label: "Learn Syntax & Loops → Build Tutorial Projects → Land Internship → Junior Developer Job",
+      },
+      {
+        year: "2026 (The AI-Accelerated Reality)",
+        label: "AI Generates Code → AI Researches → AI Debugs → AI Designs → Outcome Engineering",
+      },
     ],
-    maxBuildSteps: 1,
-    notes: "Live Poll 01. Large live-result area. Show percentages dynamically after students vote. Presenter transition: 'Interesting. Let\'s keep this result in mind and understand what the actual post-bubble tech market looks like.'",
+    quote: "“Your seniors learned how to produce code. You have to learn how to produce outcomes using technology.”",
+    maxBuildSteps: 2,
+    notes: "In 2020, raw syntax knowledge was a scarce economic skill. In 2026, generating boilerplate code is free and instantaneous. The tech landscape shifted from typing speed to outcome engineering.\n\nTransition: 'Before we talk about what you should learn, let's look at what is actually happening to the entry-level hiring market.'",
   },
 
-  // SLIDE 4 — CREDIBILITY
+  // SLIDE 4 — THE ENTRY-LEVEL PROBLEM
   {
     id: "sanjauli_slide_4",
-    type: "FOUNDER_BIO",
-    badge: "CREDIBILITY",
-    title: "AJAY MOKTA",
-    subtitle: "Founder — UNISOLE Skill AI Labs · B.Tech, NIT Hamirpur",
-    initials: "AM",
-    credentials: [
-      "B.Tech — NIT Hamirpur",
-      "AI Educator & Keynote Speaker",
-      "Innovator & Deep-Tech Entrepreneur",
-      "Mentored 5,000+ students across India",
-    ],
-    quote: "“A degree from any college in Himachal should be backed by skills that compete globally.”",
-    sideSection: {
-      title: "UNISOLE",
-      items: ["AI Education", "Systems Engineering", "Career Awareness", "Production Projects"],
+    type: "SCENARIO_SPLIT",
+    badge: "MARKET MECHANICS",
+    title: "The Entry-Level Squeeze",
+    subtitle: "AI may not replace everyone. It can change who gets to start.",
+    scenarioA: {
+      title: "THE OLD LADDER (Pre-AI)",
+      subtitle: "Junior tasks provided a gradual learning ramp",
+      steps: [
+        "Company hires junior graduates for simple boilerplate tasks",
+        "Junior learns on the job through trial and error",
+        "Gradually advances to intermediate and senior systems engineer",
+        "Plenty of entry-level openings with low evaluation thresholds",
+      ],
+      footer: "Easy entry ramp · High tolerance for tutorial knowledge",
     },
-    maxBuildSteps: 3,
-    notes: "Build trust before dissecting the industry shifts.",
+    scenarioB: {
+      title: "THE NEW REALITY (Post-2024)",
+      subtitle: "AI handles the basic tasks, raising the entry bar",
+      steps: [
+        "AI agents handle boilerplate, simple CRUD & unit test generation",
+        "Companies need fewer people for mechanical syntax typing",
+        "Entry-level bar rises: companies demand verified execution",
+        "Junior candidates must demonstrate systems resilience on day 1",
+      ],
+      footer: "Higher entry bar · Demands real proof of work",
+    },
+    punchline: "Stanford Research: Employment among 22–25-year-olds in AI-exposed fields has weakened due to automated entry-level hiring.",
+    maxBuildSteps: 2,
+    notes: "The biggest impact of AI isn't 'everyone gets fired.' It is: 'The easiest work becomes automated, so getting your first opportunity becomes harder.'\n\n[IMPORTANT: DO NOT SCARE STUDENTS]. Immediately say: 'And that creates the biggest opportunity of your career.'",
   },
 
-  // SLIDE 5 — OUR TEAM
+  // SLIDE 5 — LIVE POLL 01
   {
     id: "sanjauli_slide_5",
-    type: "TEAM_GRID",
-    badge: "OUR TEAM",
-    title: "Meet Our Team",
-    subtitle: "Built by practitioners and engineers from top-tier institutions.",
-    pillars: ["AI SYSTEMS", "BACKEND ARCHITECTURE", "INDUSTRY RESEARCH", "MENTORSHIP"],
-    members: [
-      {
-        initials: "AM",
-        name: "Ajay Mokta",
-        role: "Founder — UNISOLE · B.Tech, NIT Hamirpur · Mentored 5k+ students",
-      },
-      {
-        initials: "GG",
-        name: "Girish Gaurav Sharma",
-        role: "CTO @ UNISOLE · 20th Rank NASA Space Apps · AIR 1 AIEC-DAE",
-      },
-      {
-        initials: "SP",
-        name: "Shabd Patel",
-        role: "B.Tech, NIT Hamirpur · Software Engineer at BlackRock · AI Expert",
-      },
-      {
-        initials: "KK",
-        name: "Kushal Kesharwani",
-        role: "IIT Patna · Engineer — Tech Mahindra · Industry Expert",
-      },
-      {
-        initials: "AK",
-        name: "Aditya Kaushal",
-        role: "M.Tech — IIT Delhi · Academic & Technical Expert at UNISOLE",
-      },
-    ],
-    maxBuildSteps: 3,
-    notes: "Mentors from BlackRock, Tech Mahindra, NASA challenge, IIT & NIT.",
-  },
-
-  // SLIDE 6 — TRANSITION: THE REAL QUESTION
-  {
-    id: "sanjauli_slide_6",
-    type: "TEXT_TRANSITION",
-    badge: "A VITAL QUESTION",
-    title: "If tech opportunities are exploding globally...",
-    subtitle: "Why are so many BCA students anxious, uncertain, and struggling to break through?",
-    maxBuildSteps: 2,
-    notes: "Dark slide. Use a dramatic pause before revealing the subtitle.",
-  },
-
-  // SLIDE 7 — THE MODERN TECH ECOSYSTEM MAP
-  {
-    id: "sanjauli_slide_7",
-    type: "ECOSYSTEM_HUB",
-    badge: "THE TECH LANDSCAPE",
-    title: "Where Do Modern Software Engineers Actually Work?",
-    subtitle: "Your degree is a starting point — the global tech landscape has expanded far beyond legacy IT service desks.",
-    centerLabel: "TECH ECOSYSTEM",
-    items: [
-      "AI & Deep-Tech Labs",
-      "Global Capability Centres (GCCs)",
-      "Product Startups (Seed to Series B)",
-      "High-Growth Enterprise SaaS",
-      "Cloud & DevOps Infrastructure",
-      "FinTech & Algorithmic Systems",
-      "Remote / Global Engineering Teams",
-      "Open-Source Tooling & Developer Infrastructure",
-    ],
-    punchline: "The modern software ecosystem rewards domain depth, resilience, and verified code over pedigree.",
-    maxBuildSteps: 3,
-    notes: "Build the ecosystem around TECH ECOSYSTEM. Highlight that opportunities extend far beyond mass IT service hiring.",
-  },
-
-  // SLIDE 8 — THE INFORMATION GAP
-  {
-    id: "sanjauli_slide_8",
-    type: "THREE_CARDS",
-    badge: "INFORMATION GAP",
-    title: "Why Don't BCA Students Hear About These Roles?",
-    subtitle: "The market changed exponentially faster than academic career advice.",
-    cards: [
-      {
-        num: "01",
-        title: "Traditional College Advice",
-        items: [
-          "Parents, relatives, and general seniors",
-          "Focus on legacy government exams or mass recruiting drives",
-          "Advice rooted in the 2005–2015 tech market",
-        ],
-      },
-      {
-        num: "02",
-        title: "Academic Syllabus Lag",
-        items: [
-          "Textbook syntax without modern toolchains (Docker, Git, CI/CD)",
-          "Focus on theoretical exams rather than live deployed architectures",
-          "Zero exposure to microservices, async queues, or local LLMs",
-        ],
-      },
-      {
-        num: "03",
-        title: "The Modern Engineering Reality",
-        items: [
-          "Containerized backends, REST/gRPC contracts, and API performance",
-          "Small open-weight AI models (Ollama, vLLM) & vector embeddings",
-          "Proof-of-work hiring: live GitHub repos, Dockerfiles & public demos",
-        ],
-      },
-    ],
-    punchline: "The industry demands production builders while traditional advice remains stuck in legacy theory.",
-    maxBuildSteps: 3,
-    notes: "Three large cards showing why standard guidance lagged behind real-world engineering shifts.",
-  },
-
-  // SLIDE 9 — THE EDUCATION SURGE
-  {
-    id: "sanjauli_slide_9",
-    type: "EDUCATION_SHIFT",
-    badge: "EDUCATION SHIFT",
-    title: "The Indian Higher Education Surge",
-    subtitle: "More graduates than ever before. A degree alone is no longer enough to differentiate yourself.",
-    stat1: {
-      year: "1990–91",
-      count: "~49 LAKH",
-      label: "Higher Education Enrolment",
-      ratio: "GER ≈ 6%",
-    },
-    stat2: {
-      year: "2023–24",
-      count: "~4.5 CRORE",
-      label: "Higher Education Enrolment",
-      ratio: "GER ≈ 30% (9x surge)",
-    },
-    punchline: "When millions hold a degree, companies filter candidates by proof of execution, not certificates.",
-    maxBuildSteps: 3,
-    notes: "Large visual comparison with animated bars. Highlight that a degree alone is no longer a moat—verifiable capability is.",
-  },
-
-  // SLIDE 10 — WHAT MODERN TECH OFFERS BCA GRADUATES
-  {
-    id: "sanjauli_slide_10",
-    type: "BENEFITS_GRID",
-    badge: "CAREER ADVANTAGES",
-    title: "What Can a Modern Tech Career Offer You?",
-    subtitle: "One strong technical foundation → Multiple roles → Compounding career upside.",
-    benefits: [
-      { title: "REMOTE & HYBRID WORK", value: "Global", sub: "Build for world-class teams from Shimla" },
-      { title: "PERFORMANCE-DRIVEN PAY", value: "Compounding", sub: "Merit-based compensation that scales with impact" },
-      { title: "RAPID MERITOCRACY", value: "Fast Track", sub: "Promotions based on shipping code, not seniority" },
-      { title: "CONTINUOUS CUTTING-EDGE TECH", value: "AI & Cloud", sub: "Work with modern LLM pipelines & cloud infra" },
-      { title: "2,100+ GCC HUBS IN INDIA", value: "Enterprise", sub: "Global engineering headquarters operating in India" },
-    ],
-    maxBuildSteps: 3,
-    notes: "Highlight the immense upside of modern software engineering: remote capability, meritocracy, and 2,100+ GCCs in India.",
-  },
-
-  // SLIDE 11 — LIVE POLL 02
-  {
-    id: "sanjauli_slide_11",
     type: "POLL",
-    badge: "LIVE POLL 02",
-    title: "What Matters Most in Modern Software Hiring?",
-    question: "What do top tech hiring managers value most when evaluating junior engineers?",
+    badge: "LIVE POLL 01",
+    title: "Audience Pulse: The AI Anxiety Check",
+    question: "Be honest: How worried are you that AI code generators will make entry-level programming jobs obsolete?",
     options: [
-      "College Tier & Degree Name",
-      "Live Deployed Projects & System Proof",
-      "Problem Solving & CS Fundamentals",
-      "Quantity of Online Course Certificates",
-      "Syntax Memorization & Typing Speed",
+      "Extremely worried — Wondering if coding is still worth learning",
+      "Moderately concerned — Feel I need more than basic syntax",
+      "Confident — AI is just a tool for real builders",
+      "Curious — Waiting to see where the real opportunity is",
     ],
     maxBuildSteps: 1,
-    notes: "Live Poll 02. Let students vote. Transition: 'Now let\'s look at how the tech industry actually evaluated talent in 2026.'",
+    notes: "Live Poll 01. Give students 20 seconds to vote on their mobile screens. Highlight the dynamic percentages on the big screen.\n\nTransition: 'Most of you feel the anxiety. Now let's look at why the market reset is actually a massive gift for disciplined builders.'",
   },
 
-  // SLIDE 12 — ACT 1: BEYOND THE HYPE & PANIC TRIGGER
+  // SLIDE 6 — THE MARKET RESET
   {
-    id: "sanjauli_slide_12",
-    type: "MYTH_REALITY_PAIRS",
-    badge: "ACT 1: THE WAKE-UP CALL",
-    title: "Beyond the Hype — The New Rules of Tech Careers",
-    subtitle: "Navigating the Post-Bubble AI Market for BCA Students",
-    pairs: [
-      {
-        myth: "“AI can write code now, software engineering is dead, don't bother learning to code.”",
-        reality: "Syntax typing is dead. Software engineering—deciding what to build, handling failure modes, and keeping systems alive—is more in demand than ever.",
-      },
-      {
-        myth: "“Speed of typing syntax gets you hired.”",
-        reality: "Landing an engineering role today is not about typing speed; it is about building reliable, maintainable systems with clean data contracts.",
-      },
-      {
-        myth: "“Glossy social media demos represent real industry jobs.”",
-        reality: "The tech landscape has shifted decisively from speculative 'cool demos' to disciplined 'production systems' with verified enterprise ROI.",
-      },
-    ],
-    maxBuildSteps: 3,
-    questionPrompt: "Raise your hand if you’ve seen a post saying: 'AI can write code now, software engineering is dead, don't bother learning to code.' Be honest—who here is worried about this?",
-    speakerHook: "Syntax typing is dead. Software engineering—deciding what to build, handling failure modes, and keeping systems alive—is more in demand than ever.",
-    notes: "Audience Question #1 (The Panic Trigger): 'Raise your hand if you’ve seen a post saying AI can write code now, software engineering is dead, don't bother learning to code. Be honest—who here is worried about this?'\n\nSpeaker Hook: 'Syntax typing is dead. Software engineering—deciding what to build, handling failure modes, and keeping systems alive—is more in demand than ever.'",
-  },
-
-  // SLIDE 13 — CODING IS NO LONGER THE BOTTLENECK
-  {
-    id: "sanjauli_slide_13",
+    id: "sanjauli_slide_6",
     type: "THREE_CARDS",
-    badge: "SYSTEM COMPLEXITY",
-    title: "Coding is No Longer the Bottleneck",
-    subtitle: "Speed vs. Specification — The Changing Dynamics of Software Engineering",
+    badge: "THE MARKET RESET",
+    title: "When Easy Work Disappears...",
+    subtitle: "The value of difficult, disciplined engineering multiplies.",
     cards: [
       {
         num: "01",
-        title: "Exponential Agent Horizon",
+        title: "Problem Solving & Specs",
         items: [
-          "Task horizon capabilities for AI agents have historically doubled every 7 months",
-          "Code generation & boilerplate scaffolding occur in seconds",
-          "Raw syntax is no longer a scarce economic skill",
+          "Taking messy, ambiguous requirements and defining clean specs",
+          "Understanding user constraints and business domain logic",
+          "Designing precise data contracts and API interfaces",
         ],
       },
       {
         num: "02",
-        title: "The True Bottleneck",
+        title: "Systems Resilience",
         items: [
-          "Not 'How do I write this loop?'",
-          "Can you define clear, unambiguous specifications?",
-          "Can you handle corner cases and user constraints?",
-          "Can you systematically verify the output actually works?",
+          "Defensive error handling and boundary conditions",
+          "Database indexing, connection pooling & memory management",
+          "Graceful degradation when external APIs or networks fail",
         ],
       },
       {
         num: "03",
-        title: "From Coder to System Architect",
+        title: "Verification & Testing",
         items: [
-          "Design system interfaces and data contracts",
-          "Defensive error handling and boundary testing",
-          "Understanding latency profiles, caching & fallbacks",
+          "Automated unit, integration, and benchmark test suites",
+          "Evaluating AI outputs against deterministic schema rules",
+          "Containerized deployment and live cloud monitoring",
         ],
       },
     ],
-    punchline: "Anyone can scaffold code in seconds. The bottleneck is defining specs and verifying resilience.",
+    punchline: "Companies don't just need someone who can make code appear. They need someone who makes systems work.",
     maxBuildSteps: 3,
-    notes: "Speed vs. Spec: The new bottleneck is no longer 'How do I write this algorithm?' but 'Can I define a clear spec, handle user needs, and verify that the output actually works?'",
+    notes: "When easy work disappears, the value of difficult work skyrockets: Problem solving, System design, Verification, Product thinking, and Communication. Companies don't just need syntax typers; they need builders who solve real-world problems.\n\nTransition: 'And this is where the most talked-about development in software enters the story: Vibe Coding.'",
   },
 
-  // SLIDE 14 — THE 2021-2026 RESET & CREDENTIAL INSECURITY
+  // =========================================================================
+  // ACT 2 — VIBE CODING: POWER VS. PRODUCTION REALITY
+  // =========================================================================
+
+  // SLIDE 7 — VIBE CODING
+  {
+    id: "sanjauli_slide_7",
+    type: "BIG_QUESTION",
+    badge: "ACT 2: THE MODERN TOOLKIT",
+    title: "“Build Me An App.”",
+    subtitle: "The Rise of Vibe Coding (Claude Code, Cursor, Copilot)",
+    maxBuildSteps: 1,
+    notes: "Show an AI tool spinning up a full-stack application in 30 seconds from a single prompt.\n\n[ASK AUDIENCE]: 'How many of you think this is amazing?' (Hands up). 'It is.' [PAUSE]. 'But here is the dangerous part.'",
+  },
+
+  // SLIDE 8 — THE VIBE-CODING ILLUSION
+  {
+    id: "sanjauli_slide_8",
+    type: "PROOF_HIERARCHY",
+    badge: "THE COMPETENCE TRAP",
+    title: "The Vibe-Coding Illusion",
+    subtitle: "AI can make you look like a developer before you actually become one.",
+    layers: [
+      {
+        label: "LEVEL 1: PROMPT → APP",
+        desc: "Copy-pasting prompts until red squiggles disappear. Zero architectural understanding. High illusion of competence.",
+      },
+      {
+        label: "LEVEL 2: PROMPT → UNDERSTAND → MODIFY",
+        desc: "Inspecting AI-generated code, understanding data flow, tweaking components, and debugging edge cases.",
+      },
+      {
+        label: "LEVEL 3: SPEC → AI → TEST → VERIFY → DEPLOY",
+        desc: "You define data contracts, schemas & specs. AI writes boilerplate. You write test suites, benchmark latency, and deploy.",
+      },
+    ],
+    punchline: "I don't want you to stop vibe coding. I want you to become so good at systems that you vibe code responsibly.",
+    maxBuildSteps: 3,
+    notes: "Vibe coding is a superpower, but mistaking AI-generated syntax for personal architectural understanding is toxic. Level 1 coders get filtered out on whiteboards. Level 3 engineers become 10x more productive.\n\nTransition: 'Let's test this with a live thought experiment.'",
+  },
+
+  // SLIDE 9 — LIVE DEMO & PRODUCTION TEST
+  {
+    id: "sanjauli_slide_9",
+    type: "MYTH_REALITY_PAIRS",
+    badge: "THE PRODUCTION TEST",
+    title: "The Live Test: Would You Trust This in Production?",
+    subtitle: "Generating software is cheap. Engineering software is not.",
+    pairs: [
+      {
+        myth: "The Demo Illusion (Localhost)",
+        reality: "AI generates a quick UI for scholarship documents in 2 minutes. It works smoothly on localhost for 1 user.",
+      },
+      {
+        myth: "The Production Reality (10,000 Users)",
+        reality: "What if 10,000 students apply simultaneously? What if the database deadlocks? What if personal Aadhaar data leaks?",
+      },
+      {
+        myth: "The Economic Reality (API Costs)",
+        reality: "What if the model hallucinates wrong scholarship eligibility? What if unoptimized API calls cost ₹5 per request?",
+      },
+    ],
+    questionPrompt: "If I took away ChatGPT, Claude, and Copilot right now and asked you to build a simple CRUD API and connect it to a database on a whiteboard, could you do it?",
+    speakerHook: "Generating software is becoming cheap. Engineering software is not. If you can't explain it on a whiteboard, you don't own the system—you borrowed technical debt.",
+    maxBuildSteps: 3,
+    notes: "Ask students: 'Give me a college problem (e.g. scholarship documents). AI generates it. Would you deploy it to 100k students? What if the API costs ₹5 per request?'\n\nSpeaker Hook: 'Generating software is becoming cheap. Engineering software is not.'",
+  },
+
+  // SLIDE 10 — THE AI PRODUCTIVITY PARADOX
+  {
+    id: "sanjauli_slide_10",
+    type: "SCENARIO_SPLIT",
+    badge: "EMPIRICAL RESEARCH",
+    title: "The AI Productivity Paradox",
+    subtitle: "FASTER CODE ≠ FASTER ENGINEERING",
+    scenarioA: {
+      title: "THE 10-MINUTE SYNTAX ILLUSION",
+      subtitle: "What AI accelerates in seconds",
+      steps: [
+        "Instant boilerplate scaffolding and function templates",
+        "Fast CSS layout formatting and component generation",
+        "High initial dopamine: 'I built an app in 5 minutes!'",
+        "Zero automated tests or verified error boundaries",
+      ],
+      footer: "Fast syntax generation · High illusion of speed",
+    },
+    scenarioB: {
+      title: "THE 90% ENGINEERING REALITY",
+      subtitle: "Where real engineering time is actually spent",
+      steps: [
+        "Validating business constraints and edge cases",
+        "Debugging silent model hallucinations and race conditions",
+        "API security, auth tokens, database migrations & indexes",
+        "Deploying, monitoring, load-testing & container orchestration",
+      ],
+      footer: "METR Study: AI increased completion time when debugging unverified code",
+    },
+    punchline: "Never measure AI by how fast it writes code. Measure by whether you solved the problem faster.",
+    maxBuildSteps: 2,
+    notes: "A METR randomized study of experienced developers found that AI tools can actually increase total completion time when developers spend hours debugging subtle AI-generated hallucinations.\n\nTransition: 'So AI is powerful, but it has also attracted astronomical amounts of hype and capital. Which brings us to a much bigger question: Are we in an AI bubble?'",
+  },
+
+  // =========================================================================
+  // ACT 3 — THE AI BUBBLE & SPECULATION
+  // =========================================================================
+
+  // SLIDE 11 — BUBBLE?
+  {
+    id: "sanjauli_slide_11",
+    type: "THREE_CARDS",
+    badge: "ACT 3: MACRO REALITY",
+    title: "Are We in an AI Bubble?",
+    subtitle: "Three distinct forces can exist at the exact same time.",
+    cards: [
+      {
+        num: "01",
+        title: "Real Technology",
+        items: [
+          "Generative intelligence is a permanent general-purpose utility",
+          "Large language models, embeddings & reasoning engines are real",
+          "Automates cognitive, repetitive developer workflows",
+        ],
+      },
+      {
+        num: "02",
+        title: "Real Business Value",
+        items: [
+          "Enterprises saving millions in document intelligence & support",
+          "Accelerating software delivery and internal operations",
+          "Irreversible productivity compounding across industries",
+        ],
+      },
+      {
+        num: "03",
+        title: "Massive Speculation",
+        items: [
+          "Thin API wrappers funded at unsustainable valuations",
+          "Hype farming, FOMO capital, and unrealistic revenue projections",
+          "Foundation model updates destroy wrapper startups overnight",
+        ],
+      },
+    ],
+    punchline: "The technology does not have to be fake for market valuations to be overhyped.",
+    questionPrompt: "Is AI in a massive bubble right now that is about to burst?",
+    speakerHook: "Yes and no. The speculation and wrapper apps are in an enormous bubble. But the underlying utility is permanent. When the bubble bursts, the hype disappears, but real systems engineers inherit the industry.",
+    maxBuildSteps: 3,
+    notes: "Audience Question #4: 'Is AI in a massive bubble right now?'\n\nSpeaker Hook: 'Three things exist simultaneously: Real tech + Real business value + Massive speculation. That is what makes bubbles complicated.'\n\nTransition: 'To understand how this plays out without panic, let's look at what creates a bubble.'",
+  },
+
+  // SLIDE 12 — WHAT CREATES A BUBBLE?
+  {
+    id: "sanjauli_slide_12",
+    type: "PIPELINE_FLOW",
+    badge: "MARKET DYNAMICS",
+    title: "The Anatomy of a Technology Bubble",
+    subtitle: "How excitement turns into speculation and how markets correct.",
+    stages: [
+      "Breakthrough Tech",
+      "Huge Expectations",
+      "Capital Floods In",
+      "Valuations Soar",
+      "Weak Wrappers Funded",
+      "Market Reset & Discipline",
+    ],
+    punchline: "When capital tightens, speculative hype dies — but foundational infrastructure remains.",
+    maxBuildSteps: 3,
+    notes: "Every major technological revolution follows this curve: Steam engines, Railroads, Electricity, the Internet, and now AI.\n\nTransition: 'To understand what this means for your career, let's go back to 1999.'",
+  },
+
+  // =========================================================================
+  // ACT 4 — THE 1999 DOT-COM LESSON
+  // =========================================================================
+
+  // SLIDE 13 — LET'S GO BACK TO 1999
+  {
+    id: "sanjauli_slide_13",
+    type: "BIG_QUESTION",
+    badge: "HISTORICAL PERSPECTIVE",
+    title: "“Let's Go Back to 1999.”",
+    subtitle: "Imagine sitting in a college classroom at the peak of the Internet boom.",
+    maxBuildSteps: 1,
+    notes: "Dark slide. Pause. Imagine you are sitting in a college classroom in 1999. Someone tells you: 'The Internet is going to change everything.' Was that true? YES. 'Every company must go online.' True? YES. 'This company has no revenue, but its stock is up 500%.' That's where things become dangerous.",
+  },
+
+  // SLIDE 14 — THE DOT-COM CRASH (1999-2000)
   {
     id: "sanjauli_slide_14",
     type: "TIMELINE_EVOLUTION",
-    badge: "THE 2021–2026 CYCLE",
-    title: "Why Has Tech Hiring Shifted? (The Great Reset)",
-    subtitle: "Understanding Macro Market Waves & The Credential Insecurity",
+    badge: "DOT-COM PARALLEL",
+    title: "The 1999–2000 Dot-Com Boom & Crash",
+    subtitle: "Understanding what collapsed and what permanently survived.",
     timeline: [
       {
-        year: "2021–2022 (Pandemic Surge)",
-        label: "Zero-interest rates + remote lockdown created an artificial tech hiring surge with loose evaluation standards.",
+        year: "1998–1999 (The Internet Euphoria)",
+        label: "Massive capital flood. Startups with zero revenue raised millions simply by putting '.com' in their name.",
       },
       {
-        year: "2022–2023 (Generative AI FOMO)",
-        label: "Corporate talent hoarding. Companies hired anyone with 'AI' on their resume with zero clear product ROI.",
+        year: "March 2000 (The Peak & Crash)",
+        label: "The Nasdaq peaked and crashed 78%. Hundreds of speculative, unprofitable startups vanished overnight.",
       },
       {
-        year: "2024–2026 (The Great Reset)",
-        label: "Fiscal discipline returned. Speculative hiring froze. Teams pivot strictly to verified execution, cost efficiency, and bottom-line ROI.",
+        year: "2001–2026 (The Permanent Utility)",
+        label: "The Internet did NOT die. It grew into a multi-trillion dollar foundation of modern civilization.",
       },
     ],
-    quote: "“In a boom market, pedigree gets people hired into rotation pools. In a disciplined market, companies hire verified execution. A BCA student with a live, containerized, documented project beats a textbook B.Tech student with zero production experience every single day.”",
+    quote: "“The lesson isn't that the Internet was fake. The lesson is that technology adoption and business survival are two different things.”",
     maxBuildSteps: 3,
-    questionPrompt: "How many of you feel that because you are pursuing a BCA rather than a B.Tech from a top-tier university, top companies won't give you a chance?",
-    speakerHook: "In a boom market, pedigree gets people hired into rotation pools. In a disciplined market, companies hire verified execution. A BCA student with a live, containerized, documented project beats a textbook B.Tech student with zero production experience every single day.",
-    notes: "Audience Question #2 (The Credential Insecurity): 'How many of you feel that because you are pursuing a BCA rather than a B.Tech from a top-tier university, top companies won't give you a chance?'\n\nSpeaker Hook: 'In a boom market, pedigree gets people hired into rotation pools. In a disciplined market, companies hire verified execution. A BCA student with a live, containerized, documented project beats a textbook B.Tech student with zero production experience every single day.'",
+    notes: "Ask the students: 'Did the Internet die after the 2000 crash?' (Students: NO!).\n\nTransition: 'Let's see what that means for who survived and compounded.'",
   },
 
-  // SLIDE 15 — WHAT EMPLOYERS URGENTLY NEED
+  // SLIDE 15 — LIVE POLL 02: THE DOT-COM TEST
   {
     id: "sanjauli_slide_15",
-    type: "THREE_CARDS",
-    badge: "EMPLOYER DEMAND",
-    title: "Should You Worry? What Employers Urgently Need",
-    subtitle: "Entry-level hiring feels scarce only if you rely on the 2022 tutorial playbook.",
-    cards: [
-      {
-        num: "01",
-        title: "Cost & Token Discipline",
-        items: [
-          "Engineers who drastically reduce cloud API and token expenses",
-          "Prompt caching, compact context windows, and efficient embeddings",
-          "Knowing when NOT to call an expensive proprietary model",
-        ],
-      },
-      {
-        num: "02",
-        title: "Open-Weight & Local Models",
-        items: [
-          "Developers building with small, self-hosted models (Ollama, vLLM)",
-          "Enterprise data privacy, on-premise compliance & quantization",
-          "Deploying 3B–8B models at zero marginal token cost",
-        ],
-      },
-      {
-        num: "03",
-        title: "Production Resilience",
-        items: [
-          "Builders with product sense who test against real production edge cases",
-          "Automated evaluation suites & deterministic schema fallbacks",
-          "Containerized microservices that stay online under stress",
-        ],
-      },
+    type: "POLL",
+    badge: "LIVE POLL 02",
+    title: "Prediction Check: What Survived 2000?",
+    question: "When the Dot-Com bubble burst and 1,000+ startups died, what happened to software engineering?",
+    options: [
+      "Software jobs vanished permanently",
+      "Hype died, but real systems & infrastructure grew 100x",
+      "Companies stopped building on the Internet",
+      "Only elite tier-1 university graduates got hired",
     ],
-    punchline: "Companies face a severe shortage of engineers who actually know how to deploy, evaluate, and maintain software.",
-    maxBuildSteps: 3,
-    notes: "What Companies Desperately Seek: Engineers who reduce cloud costs, developers who build with small open-weight models, and builders who test code against production edge cases.",
+    maxBuildSteps: 1,
+    notes: "Live Poll 02. Let students vote. Transition: 'Exactly. The hype and speculation died, but servers, databases, networking, e-commerce, and real systems engineers inherited the next 20 years.'",
   },
 
-  // SLIDE 16 — VIBE CODING & THE REALITY CHECK
+  // SLIDE 16 — THIS IS THE LESSON
   {
     id: "sanjauli_slide_16",
     type: "MYTH_REALITY_PAIRS",
-    badge: "ACT 2: THE DOUBLE-EDGED SWORD",
-    title: "Vibe Coding: Power vs. The Illusion of Competence",
-    subtitle: "Modern AI Tools (Claude Code, Cursor, Copilot) — Power vs. Whiteboard Reality",
+    badge: "THE LESSON OF 2000",
+    title: "What Disappeared vs. What Compounded",
+    subtitle: "Separating transient market noise from durable engineering capabilities.",
     pairs: [
       {
-        myth: "The Superpower",
-        reality: "Instant scaffolding, rapid prototyping, and dropping the cost of failure to a lost weekend. Builders can test ideas in hours rather than months.",
+        myth: "What the Crash Destroyed",
+        reality: "Weak business models, Pets.com, slide-deck startups, and tutorial coders who only knew superficial syntax.",
       },
       {
-        myth: "The Illusion of Competence",
-        reality: "Mistaking AI-generated syntax for personal architectural understanding. Piling prompt upon prompt creates brittle, unreadable 'spaghetti code.'",
+        myth: "What Permanently Survived",
+        reality: "Networking protocols, Linux servers, relational databases, web browsers, e-commerce & distributed systems.",
       },
       {
-        myth: "The Whiteboard Reality Check",
-        reality: "If you cannot explain memory management, concurrency, edge cases, and failure modes on a whiteboard without an AI prompt, you cannot pass a technical loop.",
+        myth: "Who Compounded Career Equity",
+        reality: "Engineers who understood core CS fundamentals, algorithms, database queries, and system reliability.",
       },
     ],
+    punchline: "Speculation collapses. Real engineering value compounds.",
     maxBuildSteps: 3,
-    questionPrompt: "If I took away ChatGPT, Claude, and Copilot right now and asked you to build a simple CRUD API and connect it to a database on a whiteboard, could you do it?",
-    speakerHook: "If you can't explain the code on a whiteboard, you don't own the system—you borrowed technical debt.",
-    notes: "Audience Question #3 (The Reality Check): 'If I took away ChatGPT, Claude, and Copilot right now and asked you to build a simple CRUD API and connect it to a database on a whiteboard, could you do it?'\n\nSpeaker Hook: 'If you can't explain the code on a whiteboard, you don't own the system—you borrowed debt.'",
+    notes: "The crash filtered out the tourist coders and speculative wrappers. Real systems engineers inherited the entire digital economy.",
   },
 
-  // SLIDE 17 — TECHNICAL DEBT: MORTGAGE VS CREDIT CARD
+  // SLIDE 17 — AMAZON CASE STUDY
   {
     id: "sanjauli_slide_17",
     type: "SCENARIO_SPLIT",
-    badge: "ARCHITECTURAL OWNERSHIP",
-    title: "Technical Debt: The Mortgage vs. The Credit Card Trap",
-    subtitle: "How you use AI determines whether you compound capability or accumulate toxic debt.",
+    badge: "CASE STUDY",
+    title: "Amazon in 2000: Surviving the Downturn",
+    subtitle: "Don't spend your career trying to predict which AI startup wins.",
     scenarioA: {
-      title: "THE CREDIT CARD TRAP (High-Interest Debt)",
-      subtitle: "Mindlessly prompting code without understanding architecture",
+      title: "SPECULATIVE STARTUPS (Folded 2000)",
+      subtitle: "Relying purely on hype and easy venture capital",
       steps: [
-        "Copy-pasting syntax until red error squiggles disappear",
-        "Zero understanding of database queries, indexes, or memory limits",
-        "No unit tests, no schema validation, no structured logs",
-        "The debt compounds until the system collapses in production or during interviews",
+        "Zero positive unit economics or real customer retention",
+        "Spent millions on Super Bowl ads with no product moat",
+        "Collapsed within months once venture capital dried up",
+        "Built on shallow ideas with zero engineering defensibility",
       ],
-      footer: "High interest debt · Collapses on the whiteboard",
+      footer: "Vanished overnight · Zero residual value",
     },
     scenarioB: {
-      title: "THE MORTGAGE MINDSET (Disciplined Leverage)",
-      subtitle: "Using AI to accelerate typing while owning every architectural contract",
+      title: "AMAZON'S FOUNDATION (Survived & Scaled)",
+      subtitle: "Focusing on real customers and resilient infrastructure",
       steps: [
-        "Use AI to accelerate typing speed and boilerplate generation",
-        "Define rigorous data schemas, API contracts & specs yourself",
-        "Write automated unit tests and evaluation benchmarks",
-        "Own and defend every line of code, memory profile, and trade-off",
+        "Real customer demand, logistics execution & disciplined unit economics",
+        "Raised critical financing right before the crash (HBR Case)",
+        "Invested heavily in server infrastructure (which later birthed AWS)",
+        "Compounded through the downturn to become a global titan",
       ],
-      footer: "Compounding equity · Whiteboard & production mastery",
+      footer: "Compounded 100x · Built enduring infrastructure",
     },
+    punchline: "Build your career on durable infrastructure skills, not on fleeting startup hype.",
     maxBuildSteps: 2,
-    notes: "The 'Mortgage' Mindset: Use AI to accelerate typing, but own every single line of code, data contract, and test suite yourself.",
+    notes: "Would you have known in 1999 which AI company will win in 2026? Probably not. Don't build your identity on one AI tool; build it on engineering fundamentals.",
   },
 
-  // SLIDE 18 — IS AI IN A MASSIVE BUBBLE?
+  // SLIDE 18 — BRING IT BACK TO AI
   {
     id: "sanjauli_slide_18",
     type: "THREE_CARDS",
-    badge: "THE MACRO LANDSCAPE",
-    title: "Is AI in a Massive Bubble Right Now?",
-    subtitle: "Audience Question #4: Debunking the Hype and Spotting Genuine Opportunity",
+    badge: "POST-CORRECTION REALITY",
+    title: "What Happens to YOU in a Correction?",
+    subtitle: "When the AI hype cools, real systems engineers inherit the industry.",
     cards: [
       {
         num: "01",
-        title: "The Wrapper Bubble",
+        title: "Thin Wrappers Fold",
         items: [
-          "Thin API wrappers with zero proprietary depth are collapsing",
-          "Speculative hype and engagement farming are fading fast",
-          "Foundation model updates replace simple wrappers overnight",
+          "Generic chatbot wrappers without proprietary data collapse",
+          "Engagement farming and prompt-only hype fades away",
+          "Companies demand strict ROI and cost efficiency",
         ],
       },
       {
         num: "02",
-        title: "Permanent Utility",
+        title: "Tourist Coders Filtered",
         items: [
-          "Underlying generative technology is a permanent general-purpose utility",
-          "Enterprise workflow automation has massive, irreversible ROI",
-          "Small AI & edge deployment on private data is exploding",
+          "Prompt-only coders unable to debug systems face ATS rejections",
+          "Tutorial clone portfolios fail technical whiteboard loops",
+          "Surface-level syntax familiarity loses all market value",
         ],
       },
       {
         num: "03",
-        title: "Who Inherits the Industry",
+        title: "Systems Builders Inherit",
         items: [
-          "When the bubble bursts, hype tourist coders disappear",
-          "Real engineers with deep CS fundamentals inherit the industry",
-          "Traditional sectors (healthcare, finance, logistics) urgently need practical builders",
+          "Engineers who connect open-weight models to private enterprise data",
+          "Builders who optimize token latency and cloud API costs",
+          "Disciplined problem solvers who ship containerized systems",
         ],
       },
     ],
     punchline: "When the bubble bursts, hype disappears, but real systems engineers inherit the industry.",
     maxBuildSteps: 3,
-    questionPrompt: "Is AI in a massive bubble right now that is about to burst?",
-    speakerHook: "Yes and no. The speculation and wrapper apps are in an enormous bubble. But the underlying utility is permanent. When the bubble bursts, the hype disappears, but the real engineers inherit the entire industry.",
-    notes: "Audience Question #4 (The Market Bubble): 'Is AI in a massive bubble right now that is about to burst?'\n\nSpeaker Hook: 'Yes and no. The speculation and wrapper apps are in an enormous bubble. But the underlying utility is permanent. When the bubble bursts, the hype disappears, but the real engineers inherit the entire industry.'",
+    notes: "What happens to YOU? If you only know how to prompt, you're in trouble. If you know how to build, test, and deploy resilient systems, you inherit the industry.\n\nTransition: 'So how do you position yourself right now as a student?'",
   },
 
-  // SLIDE 19 — WHEN BUBBLES BURST: WHO SURVIVES
+  // =========================================================================
+  // ACT 5 — WHAT THIS MEANS FOR A STUDENT (THE CAREER HEDGE)
+  // =========================================================================
+
+  // SLIDE 19 — THE CAREER HEDGE
   {
     id: "sanjauli_slide_19",
-    type: "COURSE_VS_CAREER",
-    badge: "MARKET FILTER",
-    title: "When Bubbles Burst: The Fallout vs. Who Survives",
-    subtitle: "Speculation collapses, real engineering value compounds.",
-    normalCourseTitle: "THE FALLOUT (Who Gets Filtered Out)",
-    normalCourse: [
-      "Speculative venture funding dries up completely",
-      "'Me-too' wrapper startups fold overnight",
-      "Tutorial-clone coders face ATS rejection black holes",
-      "Untested, prompt-only coders flood the market without callbacks",
-    ],
-    careerProgramTitle: "WHO SURVIVES & COMPOUNDS (BCA Builders)",
-    careerProgram: [
-      "Engineers with deep CS, algorithms, and systems fundamentals",
-      "Builders with proven delivery records (live deployed apps)",
-      "Professionals who speak the language of business ROI & cost savings",
-      "Collaborative teammates with humility who welcome code feedback",
-    ],
-    punchline: "Speculation collapses, real value compounds.",
-    maxBuildSteps: 3,
-    notes: "The shake-out separates superficial wrapper creators from disciplined systems engineers.",
+    type: "SCENARIO_SPLIT",
+    badge: "THE CAREER HEDGE",
+    title: "Don't Become \"AI-Proof\" — Become Valuable in BOTH Worlds",
+    subtitle: "A bulletproof engineering skillset thrives in any economic climate.",
+    scenarioA: {
+      title: "WORLD 1: THE AI BOOM CONTINUES",
+      subtitle: "Massive corporate investment into intelligent systems",
+      steps: [
+        "Companies urgently need AI agent orchestration & RAG pipelines",
+        "Integration of local open-weight models (Ollama, vLLM, DeepSeek)",
+        "Engineers who build autonomous workflows and tool-calling systems",
+        "High demand for AI infrastructure and vector database architects",
+      ],
+      footer: "High growth · AI systems engineering mastery",
+    },
+    scenarioB: {
+      title: "WORLD 2: AN AI MARKET CORRECTION",
+      subtitle: "Fiscal discipline, cost reduction & operational efficiency",
+      steps: [
+        "Companies demand cloud token optimization & prompt caching",
+        "Focus shifts to reliable, fault-tolerant offline microservices",
+        "Demand for engineers who can do more with smaller budgets",
+        "Pragmatic builders who solve messy internal business workflows",
+      ],
+      footer: "High stability · Cost efficiency & systems resilience",
+    },
+    punchline: "Notice what survives both scenarios: Systems engineering, problem solving, and cost discipline.",
+    maxBuildSteps: 2,
+    notes: "Don't try to become 'AI-proof.' Become valuable in BOTH worlds. Notice what survives: problem solving, system design, testing, and business ROI.\n\nTransition: 'Let's look at how student profiles must evolve.'",
   },
 
-  // SLIDE 20 — THE 100-CANDIDATE DROPOUT FUNNEL
+  // SLIDE 20 — THE NEW STUDENT PROFILE
   {
     id: "sanjauli_slide_20",
+    type: "COMPARISON_STATS",
+    badge: "PARADIGM SHIFT",
+    title: "The Old Student Resume vs. The Modern Builder",
+    subtitle: "Proof > Claims. Projects > Certificates.",
+    stat1: {
+      year: "THE OLD RESUME PROFILE",
+      count: "KEYWORD STACKING",
+      label: "BCA · Python · Java · HTML · CSS · ChatGPT · 7 Certificates",
+      ratio: "0 Live Proof · 0 Verified Users · 0 ATS Differentiation",
+    },
+    stat2: {
+      year: "THE MODERN BUILDER PROFILE",
+      count: "VERIFIED EXECUTION",
+      label: "Understands → Builds → Tests → Deploys → Measures → Communicates",
+      ratio: "Live URL · GitHub Proof · Architecture Spec · Measurable Impact",
+    },
+    quote: "“Your resume says what you claim to know. Your project demonstrates what you can actually deliver under pressure.”",
+    maxBuildSteps: 2,
+    notes: "Would a generic resume with 'Python, Java, Machine Learning' and 7 certificates impress an engineering lead today? No. What impresses them is verified execution: 'Understands → Builds → Tests → Deploys → Measures → Communicates.'",
+  },
+
+  // SLIDE 21 — THE 100-CANDIDATE DROPOUT FUNNEL
+  {
+    id: "sanjauli_slide_21",
     type: "DROPOUT_FUNNEL",
-    badge: "ACT 3: THE STRATEGIC PLAYBOOK",
+    badge: "STRATEGIC FUNNEL",
     title: "The 100-Candidate Drop-off Funnel",
-    subtitle: "Visualizing why high-effort students fail to land offers due to strategic funnel leaks.",
+    subtitle: "Visualizing why hardworking students fail to land offers due to strategic leaks.",
     stages: [
       {
         stage: "Learning Basic Syntax",
         remaining: "100",
         drop: "Baseline",
-        cause: "Finish basic tutorials, YouTube courses, and syntax drills.",
+        cause: "Complete YouTube courses, syntax tutorials & university assignments.",
       },
       {
         stage: "Production-Grade Projects",
         remaining: "25",
         drop: "75 Drop Out",
-        cause: "75% build clone tutorials (Netflix/Todo/Chatbot wrappers) with zero real users, tests, or backend depth.",
+        cause: "75% build clone tutorial apps (Weather/Todo/Netflix) with zero tests, users, or backend depth.",
       },
       {
-        stage: "Resume / ATS Screening",
-        remaining: "5",
-        drop: "20 Drop Out",
-        cause: "Poor resumes with no metrics, generic buzzword bullet points, or missing GitHub proofs fail automated screens.",
+        stage: "Outcome-Driven Resume",
+        remaining: "10",
+        drop: "15 Drop Out",
+        cause: "Resumes describe tasks ('built a chatbot') rather than measurable engineering impact.",
       },
       {
-        stage: "Technical & System Loops",
-        remaining: "2",
+        stage: "Targeted Strategic Outreach",
+        remaining: "4",
+        drop: "6 Drop Out",
+        cause: "Mass-apply to 500 LinkedIn job boards instead of high-signal proof outreach to founders.",
+      },
+      {
+        stage: "Technical Loop & Whiteboard Offer",
+        remaining: "1",
         drop: "3 Drop Out",
-        cause: "Candidates crumble under edge cases, cannot explain architectural trade-offs, or display defensive attitudes.",
-      },
-      {
-        stage: "Final Offer",
-        remaining: "1–2",
-        drop: "Top Hires",
-        cause: "Hired candidates who demonstrate production mindset, business value, and strong culture add.",
+        cause: "Panic when asked to defend architecture, latency spikes & failure modes on a whiteboard.",
       },
     ],
-    takeaway: "Your degree is not your barrier—your portfolio quality and communication funnel are.",
+    punchline: "Fix the leaks at each step of the funnel to guarantee an offer.",
     maxBuildSteps: 4,
-    notes: "Speaker Takeaway for BCA Students: 'Your degree is not your barrier—your portfolio quality and communication funnel are.' Walk through the numbers: 100 → 25 → 5 → 2 → 1-2.",
+    notes: "Walk through the 100-candidate drop-off funnel. 100 start. 75 die at toy projects. 15 die at weak resumes. 6 die at cold applying. Only 1 survives. We are going to fix every single leak right now.",
   },
 
-  // SLIDE 21 — STEP 1: MASTER INDUSTRY-GRADE SKILLS
-  {
-    id: "sanjauli_slide_21",
-    type: "DEDICATED_ROADMAP",
-    badge: "PLAYBOOK STEP 01",
-    title: "Step 1 — Master Non-Negotiable Industry-Grade Skills",
-    subtitle: "The T-Shaped AI & Backend Profile for BCA Students",
-    stream: "BCA Systems & AI",
-    foundation: [
-      "Data Structures & Algorithms",
-      "Modular OOP / Functional Patterns",
-      "Relational Databases & Indexing (PostgreSQL)",
-      "RESTful APIs & Microservices (FastAPI / Node)",
-      "Linux Fundamentals & Git Hygiene",
-    ],
-    industrySkills: [
-      "Docker & Container Orchestration",
-      "Redis Caching & Async Message Queues",
-      "Small Local LLMs (Ollama / vLLM)",
-      "RAG Architectures & Vector Embeddings",
-      "Deterministic Schemas (Pydantic / Zod)",
-    ],
-    projects: "High-throughput microservices treating LLMs like probabilistic microservices with latency, rate limits & error budgets",
-    proof: "Verifiable code on GitHub, containerized live endpoints, and clean API schemas",
-    opportunity: "Backend Engineer · AI Systems Developer · Full Stack Software Associate",
-    maxBuildSteps: 4,
-    notes: "Demystify the Stack: Stop treating LLMs like magic; treat them like probabilistic microservices with latency, rate limits, and failure modes.",
-  },
+  // =========================================================================
+  // ACT 6 — THE PEAK: THE 5-STEP CAREER BLUEPRINT
+  // =========================================================================
 
-  // SLIDE 22 — STEP 2: BUILD PRODUCTION-GRADE SYSTEMS
+  // SLIDE 22 — THE 5-STEP BLUEPRINT REVEAL
   {
     id: "sanjauli_slide_22",
-    type: "BUILD_VS_TUTORIAL",
-    badge: "PLAYBOOK STEP 02",
-    title: "Step 2 — Build Production-Grade Systems (Not Weekend Wrappers)",
-    subtitle: "The Zero-Tolerance Wrapper Rule: Would a real business pay for this or save 5 hours a week?",
-    tutorialChain: ["API WRAPPER", "NO DB", "NO TESTS", "MODEL UPDATE BREAKS IT", "UNHIRED"],
-    tutorialNote: "Weekend API wrappers provide zero systems engineering and can be replaced overnight.",
-    projectSteps: [
-      { step: 1, label: "DOMAIN UTILITY (Real Operational Data)" },
-      { step: 2, label: "SCHEMA ENFORCEMENT (Pydantic / Zod)" },
-      { step: 3, label: "EVALUATION BENCHMARKS (Automated)" },
-      { step: 4, label: "COST OPTIMIZATION (Local / Quantized LLMs)" },
-      { step: 5, label: "DOCKER & CI/CD PIPELINE" },
-      { step: 6, label: "LIVE ACCESSIBLE CLOUD URL" },
+    type: "PIPELINE_FLOW",
+    badge: "ACT 6: THE PEAK FRAMEWORK",
+    title: "The 5-Step AI-Era Career Blueprint",
+    subtitle: "The interconnected system to move from student learner to hired engineer.",
+    stages: [
+      "1. SKILL (Deep Foundations)",
+      "2. PROJECT (Real Problem)",
+      "3. RESUME (Proof of Work)",
+      "4. APPROACH (High-Signal)",
+      "5. INTERVIEW (Whiteboard)",
     ],
-    punchline: "The Zero-Tolerance Wrapper Rule: Avoid plain API wrapper projects that any foundation model update can replace overnight.",
+    punchline: "These 5 steps are strictly connected. If step 1 is weak, step 2 fails. If step 3 is weak, zero callbacks. Master all five.",
     maxBuildSteps: 3,
-    notes: "Key Hallmarks of a Production Project: Domain utility, automated evaluation suites, cost/latency discipline, and live containerized deployment.",
+    notes: "Here is the master formula: 1. SKILL → 2. PROJECT → 3. RESUME → 4. APPROACH → 5. INTERVIEW.\n\nTransition: 'Let's break down each step in detail.'",
   },
 
-  // SLIDE 23 — CAPSTONE PROJECT BLUEPRINT 1
+  // SLIDE 23 — STEP 1: SKILL (THE 3-LAYER FOUNDATION)
   {
     id: "sanjauli_slide_23",
     type: "THREE_CARDS",
-    badge: "FLAGSHIP BLUEPRINT 01",
-    title: "Capstone 1: Enterprise Agentic RAG & Document Intelligence",
-    subtitle: "A complete production architecture that separates you from 95% of applicants.",
+    badge: "STEP 01 — SKILL",
+    title: "Step 1 — Build the 3-Layer Foundation",
+    subtitle: "Don't learn 25 disconnected tools. Master the core stack deeply.",
     cards: [
       {
         num: "01",
-        title: "Ingestion & Vector Pipeline",
+        title: "Computer Science Core",
         items: [
-          "Document parsing & semantic chunking with metadata tagging",
-          "PostgreSQL with pgvector for hybrid dense/sparse retrieval",
-          "Local quantized embedding models running at zero cloud cost",
+          "Data Structures & Algorithms (Arrays, Hashmaps, Trees, Graphs)",
+          "Relational Database Design, SQL queries, Indexing & Joins",
+          "HTTP protocols, RESTful APIs, Git version control & Linux shell",
         ],
       },
       {
         num: "02",
-        title: "Deterministic Engine & APIs",
+        title: "Applied AI Layer",
         items: [
-          "FastAPI backend with Pydantic v2 strict schema enforcement",
-          "Local LLM fallback (Ollama Llama-3 / Mistral) when APIs timeout",
-          "Redis semantic caching for sub-50ms repeat query responses",
+          "LLM prompting, structured JSON outputs & schema validation",
+          "Retrieval-Augmented Generation (RAG) & Vector Embeddings",
+          "Tool calling, autonomous agents & local models via Ollama",
         ],
       },
       {
         num: "03",
-        title: "Evaluation & Deployment",
+        title: "Engineering Discipline",
         items: [
-          "Ragas evaluation framework: faithfulness, recall, and answer relevance",
-          "Multi-stage Dockerfile with non-root security privileges",
-          "GitHub Actions CI/CD running automated unit tests on every PR",
+          "Automated unit, integration, and end-to-end testing",
+          "Docker containerization & multi-stage image builds",
+          "API rate-limiting, error logging, monitoring & CI/CD workflows",
         ],
       },
     ],
-    punchline: "Live deployed endpoint + automated eval benchmark = instant recruiter callback.",
+    punchline: "Learn the fundamentals deeply enough that new tools become effortless to pick up.",
     maxBuildSteps: 3,
-    notes: "Walk through Capstone 1: Show how this project solves real enterprise document search with zero recurring API costs and strict schema validation.",
+    notes: "Don't jump between 25 random frameworks. Master the CS Core, the Applied AI Layer, and Engineering Discipline.",
   },
 
-  // SLIDE 24 — CAPSTONE PROJECT BLUEPRINT 2
+  // SLIDE 24 — STEP 2: PROJECT (STOP BUILDING TOY PROJECTS)
   {
     id: "sanjauli_slide_24",
-    type: "THREE_CARDS",
-    badge: "FLAGSHIP BLUEPRINT 02",
-    title: "Capstone 2: High-Throughput Resilient Microservice",
-    subtitle: "Proving backend depth: handling async task queues, rate limits, and failure modes.",
-    cards: [
+    type: "MYTH_REALITY_PAIRS",
+    badge: "STEP 02 — PROJECT",
+    title: "Step 2 — Stop Building Toy Projects",
+    subtitle: "The Project Test: Would someone actually use this under real conditions?",
+    pairs: [
       {
-        num: "01",
-        title: "Asynchronous Workflows",
-        items: [
-          "Decoupled job processing via Redis BullMQ / Celery worker pool",
-          "Graceful backoff, exponential jitter retries, and dead-letter queues",
-          "WebSocket / Server-Sent Events (SSE) for real-time progress streaming",
-        ],
+        myth: "The Toy Project Trap",
+        reality: "Calculators, to-do lists, Netflix clones, weather widgets, and tutorial copy-pastes that impress zero recruiters.",
       },
       {
-        num: "02",
-        title: "Database Performance & Indexing",
-        items: [
-          "Optimized relational schema in PostgreSQL with composite B-Tree indexes",
-          "Connection pooling via PgBouncer handling 1,000+ concurrent requests",
-          "Database migration management using Alembic / Prisma migrations",
-        ],
+        myth: "The 5-Question Project Test",
+        reality: "Who has the problem? How often? What does it cost them? What if the system fails? How do you measure success?",
       },
       {
-        num: "03",
-        title: "Production Observability",
-        items: [
-          "Structured JSON logging with unique distributed correlation IDs",
-          "Prometheus metrics & Grafana latency/error rate dashboards",
-          "One-command spin-up via Docker Compose with seeded test fixtures",
-        ],
+        myth: "Project Volume vs Depth",
+        reality: "Build ONE serious flagship production system with tests, Docker, and real users—not ten mediocre weekend clones.",
       },
     ],
-    punchline: "When an interviewer asks 'How do you handle system crashes?', this project gives you the complete answer.",
+    punchline: "Build one serious project with verified users, error handling, and clean documentation.",
     maxBuildSteps: 3,
-    notes: "Walk through Capstone 2: Highlight how distributed task queues, structured logging, and connection pooling prove senior-grade engineering discipline.",
+    notes: "Ask the room: 'Who has built a calculator? Weather app? To-do app?' (Hands up). 'Good. You learned from them. Now it's time to graduate to production systems.'",
   },
 
-  // SLIDE 25 — STEP 3: PROOF-DRIVEN RESUME
+  // SLIDE 25 — STEP 3: RESUME (THE X-Y-Z IMPACT FORMULA)
   {
     id: "sanjauli_slide_25",
     type: "PROOF_HIERARCHY",
-    badge: "PLAYBOOK STEP 03",
-    title: "Step 3 — Construct a Proof-Driven Resume",
-    subtitle: "The 6-Second Rule & The Google X-Y-Z Impact Formula",
+    badge: "STEP 03 — RESUME",
+    title: "Step 3 — Outcome-Driven Resume (The X-Y-Z Formula)",
+    subtitle: "Don't write what you did. Write what changed because you did it.",
     layers: [
-      { label: "THE 6-SECOND SCAN", desc: "Recruiters do not read resumes; they hunt for verifiable proof of work and live URLs in the top third." },
-      { label: "BAD RESUME BULLET", desc: "“Built an AI chatbot using Python and OpenAI.” (0 Metrics, 0 Differentiation, 0 Engineering Proof)" },
-      { label: "THE X-Y-Z FORMULA", desc: "Accomplished [X], as measured by [Y], by doing [Z] — focusing on engineering and business impact." },
-      { label: "GOOD RESUME BULLET", desc: "“Engineered an agentic document search pipeline handling 10k+ records, reducing query latency by 45% and slashing API token costs by 60% through prompt caching and local quantized models.”" },
-      { label: "PROMINENT PROOF LINKS", desc: "Place live demo URLs, clean GitHub repositories, and system architecture diagrams right at the top." },
+      {
+        label: "THE 6-SECOND SCAN",
+        desc: "Recruiters scan top-to-bottom in 6 seconds hunting for verifiable proof links, live URLs, and metrics.",
+      },
+      {
+        label: "WEAK RESUME BULLET",
+        desc: "“Built an AI chatbot using Python and OpenAI API.” (0 Metrics, 0 Differentiation, 0 Engineering Proof)",
+      },
+      {
+        label: "THE GOOGLE X-Y-Z FORMULA",
+        desc: "Accomplished [X], as measured by [Y], by doing [Z] — focusing on engineering and business impact.",
+      },
+      {
+        label: "STRONG RESUME BULLET",
+        desc: "“Engineered an agentic document search pipeline handling 5,000+ PDFs, reducing query latency by 45% and cutting API token costs by 60% through prompt caching and local quantized models.”",
+      },
+      {
+        label: "PROMINENT PROOF LINKS",
+        desc: "Place live demo URLs, clean GitHub repositories, and system architecture diagrams right at the top.",
+      },
     ],
-    punchline: "Frame every bullet point around business and engineering impact.",
+    punchline: "Frame every bullet point around business outcome and engineering impact.",
     maxBuildSteps: 3,
-    notes: "The 6-Second Rule: Recruiters do not read resumes; they scan for verifiable proof of work. Frame every bullet with the X-Y-Z formula.",
+    notes: "The 6-Second Rule: Recruiters do not read resumes; they scan for verifiable proof of work. Frame every bullet with the Google X-Y-Z formula.",
   },
 
-  // SLIDE 26 — STEP 4: GITHUB SHOWCASE
+  // SLIDE 26 — STEP 4: APPROACH (HIGH-SIGNAL OUTREACH)
   {
     id: "sanjauli_slide_26",
+    type: "SCENARIO_SPLIT",
+    badge: "STEP 04 — APPROACH",
+    title: "Step 4 — Stop Waiting on Job Boards (High-Signal Outreach)",
+    subtitle: "Bypassing the ATS black hole with value-first demonstrations.",
+    scenarioA: {
+      title: "THE COLD APPLICATION TRAP (Sub-2% Response)",
+      subtitle: "Mindlessly applying to hundreds of portal job postings",
+      steps: [
+        "Submitting 500 applications into ATS portal black holes",
+        "Generic message: 'Sir, please give me an internship opportunity'",
+        "Zero differentiation; filtered by automated keyword scanners",
+        "Leads to burnout, frustration, and complete radio silence",
+      ],
+      footer: "Sub-2% response rate · ATS black hole",
+    },
+    scenarioB: {
+      title: "THE TRUSTED ADVISOR OUTREACH (40%+ Response)",
+      subtitle: "Demonstrating immediate value before asking for anything",
+      steps: [
+        "Identify engineering leads and startup founders on LinkedIn / X",
+        "Audit their product: identify a bug, UI flaw, or API rate-limit edge case",
+        "Build a working mini-prototype and record a 90-second Loom demo",
+        "Message: 'Noticed this edge case in your docs workflow. Built a prototype handling it with retry fallbacks. Here’s the demo.'",
+      ],
+      footer: "40%+ callback rate · Demonstrates immediate value",
+    },
+    punchline: "Don't ask for a job first. Demonstrate value first.",
+    maxBuildSteps: 2,
+    notes: "Stop spamming job portals. Audit a company's product, build a 90-second working prototype, and send it to the engineering lead. That instantly separates you from 99% of applicants.",
+  },
+
+  // SLIDE 27 — LIVE POLL 03: THE WHITEBOARD CHECK
+  {
+    id: "sanjauli_slide_27",
+    type: "POLL",
+    badge: "LIVE POLL 03",
+    title: "The Whiteboard & Interview Reality Check",
+    question: "If an interviewer took away ChatGPT, Cursor, and Copilot right now and asked you to build a simple CRUD API on a whiteboard, could you do it?",
+    options: [
+      "Yes — I know the data flow, database queries & HTTP status codes",
+      "Partially — I can draw the architecture, but need help with syntax",
+      "Honest No — I rely heavily on AI to scaffold everything",
+      "Panic Mode — I have never coded without an AI assistant",
+    ],
+    maxBuildSteps: 1,
+    notes: "Live Poll 03. Let students vote. Transition: 'This is the exact dividing line in 2026. Let's look at how to prepare for the technical loop.'",
+  },
+
+  // SLIDE 28 — STEP 5: INTERVIEW PREPARATION
+  {
+    id: "sanjauli_slide_28",
     type: "THREE_CARDS",
-    badge: "PLAYBOOK STEP 04",
-    title: "Step 4 — Turn GitHub into a Technical Showcase",
-    subtitle: "Treat your GitHub as your primary engineering portfolio.",
+    badge: "STEP 05 — INTERVIEW",
+    title: "Step 5 — Technical Interview Preparation & Architecture Defense",
+    subtitle: "The interview is no longer just \"Do you know coding?\"",
     cards: [
       {
         num: "01",
-        title: "Flagship Repositories",
+        title: "System & DB Defense",
         items: [
-          "No empty repositories or cloned assignment forks without attribution",
-          "Pin your top 2 flagship production systems",
-          "Demonstrate disciplined commit history and PR hygiene",
+          "Explain data flow, database indexing, and query optimization",
+          "Handling latency spikes, network timeouts & broken inputs",
+          "Explaining concurrency limits and memory trade-offs",
         ],
       },
       {
         num: "02",
-        title: "README Architecture",
+        title: "AI Trade-Off Mastery",
         items: [
-          "System architecture diagram showing data flow and failure modes",
-          "One-command local setup via Docker / Docker Compose",
-          "API request/response schema specifications",
-          "Documented latency, cost, and architectural trade-offs",
+          "Why did you choose this specific model architecture?",
+          "How do you evaluate and eliminate model hallucinations?",
+          "What is the token cost and latency profile per user request?",
         ],
       },
       {
         num: "03",
-        title: "Production Proof",
+        title: "The 'No Jerks' Rule",
         items: [
-          "CI/CD passing status badge with automated test runs",
-          "High test coverage with unit and integration tests",
-          "Clickable live production link deployed to cloud",
+          "Treat the interviewer as a collaborative teammate",
+          "Clarify ambiguous constraints and verbalize your trade-offs",
+          "Accept code critique with humility, poise, and systems rigor",
         ],
       },
     ],
-    punchline: "A clean README with Docker setup and system architecture diagrams proves you build for real users.",
-    maxBuildSteps: 3,
-    notes: "The README Anatomy: Include an architectural system design diagram, clear local setup instructions via Docker, an API schema breakdown, and a documented section on failure modes and performance trade-offs.",
-  },
-
-  // SLIDE 27 — STEP 5: TARGET STRATEGICALLY
-  {
-    id: "sanjauli_slide_27",
-    type: "MYTH_REALITY_PAIRS",
-    badge: "PLAYBOOK STEP 05",
-    title: "Step 5 — Target Companies Strategically",
-    subtitle: "Bypassing the Job Board Abyss with High-Signal Outreach",
-    pairs: [
-      {
-        myth: "The Cold Application Trap",
-        reality: "Submitting 500 applications into ATS black holes yields a sub-2% response rate and leads to burnout.",
-      },
-      {
-        myth: "Targeting the 'Bifurcation'",
-        reality: "Target mid-size enterprises, traditional industries (finance, healthcare, logistics), and startups that need pragmatic builders to automate internal workflows using open-weight models.",
-      },
-      {
-        myth: "The Trusted Advisor Outreach",
-        reality: "Find engineering leads and founders on LinkedIn/X. Audit their product: identify a bug, propose an optimization, or link to a mini-tool you built that directly relates to their stack.",
-      },
-    ],
-    maxBuildSteps: 3,
-    notes: "The Trusted Advisor Outreach: Send low-friction, high-signal messages: 'Hey [Name], noticed your API has this rate-limit edge case on streaming endpoints. Built a quick demo showing how to handle it gracefully with deterministic retries. Here’s the repo.'",
-  },
-
-  // SLIDE 28 — STEP 6: TECHNICAL INTERVIEW PREP
-  {
-    id: "sanjauli_slide_28",
-    type: "PIPELINE_FLOW",
-    badge: "PLAYBOOK STEP 06",
-    title: "Step 6 — Technical Interview Preparation & Architecture Defense",
-    subtitle: "Whiteboard Fundamentals & Graceful Degradation",
-    stages: [
-      "Whiteboard Algorithms (No AI Assistant)",
-      "System Design & Corner Cases",
-      "Broken Inputs & Model Hallucinations",
-      "Network Timeouts & Graceful Degradation",
-      "Memory & Concurrency Limits",
-      "Defend Every Line on Your Resume",
-    ],
-    punchline: "If it’s on your resume or GitHub, you must be able to explain the underlying libraries, data flow, and runtime complexities on a whiteboard.",
-    maxBuildSteps: 3,
-    notes: "Whiteboard Fundamentals: Be ready to code algorithms without an AI assistant prompting syntax. System Design & Corner Cases: Explain how your system degrades gracefully.",
-  },
-
-  // SLIDE 29 — STEP 7: COMMUNICATION, HUMILITY & NO JERKS RULE
-  {
-    id: "sanjauli_slide_29",
-    type: "SCENARIO_SPLIT",
-    badge: "PLAYBOOK STEP 07",
-    title: "Step 7 — Communication, Humility & Cultural Fit",
-    subtitle: "The 'No Jerks' Rule — Why Companies Hire Teammates Over Brilliant Egos",
-    scenarioA: {
-      title: "THE DEFENSIVE CANDIDATE (Fails 300+ Loops)",
-      subtitle: "Argues aggressively when an interviewer challenges code",
-      steps: [
-        "Elite syntax coding skills, but hostile when challenged",
-        "Blames vague requirements instead of seeking clarity",
-        "Lawrence Moroni case study: 300+ loop failures due to rigidity",
-        "Company verdict: Brilliant jerks poison engineering teams",
-      ],
-      footer: "Defensive attitude = Instant rejection",
-    },
-    scenarioB: {
-      title: "THE COLLABORATIVE TEAMMATE (Receives Offers)",
-      subtitle: "Treats the interviewer as a collaborative problem solver",
-      steps: [
-        "Treats the interviewer as a teammate working on a shared problem",
-        "Clarifies constraints, boundary conditions, and verbalizes trade-offs",
-        "Admits what they don't know and accepts feedback with grace",
-        "Exhibits product sense and care for business ROI",
-      ],
-      footer: "Humility + systems rigor = Immediate offer",
-    },
-    maxBuildSteps: 2,
     questionPrompt: "If an interviewer challenges your code and says, 'This solution will fail when latency spikes,' do you argue back and stand your ground, or do you ask questions?",
     speakerHook: "Lawrence Moroni mentored an elite coder who failed over 300 interview loops because he was trained to be rigid and defensive. Companies don't hire brilliant jerks; they hire teammates.",
-    notes: "Audience Question #5 (The Culture Check): 'If an interviewer challenges your code and says, This solution will fail when latency spikes, do you argue back and stand your ground, or do you ask questions?'\n\nSpeaker Hook: 'Lawrence Moroni mentored an elite coder who failed over 300 interview loops because he was trained to be rigid and defensive. Companies don't hire brilliant jerks; they hire teammates.'",
+    punchline: "When an interviewer challenges your code, clarify constraints and defend trade-offs with humility.",
+    maxBuildSteps: 3,
+    notes: "Audience Question #5: 'If an interviewer challenges your code, do you argue back or ask questions?'\n\nSpeaker Hook: 'Companies don't hire brilliant jerks; they hire teammates who collaborate and defend systems with humility.'",
   },
 
-  // SLIDE 30 — A COURSE IS NOT A CAREER
+  // SLIDE 29 — THE ULTIMATE INTERVIEW TEST
+  {
+    id: "sanjauli_slide_29",
+    type: "BIG_QUESTION",
+    badge: "THE ULTIMATE TEST",
+    title: "“Never Put an AI Project on Your Resume That You Cannot Defend on a Whiteboard.”",
+    subtitle: "If an interviewer takes your project apart for 30 minutes, can you defend every single decision?",
+    maxBuildSteps: 1,
+    notes: "If the interviewer tears down your architecture for 30 minutes, can you defend every decision? If yes: YOU built it. If no: AI built it.\n\nTransition: 'Now, how do you actually execute all of this while in college?'",
+  },
+
+  // =========================================================================
+  // ACT 7 — UNISOLE PROGRAM REVEAL & CALL TO ACTION
+  // =========================================================================
+
+  // SLIDE 30 — THE EXECUTION GAP
   {
     id: "sanjauli_slide_30",
-    type: "COURSE_VS_CAREER",
-    badge: "PARADIGM SHIFT",
-    title: "A Course Is Not a Career",
-    subtitle: "Certificate proves completion. Portfolio proves capability.",
-    normalCourseTitle: "A NORMAL COURSE",
-    normalCourse: [
-      "Watch Recorded Video Lectures Passively",
-      "Memorize Theoretical Syntax",
-      "Copy Weekend Todo / Chatbot Tutorial",
-      "Collect Generic Certificate Nobody Verifies",
-    ],
-    careerProgramTitle: "UNISOLE CAREER ACCELERATION",
-    careerProgram: [
-      "Master Production-Grade Systems & AI Architectures",
-      "Build Containerized Flagship Capstones with Real Data",
-      "Implement Automated Evaluation Suites & Testing",
-      "Architect a Proof-Driven Resume & GitHub Showcase",
-      "Whiteboard System Design & Project Defense Coaching",
-      "Unlock Direct Pipeline to UNISOLE Talent Pool",
-    ],
-    punchline: "Certificate proves completion. Portfolio proves capability.",
-    maxBuildSteps: 3,
-    notes: "Two-column comparison between passive courses and active career-building programs.",
+    type: "SCENARIO_SPLIT",
+    badge: "ACT 7: THE EXECUTION PATHWAY",
+    title: "College Teaches Knowledge. Industry Demands Execution.",
+    subtitle: "Bridging the gap between classroom theory and production engineering.",
+    scenarioA: {
+      title: "COLLEGE SYLLABUS (Theoretical Knowledge)",
+      subtitle: "Essential theoretical academic foundation",
+      steps: [
+        "Classroom lectures, textbook theory & paper-based exams",
+        "Syntax memorization without live production deployment",
+        "Building toy assignment clones without real users or stress tests",
+        "Zero exposure to cloud infrastructure, CI/CD, or production logs",
+      ],
+      footer: "Academic foundation · Knowledge without execution",
+    },
+    scenarioB: {
+      title: "THE INDUSTRY GAP (What Employers Demand)",
+      subtitle: "The practical skills required to land top engineering roles",
+      steps: [
+        "Real-world problem-based capstone systems with live users",
+        "Applied AI toolchains: RAG, tool calling, local models & evaluation",
+        "Docker containerization, cloud deployment & CI/CD test suites",
+        "Outcome-driven resume, portfolio showcase & interview defense",
+      ],
+      footer: "The execution bridge · Moving from student to hired engineer",
+    },
+    punchline: "This gap is exactly what prevents ambitious BCA students from breaking into top roles.",
+    maxBuildSteps: 2,
+    notes: "College teaches knowledge. Industry demands execution. Between them is a massive gap: skills, projects, industry tools, mentorship, portfolio, and interview preparation. This gap is what students struggle with.\n\nTransition: 'And that is why UNISOLE exists.'",
   },
 
-  // SLIDE 31 — MONTH-BY-MONTH CURRICULUM
+  // SLIDE 31 — UNISOLE PROGRAM REVEAL (6 PILLARS)
   {
     id: "sanjauli_slide_31",
     type: "THREE_CARDS",
-    badge: "3-MONTH ROADMAP",
-    title: "The 3-Month Month-by-Month Technical Curriculum",
-    subtitle: "Structured progressive mastery tailored specifically for Sanjauli BCA students.",
+    badge: "UNISOLE INDUSTRIAL TRAINING",
+    title: "Industrial Training & Internship Opportunity Program",
+    subtitle: "By UNISOLE Skill AI Labs · The 6 Core Execution Pillars",
     cards: [
       {
         num: "01",
-        title: "Month 1: Systems & Core APIs",
+        title: "Skills & Applied AI",
         items: [
-          "Modern Python / Node.js & OOP paradigms",
-          "Relational modeling in PostgreSQL & query optimization",
-          "RESTful API architectures & FastAPI backend design",
-          "Linux terminal mastery, Git branch flows & PR hygiene",
+          "Full-stack REST APIs, SQL databases, Git & Linux shell",
+          "LLM prompting, RAG architectures, local models & agent tool calling",
+          "Production test suites and defensive error boundaries",
         ],
       },
       {
         num: "02",
-        title: "Month 2: AI Pipelines & Containers",
+        title: "Flagship Projects",
         items: [
-          "Local open-weight models (Ollama, vLLM) & quantization",
-          "pgvector hybrid embeddings & agentic RAG workflows",
-          "Redis caching, background task queues & message brokers",
-          "Docker containerization & multi-stage build optimization",
+          "Build real problem-based microservices, not toy clones",
+          "One-command setup via Docker & Docker Compose",
+          "Live cloud deployment with documented architecture specs",
         ],
       },
       {
         num: "03",
-        title: "Month 3: Production Defense & Career",
+        title: "Portfolio & Interviews",
         items: [
-          "Automated test suites (PyTest) & LLM evaluation benchmarks",
-          "CI/CD pipelines & live cloud deployment on production URLs",
-          "Google X-Y-Z proof resume & GitHub technical showcase",
-          "Whiteboard architecture defense & mock interview loops",
+          "Google X-Y-Z impact resume & flagship GitHub showcase",
+          "High-signal prototype outreach to engineering leads",
+          "Mock technical whiteboard loops and architecture defense",
         ],
       },
     ],
-    punchline: "From classroom student to production software engineer in 90 days of disciplined building.",
+    punchline: "Not another certificate course. An execution engine to build verified proof of work.",
     maxBuildSteps: 3,
-    notes: "Month-by-month technical roadmap breakdown: Month 1 (Core APIs & DB), Month 2 (AI Pipelines & Docker), Month 3 (Evals, Whiteboard & Deployment).",
+    notes: "Present the 6 pillars: Skills, Projects, AI Tooling, Portfolio, Career Outreach, and Interview Mastery.\n\nTransition: 'Let's look at the complete 9-stage transformation journey.'",
   },
 
-  // SLIDE 32 — UNISOLE SANJAULI PROGRAM
+  // SLIDE 32 — THE 9-STAGE JOURNEY
   {
     id: "sanjauli_slide_32",
-    type: "PROGRAM_OVERVIEW",
-    badge: "STRUCTURED PROGRAM",
-    title: "UNISOLE Industrial Training cum Internship Opportunity Program",
-    subtitle: "3-Month Live Industrial Training for BCA Students · Centre of Excellence Sanjauli",
-    pillars: [
-      "BCA-Dedicated Production Systems & AI Roadmap",
-      "Live Weekend Labs & Architectural Masterclasses",
-      "Two Containerized Flagship Capstone Deployments",
-      "Automated Testing, Evals & Pydantic Schemas",
-      "ATS-Optimized X-Y-Z Resume & GitHub Showcase",
-      "Whiteboard System Defense & Mock Interview Rounds",
-      "Exclusive Access to UNISOLE Hiring Talent Pool",
+    type: "PIPELINE_FLOW",
+    badge: "THE TRANSFORMATION PIPELINE",
+    title: "The 9-Stage Execution Pipeline",
+    subtitle: "From student learner to verified, employable software engineer.",
+    stages: [
+      "1. LEARN",
+      "2. BUILD",
+      "3. TEST",
+      "4. DEPLOY",
+      "5. DOCUMENT",
+      "6. PORTFOLIO",
+      "7. APPROACH",
+      "8. INTERVIEW",
+      "9. INTERNSHIP",
     ],
+    punchline: "Move from 'I am a student who learned things' to 'I am an engineer who demonstrates proof of work.'",
     maxBuildSteps: 3,
-    notes: "Large visual highlight of the 3-Month Live Program structure tailored for Sanjauli BCA students.",
+    notes: "Walk through the pipeline: LEARN → BUILD → TEST → DEPLOY → DOCUMENT → PORTFOLIO → APPROACH → INTERVIEW → INTERNSHIP.\n\nThis is not a theoretical certificate. It is a systematic roadmap to capability.",
   },
 
-  // SLIDE 33 — JOINT CERTIFICATE
+  // SLIDE 33 — THE BIG QUESTION
   {
     id: "sanjauli_slide_33",
-    type: "CERTIFICATE_SHOWCASE",
-    badge: "ACCREDITATION",
-    title: "JOINT CERTIFICATE",
-    subtitle: "NIT HAMIRPUR × IAPT × UNISOLE",
-    note: "Awarded to BCA students upon successful deployment of containerized capstone systems, automated test suites, and project defense.",
-    maxBuildSteps: 2,
-    notes: "Extremely premium and minimal. NIT Hamirpur x IAPT x UNISOLE.",
+    type: "BIG_QUESTION",
+    badge: "THE ACTION CHECK",
+    title: "“What Will You Do Differently After Today?”",
+    subtitle: "Don't say 'I will learn AI.' That's too vague.",
+    maxBuildSteps: 1,
+    notes: "Dark screen. Give them 10 seconds of silence. Then: 'Don't tell me you will learn AI. That's too vague. Tell yourself: What will I build? What skill will I master? What company will I approach? What proof will I create?'",
   },
 
-  // SLIDE 34 — TALENT POOL
+  // SLIDE 34 — THE VALUE CHAIN HAS MOVED
   {
     id: "sanjauli_slide_34",
-    type: "TALENT_POOL_PIPELINE",
-    badge: "OPPORTUNITY PIPELINE",
-    title: "Perform Well → Get Noticed",
-    subtitle: "Direct Pipeline to Startups, GCCs & Engineering Internships",
-    steps: [
-      "Program Performance & Live Labs",
-      "Milestone Evaluation & Code Defense",
-      "UNISOLE TALENT POOL",
-      "Internship & Project Opportunities",
+    type: "PROOF_HIERARCHY",
+    badge: "THE MOVING VALUE CHAIN",
+    title: "The Value Chain Has Moved",
+    subtitle: "AI is changing the game. Position yourself where value compounds.",
+    layers: [
+      {
+        label: "TYPING SYNTAX",
+        desc: "Automated by AI models in seconds (Low economic value / Commodity)",
+      },
+      {
+        label: "SCAFFOLDING BOILERPLATE",
+        desc: "Instantly generated via modern AI prompts and scaffolding tools",
+      },
+      {
+        label: "PROBLEM DEFINITION & SPECS",
+        desc: "Translating messy real-world ambiguity into precise architectural specifications",
+      },
+      {
+        label: "DEFENSIVE SYSTEM DESIGN",
+        desc: "Ensuring security, database resilience, latency optimization & error boundaries",
+      },
+      {
+        label: "BUSINESS VALUE & OUTCOMES",
+        desc: "Slashing costs, automating workflows, and delivering reliable customer ROI",
+      },
     ],
-    disclaimer: "Opportunities are performance-based and awarded on verified system capability.",
+    punchline: "Don't compete at the bottom of the value chain. Lead at the top.",
     maxBuildSteps: 3,
-    notes: "Dark navy pipeline showing progression into the UNISOLE Talent Pool.",
+    notes: "AI is not killing software engineering. It is moving the value chain upward: From Typing → Building → Problem Solving → Systems Architecture → Business Value.",
   },
 
-  // SLIDE 35 — 30-DAY CHALLENGE & ENROLLMENT (FINAL MESSAGE)
+  // SLIDE 35 — FINAL MESSAGE & CALLBACK
   {
     id: "sanjauli_slide_35",
-    type: "ENROLLMENT_CTA",
-    badge: "ACTION CHALLENGE & ENROLLMENT",
-    title: "The 30-Day BCA Action Challenge",
-    subtitle: "Centre of Excellence Govt. College Sanjauli · BCA Industrial Training Program",
-    actions: [
-      "01. Delete or archive toy projects and tutorial clones from your GitHub",
-      "02. Pick one real-world domain problem and build an end-to-end containerized system",
-      "03. Ship it to a live cloud endpoint with tests and automated eval benchmarks",
-      "04. Register for UNISOLE Industrial Training to accelerate your engineering career",
-    ],
-    qrUrl: "https://unisole.org/programs",
-    qrPrompt: "Scan QR Code to Register for Sanjauli College BCA Program",
+    type: "FINAL_MESSAGE",
+    badge: "YOUR CAREER AFTER AI",
+    title: "DON'T COMPETE WITH AI. LEARN TO DIRECT IT.",
+    subtitle: "Understand deeply. Build boldly. Verify everything. Show your work.",
+    quote: "“Your degree gets you into the conversation. Your proof gets you taken seriously.”",
+    punchline: "The future belongs to builders who direct AI with deep systems understanding.",
     maxBuildSteps: 3,
-    notes: "Closing Spoken Line: 'In a disciplined market, pedigree gets people into rotation pools, but verified execution gets you hired. A BCA student who builds and deploys real systems beats a textbook graduate every single day.'\n\nScan QR Code to Register.",
+    notes: "Return to the opening question: 'If AI can code, why should a company hire you?'\n\nBecause companies aren't hiring syntax typers. They are hiring engineers who understand, build, verify, communicate, and create value.\n\nYour degree gets you into the conversation. Your proof gets you taken seriously.\n\nThank you, and now go build!",
   },
 ];
