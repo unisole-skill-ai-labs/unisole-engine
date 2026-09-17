@@ -68,18 +68,31 @@ export const presentationsService = {
           collegeId: sanjauliCollegeId,
           collegeName: sanjauliCollegeName,
           title: "Sanjauli College PPT",
-          description: "35-slide high-energy BCA-oriented career awareness & industrial training presentation for Centre of Excellence Govt. College Sanjauli featuring the Post-Bubble Macro AI Landscape, 100-Candidate Drop-off Funnel, Flagship Capstone Blueprints, and 7-Step Strategic Action Playbook.",
+          description: "35-slide high-energy BCA-oriented career awareness & industrial training presentation for Centre of Excellence Govt. College Sanjauli: YOUR CAREER AFTER AI.",
           theme: "dark",
           slides: SANJAULI_COLLEGE_PPT_SLIDES,
           isActive: true,
         });
         console.log("[Presentations] Auto-seeded flagship deck: Sanjauli College PPT");
-      } else if (Array.isArray(existingSanjauli.slides) && existingSanjauli.slides.length !== SANJAULI_COLLEGE_PPT_SLIDES.length) {
-        await presentationsRepository.updatePresentation("pres_sanjauli_college_ppt", {
-          description: "35-slide high-energy BCA-oriented career awareness & industrial training presentation for Centre of Excellence Govt. College Sanjauli featuring the Post-Bubble Macro AI Landscape, 100-Candidate Drop-off Funnel, Flagship Capstone Blueprints, and 7-Step Strategic Action Playbook.",
-          slides: SANJAULI_COLLEGE_PPT_SLIDES,
-        });
-        console.log(`[Presentations] Auto-synced Sanjauli College PPT to ${SANJAULI_COLLEGE_PPT_SLIDES.length} slides.`);
+      } else {
+        const firstTitle = Array.isArray(existingSanjauli.slides) ? existingSanjauli.slides[0]?.title : null;
+        const currentTargetTitle = SANJAULI_COLLEGE_PPT_SLIDES[0]?.title;
+        const secondTitle = Array.isArray(existingSanjauli.slides) ? existingSanjauli.slides[1]?.title : null;
+        const currentSecondTitle = SANJAULI_COLLEGE_PPT_SLIDES[1]?.title;
+        const slideCount = Array.isArray(existingSanjauli.slides) ? existingSanjauli.slides.length : 0;
+
+        if (
+          firstTitle !== currentTargetTitle ||
+          secondTitle !== currentSecondTitle ||
+          slideCount !== SANJAULI_COLLEGE_PPT_SLIDES.length
+        ) {
+          await presentationsRepository.updatePresentation("pres_sanjauli_college_ppt", {
+            title: "Sanjauli College PPT",
+            description: "35-slide high-energy BCA-oriented career awareness & industrial training presentation for Centre of Excellence Govt. College Sanjauli: YOUR CAREER AFTER AI.",
+            slides: SANJAULI_COLLEGE_PPT_SLIDES,
+          });
+          console.log(`[Presentations] Auto-synced Sanjauli College PPT to latest ${SANJAULI_COLLEGE_PPT_SLIDES.length} master slides.`);
+        }
       }
     } catch (err) {
       console.warn("[Presentations] Could not auto-sync flagship decks:", err);
