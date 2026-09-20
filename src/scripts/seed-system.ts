@@ -318,22 +318,22 @@ export async function seedSystemData() {
       // --- GROUP 02: Science & Mathematics (2 Courses) ---
       {
         id: "sci-p1",
-        title: "Scientific Machine Learning & AI for Science",
+        title: "Scientific AI & Machine Learning Professional Program",
         slug: "sci-p1",
-        short_description: "Combines mathematical principles with modern scientific computing, differential equations, and Physics-Informed Neural Networks (PINNs).",
-        price_paise: 200000,
-        mrp_paise: 699900,
+        short_description: "Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Formulate differential equations as learning constraints, implement PINNs via PyTorch autograd, and solve forward/inverse problems.",
+        price_paise: 299900,
+        mrp_paise: 899900,
         status: "PUBLISHED",
         metadata: {
           group: "group-2",
           pathwayId: "sci-p1",
           badge: "GROUP 02 • PATHWAY 01",
           shortName: "Science & Math: SciML & AI",
-          target: "Physics • Mathematics • Chemistry • Biology • Applied Science",
-          duration: "3 Months",
-          level: "Undergraduate / Postgraduate",
-          roles: ["SciML Researcher", "Computational Physicist", "Data Modeler"],
-          tools: ["Python", "NumPy", "SciPy", "PINNs", "ODEs", "Jupyter"]
+          target: "Physics • Mathematics • Statistics • Chemistry • Engineering • Quantitative Science",
+          duration: "6 Months",
+          level: "Undergraduate → Early Professional",
+          roles: ["Scientific AI Researcher", "Computational Data Scientist", "SciML / PINNs Engineer", "Simulation & Modeling Specialist", "Quantitative Analyst"],
+          tools: ["Python", "PyTorch", "SciPy", "NumPy", "PINNs", "Autograd", "ODEs/PDEs", "DeepONet", "FNO", "Jupyter"]
         }
       },
       {
