@@ -77,7 +77,7 @@ export const pricingService = {
         "cs-p2": { title: "Full Stack Web Development (AI-Powered)", pricePaise: 149900, mrpPaise: 699900 },
         "cs-p3": { title: "Complete Machine Learning + Full Stack (Dual Track)", pricePaise: 399900, mrpPaise: 1499900 },
         "cs-common": { title: "AI Entrepreneurship & Innovation (CS Edition)", pricePaise: 59900, mrpPaise: 299900 },
-        "sci-p1": { title: "Scientific AI & Machine Learning Professional Program", pricePaise: 299900, mrpPaise: 899900 },
+        "sci-p1": { title: "Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)", pricePaise: 299900, mrpPaise: 899900 },
         "sci-p2": { title: "Mathematics + AI / Computational Intelligence", pricePaise: 150000, mrpPaise: 599900 },
         "mgmt-p1": { title: "Business Analytics & Data Engineering", pricePaise: 200000, mrpPaise: 699900 },
         "mgmt-p2": { title: "AI in Finance & FinTech Systems", pricePaise: 200000, mrpPaise: 699900 },
