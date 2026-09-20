@@ -46,9 +46,17 @@ jobs:
                       cp .env.staging .env
                     fi
 
+                    # Pre-build cleanup to prevent disk exhaustion on small EC2 volume
+                    echo "[Deploy] Pruning old build cache and dangling images..."
+                    docker builder prune -af --filter "until=24h" || true
+                    docker image prune -f || true
+
                     # Start Staging Containers
                     echo "[Deploy] Starting Staging Docker containers..."
                     docker compose --env-file .env -f docker-compose.staging.yml up -d --build
+
+                    # Post-build cleanup to keep disk lean
+                    docker image prune -f || true
 
                     # Wait for PostgreSQL container to become ready
                     echo "[Deploy] Waiting for Staging PostgreSQL to initialize..."
