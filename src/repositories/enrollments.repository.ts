@@ -133,7 +133,7 @@ export const enrollmentsRepository = {
   async deactivateByUserAndItem(userId: string, itemType: Enrollment["itemType"], itemId: string): Promise<number> {
     const res = await db
       .update(enrollments)
-      .set({ status: "REVOKED" as any, updatedAt: new Date().toISOString() })
+      .set({ status: "CANCELLED", updatedAt: new Date().toISOString() })
       .where(
         and(
           eq(enrollments.userId, userId),

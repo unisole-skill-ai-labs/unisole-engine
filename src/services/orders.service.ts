@@ -370,11 +370,11 @@ export const ordersService = {
         : `${order.notes ? order.notes + " | " : ""}Reverted to PENDING by ${adminUser.name}`,
     });
 
-    // Update payment record to CANCELLED
-    await paymentsRepository.updateStatusByOrderId(order.id, "CANCELLED" as any);
+    // Update payment record to FAILED (valid payment_status enum: CREATED, PENDING, SUCCESS, FAILED, REFUNDED)
+    await paymentsRepository.updateStatusByOrderId(order.id, "FAILED");
 
-    // Revoke enrollments tied to this order
-    await enrollmentsRepository.updateStatusByOrderId(order.id, "REVOKED" as any);
+    // Revoke enrollments tied to this order (valid enrollment_status enum: PENDING, ACTIVE, CANCELLED, EXPIRED)
+    await enrollmentsRepository.updateStatusByOrderId(order.id, "CANCELLED");
 
     // Also deactivate active user enrollments for the items in this order
     if (order.userId) {
