@@ -148,5 +148,28 @@ export const ordersRepository = {
       .returning();
     return updated ?? null;
   },
+
+  async delete(id: string): Promise<boolean> {
+    return db.transaction(async (tx) => {
+      await tx.delete(orderItems).where(eq(orderItems.orderId, id));
+      const res = await tx.delete(orders).where(eq(orders.id, id));
+      return (res.rowCount ?? 0) > 0;
+    });
+  },
+
+  async countPaidOrdersByUser(userId: string, excludeOrderId?: string): Promise<number> {
+    const conditions = [
+      eq(orders.userId, userId),
+      eq(orders.status, "PAID"),
+    ];
+    if (excludeOrderId) {
+      conditions.push(sql`${orders.id} != ${excludeOrderId}`);
+    }
+    const [res] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(and(...conditions));
+    return res?.count || 0;
+  },
 };
 
