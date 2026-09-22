@@ -33,6 +33,8 @@ export const paymentsService = {
     providerSignature?: string;
     orderId?: number;
     userId?: string;
+    phone?: string;
+    [key: string]: any;
   }): Promise<{
     success: boolean;
     payment: Payment;
@@ -59,29 +61,53 @@ export const paymentsService = {
       throw new ValidationError("providerOrderId (or razorpay_order_id) and providerPaymentId (or razorpay_payment_id) are required");
     }
 
-    // 1. Signature Verification
-    if (providerSignature && providerSignature !== "mock_sig" && providerSignature !== "webhook_verified" && providerSignature !== "token_verified") {
-      const isValid = razorpayService.verifyPaymentSignature({
+    // 1. Signature Verification with direct gateway fallback
+    let isVerified = false;
+    if (providerSignature === "mock_sig" || providerSignature === "webhook_verified" || providerSignature === "token_verified") {
+      isVerified = true;
+    } else if (providerSignature) {
+      isVerified = razorpayService.verifyPaymentSignature({
         orderId: providerOrderId,
         paymentId: providerPaymentId,
         signature: providerSignature,
       });
+    }
 
-      if (!isValid && process.env.RAZORPAY_KEY_SECRET) {
-        console.error("[PaymentsService] Invalid Razorpay signature provided for order:", providerOrderId);
-        throw new ValidationError("Invalid payment signature. Verification failed.");
+    // Direct gateway verification fallback via Razorpay API
+    if (!isVerified) {
+      const isGatewayConfirmed = await razorpayService.verifyPaymentWithGateway(providerPaymentId, providerOrderId);
+      if (isGatewayConfirmed) {
+        console.log(`[PaymentsService] Payment ${providerPaymentId} confirmed directly via Razorpay API`);
+        isVerified = true;
       }
+    }
+
+    if (!isVerified && process.env.RAZORPAY_KEY_SECRET) {
+      console.error("[PaymentsService] Invalid Razorpay signature and direct fetch failed for order:", providerOrderId);
+      throw new ValidationError("Invalid payment signature. Verification failed.");
     }
 
     // 2. Find Payment and Order
     let payment = await paymentsRepository.getByProviderOrderId(providerOrderId);
     let order = await ordersRepository.getByRazorpayOrderId(providerOrderId);
 
+    const candidateOrderId = body.orderId || (body as any).order_id;
+    if (!order && candidateOrderId) {
+      order = await ordersRepository.getById(candidateOrderId);
+    }
     if (!order && payment?.orderId) {
       order = await ordersRepository.getById(payment.orderId);
     }
 
-    const targetUserId = order?.userId || payment?.userId || body.userId;
+    let targetUserId = order?.userId || payment?.userId || body.userId;
+    if (!targetUserId && (body.phone || order?.customerPhone || (body as any).customerPhone)) {
+      const cleanPhone = normalizePhone(body.phone || order?.customerPhone || (body as any).customerPhone);
+      if (cleanPhone) {
+        const u = await usersRepository.getByPhone(cleanPhone);
+        if (u) targetUserId = u.id;
+      }
+    }
+
     if (!targetUserId) {
       throw new NotFoundError("User not found for this transaction");
     }
@@ -237,7 +263,7 @@ export const paymentsService = {
     const result = await this.verifyPayment({
       providerOrderId,
       providerPaymentId,
-      providerSignature: signature || "webhook_verified",
+      providerSignature: "webhook_verified",
     });
 
     return {
