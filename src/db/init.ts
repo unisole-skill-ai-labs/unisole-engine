@@ -201,6 +201,10 @@ export async function initializeDatabase() {
 
     await execSqlSafe("payments_alterations", `
       DO $$ BEGIN
+        ALTER TYPE "public"."payment_status" ADD VALUE IF NOT EXISTS 'CANCELLED';
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      DO $$ BEGIN
         ALTER TABLE "public"."payments" ALTER COLUMN "pathway_id" DROP NOT NULL;
         ALTER TABLE "public"."payments" DROP CONSTRAINT IF EXISTS "fk_payments_pathway";
       EXCEPTION WHEN OTHERS THEN null; END $$;

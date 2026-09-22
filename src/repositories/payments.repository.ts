@@ -74,4 +74,22 @@ export const paymentsRepository = {
       .returning();
     return rows[0] ?? null;
   },
+
+  async getByOrderId(orderId: string): Promise<Payment | null> {
+    const rows = await db.select().from(payments).where(eq(payments.orderId, orderId)).limit(1);
+    return rows[0] ?? null;
+  },
+
+  async updateStatusByOrderId(orderId: string, status: Payment["status"]): Promise<number> {
+    const res = await db
+      .update(payments)
+      .set({ status, updatedAt: new Date().toISOString() })
+      .where(eq(payments.orderId, orderId));
+    return res.rowCount ?? 0;
+  },
+
+  async removeByOrderId(orderId: string): Promise<number> {
+    const res = await db.delete(payments).where(eq(payments.orderId, orderId));
+    return res.rowCount ?? 0;
+  },
 };

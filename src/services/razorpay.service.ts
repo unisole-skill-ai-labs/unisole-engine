@@ -115,4 +115,37 @@ export const razorpayService = {
       return false;
     }
   },
+
+  /**
+   * Authoritative verification directly via Razorpay Gateway API.
+   * Fetches payment record from Razorpay servers to verify capture/authorization status.
+   */
+  async verifyPaymentWithGateway(paymentId: string, expectedOrderId?: string): Promise<boolean> {
+    const client = getClient();
+    if (!client) {
+      console.warn("[RazorpayService] Cannot query gateway directly: client not initialized");
+      return false;
+    }
+
+    try {
+      const payment: any = await client.payments.fetch(paymentId);
+      if (!payment) return false;
+
+      const isPaid = payment.status === "captured" || payment.status === "authorized";
+      if (!isPaid) {
+        console.warn(`[RazorpayService] Payment ${paymentId} status is ${payment.status}, not captured/authorized`);
+        return false;
+      }
+
+      if (expectedOrderId && payment.order_id && payment.order_id !== expectedOrderId) {
+        console.warn(`[RazorpayService] Order ID mismatch for ${paymentId}: expected ${expectedOrderId}, got ${payment.order_id}`);
+        return false;
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error(`[RazorpayService] Direct payment fetch failed for ${paymentId}:`, err?.message || err);
+      return false;
+    }
+  },
 };

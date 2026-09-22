@@ -266,63 +266,181 @@ export const ordersService = {
     adminUser: { id: string; name: string },
     notes?: string
   ) {
+    return this.updateOrderStatus(orderId, "PAID", adminUser, notes);
+  },
+
+  /**
+   * Admin Update Order Status (Supports PAID ⇄ PENDING toggles with access grant/revocation)
+   */
+  async updateOrderStatus(
+    orderId: string,
+    targetStatus: "PAID" | "PENDING",
+    adminUser: { id: string; name: string },
+    notes?: string
+  ) {
     const order = await ordersRepository.getById(orderId);
     if (!order) throw new NotFoundError("Order not found");
 
-    if (order.status === "PAID") {
-      throw new ConflictError("Order is already marked as PAID");
+    if (targetStatus === "PAID") {
+      // 1. Update order status to PAID
+      const updatedOrder = await ordersRepository.update(order.id, {
+        status: "PAID",
+        notes: notes
+          ? `${order.notes ? order.notes + " | " : ""}Manual Admin Approval by ${adminUser.name}: ${notes}`
+          : `${order.notes ? order.notes + " | " : ""}Manually confirmed by ${adminUser.name}`,
+      });
+
+      // 2. Record / update payment
+      const existingPayment = await paymentsRepository.getByOrderId(order.id);
+      if (existingPayment) {
+        await paymentsRepository.update(existingPayment.id, {
+          status: "SUCCESS",
+          paidAt: new Date().toISOString(),
+        });
+      } else {
+        await paymentsRepository.create({
+          userId: order.userId || adminUser.id,
+          orderId: order.id,
+          amountPaise: order.totalPaise,
+          currency: order.currency,
+          status: "SUCCESS",
+          provider: "MANUAL_ADMIN",
+          providerOrderId: `manual_${order.orderNumber || order.id}`,
+          providerPaymentId: `pay_manual_${Date.now()}`,
+          paidAt: new Date().toISOString(),
+        });
+      }
+
+      // 3. Fulfill enrollments
+      const enrollmentsCreated = [];
+      if (order.userId) {
+        for (const item of order.items) {
+          const existing = await enrollmentsRepository.getActiveByUserAndItem(
+            order.userId,
+            item.itemType,
+            item.itemId
+          );
+          if (!existing) {
+            const enr = await enrollmentsRepository.create({
+              userId: order.userId,
+              itemType: item.itemType,
+              itemId: item.itemId,
+              pathwayId: item.itemType === "PATHWAY" ? item.itemId : undefined,
+              source: "ADMIN_MANUAL",
+              orderId: order.id,
+              status: "ACTIVE",
+              enrolledAt: new Date().toISOString(),
+            });
+            enrollmentsCreated.push(enr);
+          } else {
+            enrollmentsCreated.push(existing);
+          }
+        }
+
+        // 4. Update user metadata so profile and workshop status show active confirmed access
+        const user = await usersRepository.getById(order.userId);
+        if (user) {
+          const userMeta = (typeof user.metadata === "object" && user.metadata !== null)
+            ? (user.metadata as Record<string, any>)
+            : {};
+          await usersRepository.update(user.id, {
+            metadata: {
+              ...userMeta,
+              tokenPaid: true,
+              workshopTokenPaid: true,
+              lastPaymentAt: new Date().toISOString(),
+              lastOrderId: order.id,
+            },
+          });
+        }
+      }
+
+      return {
+        order: updatedOrder,
+        enrollments: enrollmentsCreated,
+        message: "Order marked as PAID and access granted successfully",
+      };
     }
 
-    // Update order status to PAID
+    // TARGET STATUS === "PENDING" (Un-grant / Revoke)
     const updatedOrder = await ordersRepository.update(order.id, {
-      status: "PAID",
+      status: "PENDING",
       notes: notes
-        ? `${order.notes ? order.notes + " | " : ""}Manual Admin Approval by ${adminUser.name}: ${notes}`
-        : `${order.notes ? order.notes + " | " : ""}Manually confirmed by ${adminUser.name}`,
+        ? `${order.notes ? order.notes + " | " : ""}Reverted to PENDING by ${adminUser.name}: ${notes}`
+        : `${order.notes ? order.notes + " | " : ""}Reverted to PENDING by ${adminUser.name}`,
     });
 
-    // Record manual payment
-    await paymentsRepository.create({
-      userId: order.userId || adminUser.id,
-      orderId: order.id,
-      amountPaise: order.totalPaise,
-      currency: order.currency,
-      status: "SUCCESS",
-      provider: "MANUAL_ADMIN",
-      providerOrderId: `manual_${order.orderNumber || order.id}`,
-      providerPaymentId: `pay_manual_${Date.now()}`,
-      paidAt: new Date().toISOString(),
-    });
+    // Update payment record to FAILED (valid payment_status enum: CREATED, PENDING, SUCCESS, FAILED, REFUNDED)
+    await paymentsRepository.updateStatusByOrderId(order.id, "FAILED");
 
-    // Fulfill enrollments for each item in the order
-    const enrollmentsCreated = [];
+    // Revoke enrollments tied to this order (valid enrollment_status enum: PENDING, ACTIVE, CANCELLED, EXPIRED)
+    await enrollmentsRepository.updateStatusByOrderId(order.id, "CANCELLED");
+
+    // Also deactivate active user enrollments for the items in this order
     if (order.userId) {
       for (const item of order.items) {
-        const existing = await enrollmentsRepository.getActiveByUserAndItem(
-          order.userId,
-          item.itemType,
-          item.itemId
-        );
-        if (!existing) {
-          const enr = await enrollmentsRepository.create({
-            userId: order.userId,
-            itemType: item.itemType,
-            itemId: item.itemId,
-            pathwayId: item.itemType === "PATHWAY" ? item.itemId : undefined,
-            source: "ADMIN_MANUAL",
-            orderId: order.id,
-            status: "ACTIVE",
-            enrolledAt: new Date().toISOString(),
-          });
-          enrollmentsCreated.push(enr);
+        await enrollmentsRepository.deactivateByUserAndItem(order.userId, item.itemType, item.itemId);
+      }
+
+      // Check if user has ANY OTHER paid orders
+      const remainingPaidCount = await ordersRepository.countPaidOrdersByUser(order.userId, order.id);
+      if (remainingPaidCount === 0) {
+        const user = await usersRepository.getById(order.userId);
+        if (user) {
+          const userMeta = (typeof user.metadata === "object" && user.metadata !== null)
+            ? { ...(user.metadata as Record<string, any>) }
+            : {};
+          userMeta.tokenPaid = false;
+          userMeta.workshopTokenPaid = false;
+          await usersRepository.update(user.id, { metadata: userMeta });
         }
       }
     }
 
     return {
       order: updatedOrder,
-      enrollments: enrollmentsCreated,
-      message: "Order marked as PAID and enrollments fulfilled successfully",
+      message: "Order marked as PENDING and student access revoked successfully",
+    };
+  },
+
+  /**
+   * Delete Order permanently
+   */
+  async deleteOrder(orderId: string, adminUser: { id: string; name: string }) {
+    const order = await ordersRepository.getById(orderId);
+    if (!order) throw new NotFoundError("Order not found");
+
+    // 1. Remove/revoke enrollments
+    await enrollmentsRepository.removeByOrderId(order.id);
+    if (order.userId) {
+      for (const item of order.items) {
+        await enrollmentsRepository.deactivateByUserAndItem(order.userId, item.itemType, item.itemId);
+      }
+
+      // 2. Check remaining paid orders
+      const remainingPaidCount = await ordersRepository.countPaidOrdersByUser(order.userId, order.id);
+      if (remainingPaidCount === 0) {
+        const user = await usersRepository.getById(order.userId);
+        if (user) {
+          const userMeta = (typeof user.metadata === "object" && user.metadata !== null)
+            ? { ...(user.metadata as Record<string, any>) }
+            : {};
+          userMeta.tokenPaid = false;
+          userMeta.workshopTokenPaid = false;
+          await usersRepository.update(user.id, { metadata: userMeta });
+        }
+      }
+    }
+
+    // 3. Remove payment records
+    await paymentsRepository.removeByOrderId(order.id);
+
+    // 4. Delete order and order items
+    await ordersRepository.delete(order.id);
+
+    return {
+      success: true,
+      message: `Order ${order.orderNumber || order.id} deleted permanently`,
     };
   },
 };

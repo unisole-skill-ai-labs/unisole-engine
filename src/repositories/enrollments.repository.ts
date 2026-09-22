@@ -112,5 +112,36 @@ export const enrollmentsRepository = {
     const rows = await db.delete(enrollments).where(eq(enrollments.id, id)).returning();
     return rows[0] ?? null;
   },
+
+  async listByOrderId(orderId: string): Promise<Enrollment[]> {
+    return db.select().from(enrollments).where(eq(enrollments.orderId, orderId));
+  },
+
+  async updateStatusByOrderId(orderId: string, status: Enrollment["status"]): Promise<number> {
+    const res = await db
+      .update(enrollments)
+      .set({ status, updatedAt: new Date().toISOString() })
+      .where(eq(enrollments.orderId, orderId));
+    return res.rowCount ?? 0;
+  },
+
+  async removeByOrderId(orderId: string): Promise<number> {
+    const res = await db.delete(enrollments).where(eq(enrollments.orderId, orderId));
+    return res.rowCount ?? 0;
+  },
+
+  async deactivateByUserAndItem(userId: string, itemType: Enrollment["itemType"], itemId: string): Promise<number> {
+    const res = await db
+      .update(enrollments)
+      .set({ status: "CANCELLED", updatedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(enrollments.userId, userId),
+          eq(enrollments.itemType, itemType),
+          eq(enrollments.itemId, itemId)
+        )
+      );
+    return res.rowCount ?? 0;
+  },
 };
 

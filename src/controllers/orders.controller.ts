@@ -127,4 +127,60 @@ export const ordersController = {
       ...result,
     });
   }),
+
+  /**
+   * Admin update order status (PAID or PENDING)
+   * POST /api/admin/orders/:id/status
+   */
+  adminUpdateStatus: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const orderId = req.params.id;
+    if (!orderId) {
+      throw new ValidationError("Order ID is required");
+    }
+
+    const { status, notes } = req.body;
+    if (!status || !["PAID", "PENDING"].includes(status)) {
+      throw new ValidationError("Valid status ('PAID' or 'PENDING') is required");
+    }
+
+    const adminUser = {
+      id: req.user?.id || "admin",
+      name: req.user?.name || "Admin",
+    };
+
+    const result = await ordersService.updateOrderStatus(
+      orderId,
+      status as "PAID" | "PENDING",
+      adminUser,
+      notes
+    );
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  }),
+
+  /**
+   * Admin delete order
+   * DELETE /api/admin/orders/:id
+   */
+  adminDelete: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const orderId = req.params.id;
+    if (!orderId) {
+      throw new ValidationError("Order ID is required");
+    }
+
+    const adminUser = {
+      id: req.user?.id || "admin",
+      name: req.user?.name || "Admin",
+    };
+
+    const result = await ordersService.deleteOrder(orderId, adminUser);
+
+    res.json({
+      ...result,
+    });
+  }),
 };
+
