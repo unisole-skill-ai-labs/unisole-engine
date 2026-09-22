@@ -260,6 +260,28 @@ export const paymentsService = {
       return { status: "ignored", reason: "no_order_id" };
     }
 
+    // Handle failed payments explicitly: never grant access for failed attempts
+    if (event === "payment.failed" || paymentEntity.status === "failed") {
+      console.log(`[Razorpay Webhook] Payment failed for order ${providerOrderId}`);
+      const existingPayment = await paymentsRepository.getByProviderOrderId(providerOrderId);
+      if (existingPayment && existingPayment.status !== "SUCCESS") {
+        await paymentsRepository.update(existingPayment.id, { status: "FAILED" });
+      }
+      return { status: "recorded_failed", reason: "payment_failed" };
+    }
+
+    // Only process events where Razorpay confirms payment is captured or authorized
+    const isPaymentCaptured =
+      paymentEntity.status === "captured" ||
+      paymentEntity.status === "authorized" ||
+      event === "payment.captured" ||
+      event === "order.paid";
+
+    if (!isPaymentCaptured) {
+      console.log(`[Razorpay Webhook] Ignored non-success event ${event} with status ${paymentEntity.status}`);
+      return { status: "ignored", reason: `non_success_status_${paymentEntity.status}` };
+    }
+
     const result = await this.verifyPayment({
       providerOrderId,
       providerPaymentId,
