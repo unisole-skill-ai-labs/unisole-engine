@@ -439,43 +439,43 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 14 — AI IS THE BIGGEST CATALYST OF CHANGE
+  // SLIDE 14 — YOUR ENVIRONMENT IS CHANGING FASTER THAN EVER
   // =========================================================================
   {
     id: "sunni_slide_14",
     type: "THREE_CARDS",
-    badge: "THE CATALYST",
-    title: "AI is the Biggest Catalyst of Change",
-    subtitle: "How 4 fundamental pillars of your career journey are shifting.",
+    badge: "THE SHIFTING ENVIRONMENT",
+    title: "Your Environment is Changing Faster Than Ever",
+    subtitle: "What 'Environment' Means: How you learn, what you learn, what jobs exist, and how to prepare.",
     cards: [
       {
         num: "01",
-        title: "What You Learn",
+        title: "How & What You Learn",
         items: [
-          "Memorisation is becoming cheap. AI already knows more facts than any textbook.",
-          "Focus on deep mental models, systems thinking, and synthesis.",
+          "How You Learn: Stop spending months on basic syntax. Learn at 5x speed with AI as a 24/7 personal tutor.",
+          "What You Learn: Textbook memorization is free. Focus on mental models, first principles, and synthesis.",
         ],
       },
       {
         num: "02",
-        title: "How You Learn",
+        title: "What Jobs Exist Today",
         items: [
-          "Don't spend 1 month on basic syntax.",
-          "Become an agile, self-directed rapid learner leveraging AI as a personal tutor.",
+          "Routine entry-level clerical and repetitive tasks are shrinking across tech, science, and commerce.",
+          "High-leverage new roles belong to students who can direct, orchestrate, and validate AI systems.",
         ],
       },
       {
         num: "03",
-        title: "What Jobs Exist & How You Prepare",
+        title: "How to Prepare for Them",
         items: [
-          "Repetitive entry-level tasks are automated. New roles require orchestrating AI systems.",
-          "Degree opens the door. Live proof of real skill decides who gets selected.",
+          "Your degree opens the door — but verified proof of real skill and live projects decides who gets hired.",
+          "Move beyond textbook syllabus: build public GitHub proofs, live tools, and verifiable portfolios.",
         ],
       },
     ],
-    punchline: "Shift from memorizing facts to directing systems and validating outcomes.",
+    punchline: "Tell them: Shift from memorizing facts to directing systems, validating outcomes, and proving real capability.",
     maxBuildSteps: 3,
-    notes: "Memorization is obsolete. You must learn faster, master tools that orchestrate AI, and bring proof of work.",
+    notes: "Tell the students: When we say 'your environment is changing faster than ever', what does environment mean? 1. How you learn (AI 24/7 supercomputer tutor), 2. What you learn (mental models over rote memory), 3. What jobs exist (routine roles disappearing, orchestration roles rising), and 4. How to prepare (degree opens door, verified proof of skill wins the job).",
   },
 
   // =========================================================================
@@ -586,137 +586,137 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 18 — FROM THIS CYCLE… WHAT IS BECOMING CHEAP?
+  // SLIDE 18 — FROM THIS CYCLE… WHAT IS BECOMING CHEAP? (ALL STREAMS)
   // =========================================================================
   {
     id: "sunni_slide_18",
     type: "THREE_CARDS",
-    badge: "COMMODITIZED TASKS",
+    badge: "COMMODITIZED TASKS ACROSS STREAMS",
     title: "From This Cycle… What is Becoming CHEAP?",
-    subtitle: "Anything that is repetitive, syntax-level, or first-draft is becoming near-zero cost.",
+    subtitle: "Across every degree stream, repetitive execution and first drafts are now near-zero cost.",
     cards: [
       {
-        num: "01",
-        title: "Research & Summaries",
+        num: "TECH",
+        title: "Tech / BCA: Boilerplate & Syntax",
         items: [
-          "Reading 50 research papers or financial filings",
-          "AI summarizes key data points in minutes",
-          "Basic factual aggregation is automated",
-          "Textbook knowledge lookup is instant",
+          "Writing routine boilerplate code, basic CSS styling, and standard CRUD scripts",
+          "AI writes working first-draft functions and script routines in 5 seconds",
+          "Generating repetitive test suites and translating code between languages",
+          "Building toy tutorial clones (calculators, simple clones) with no backend depth",
         ],
       },
       {
-        num: "02",
-        title: "First Drafts & Boilerplate",
+        num: "SCIENCE",
+        title: "Science / B.Sc: Paper Reading & Formulas",
         items: [
-          "Writing initial code routines, CSS, or scripts",
-          "AI generates working first drafts in 5 seconds",
-          "Drafting basic email pitches & blog outlines",
-          "Creating mock data and routine test cases",
+          "Reading 50 research papers: AI parses and summarizes key findings in 2 minutes",
+          "Routine textbook formula lookups, standard calculus, and manual data graphing",
+          "Basic factual literature reviews and memorizing experimental constants",
+          "Elementary statistical tabulations and standard laboratory math calculations",
         ],
       },
       {
-        num: "03",
-        title: "Routine Testing & Docs",
+        num: "COMMERCE",
+        title: "Commerce / B.Com: Spreadsheets & Data Entry",
         items: [
-          "Writing repetitive unit test suites",
-          "Translating code between languages",
-          "Writing standard API documentation",
-          "Manual formatting of spreadsheets",
+          "Manual Excel data entry, tabular ledger formatting, and journal vouchers",
+          "Routine tax rate lookups, basic balance sheet balancing, and standard invoicing",
+          "Drafting generic business emails, basic meeting minutes, and standard reports",
+          "Repetitive clerical bookkeeping that follows predictable static rules",
         ],
       },
     ],
-    punchline: "Key Rule: If your entire job can be done by a prompt in 10 seconds, it will not exist in 3 years.",
+    punchline: "Universal Rule: If your whole job is doing what a prompt does in 10 seconds, that role will disappear.",
     maxBuildSteps: 3,
-    notes: "If your entire job is writing boilerplate code or summarizing documents, AI does it for $0.001. That work is cheap.",
+    notes: "Tell all students: Whether you are in BCA, B.Sc, or B.Com, basic execution is cheap. For tech students: syntax and boilerplate code. For science students: reading 50 research papers and routine formula lookups. For commerce students: manual spreadsheet formatting, basic ledgers, and clerical reports. AI does all of this in seconds.",
   },
 
   // =========================================================================
-  // SLIDE 19 — FROM THIS CYCLE… WHAT IS BECOMING VALUABLE?
+  // SLIDE 19 — FROM THIS CYCLE… WHAT IS BECOMING VALUABLE? (ALL STREAMS)
   // =========================================================================
   {
     id: "sunni_slide_19",
     type: "THREE_CARDS",
-    badge: "PREMIUM CAPABILITIES",
+    badge: "PREMIUM CAPABILITIES ACROSS STREAMS",
     title: "From This Cycle… What is Becoming VALUABLE?",
-    subtitle: "Where your human judgment, critical thinking, and ownership create indispensable value.",
+    subtitle: "Where human judgment, domain depth, critical verification, and ownership command premium pay.",
     cards: [
       {
-        num: "01",
-        title: "Problem Understanding",
+        num: "TECH",
+        title: "Tech / BCA: Architecture & Verification",
         items: [
-          "AI cannot feel real human pain or frustration",
-          "Talking to real users, customers, and stakeholders",
-          "Deep contextual observation in Himachal markets",
-          "Formulating the right problem before writing code",
+          "Designing resilient system architecture, database schemas, and API contracts",
+          "Catching subtle AI hallucinations, security loopholes, and performance bottlenecks",
+          "Integrating AI agents, vector databases, and real-time streaming backends",
+          "Taking end-to-end ownership: deploying to cloud and maintaining 99.9% uptime",
         ],
       },
       {
-        num: "02",
-        title: "Architecture & Specs",
+        num: "SCIENCE",
+        title: "Science / B.Sc: Scientific Rigor & Validation",
         items: [
-          "Deciding what truly matters and what NOT to build",
-          "Designing fault-tolerant, scalable system architectures",
-          "Schema validation, data integrity, and security",
-          "Balancing cloud latency, compute costs, and reliability",
+          "Scientific domain modeling: knowing when AI outputs violate physical or biological laws",
+          "Rigorous hypothesis formulation: designing real laboratory tests and field trials",
+          "Physics-informed ML: applying computational models to Himachal climate & agriculture",
+          "Critical evaluation: deciding which research methodologies are valid vs flawed",
         ],
       },
       {
-        num: "03",
-        title: "Ownership & Judgment",
+        num: "COMMERCE",
+        title: "Commerce / B.Com: Business Judgment & Strategy",
         items: [
-          "Auditing AI outputs and catching subtle hallucinations",
-          "Standing behind the product when production goes down",
-          "Accountability to paying clients and employers",
-          "Taking end-to-end responsibility from idea to deployment",
+          "Strategic decision-making: prioritizing unit economics, ROI, and what NOT to build",
+          "Financial anomaly auditing: spotting hidden balance-sheet risks and fraud AI misses",
+          "Executive communication, client negotiations, and human stakeholder trust",
+          "Deploying AI agents to automate business operations and drive corporate growth",
         ],
       },
     ],
-    punchline: "Raw typing is cheap. Judgment, architecture, and ownership command premium compensation.",
+    punchline: "Raw output is cheap. Human judgment, scientific validation, and business ownership command the highest salaries.",
     poll: {
-      question: "Which will be most valuable for your career?",
-      options: ["Verifying Systems & Edge Cases", "Architecture & AI Tool Integration", "Understanding User & Business Context", "Syntax Typing & Memorization"],
+      question: "Which skill will be most valuable for your career stream?",
+      options: ["System Architecture & Edge-Case Verification (Tech)", "Scientific Rigor & Validation of AI Models (Science)", "Business Judgment & Financial Anomaly Auditing (Commerce)", "End-to-End Ownership & Communication"],
       timeLimit: 20,
     },
     maxBuildSteps: 3,
-    notes: "Where is the value? Understanding the problem, choosing the architecture, evaluating AI output, and taking responsibility.",
+    notes: "Now look at what becomes valuable: For tech students, it is system architecture, verifying AI edge-cases, and production ownership. For science students, it is scientific rigor, hypothesis testing, and validating AI against real physical laws. For commerce students, it is business judgment, financial anomaly auditing, unit economics, and human negotiations.",
   },
 
   // =========================================================================
-  // SLIDE 20 — SIMPLE SUMMARY: THE VALUE SHIFT MATRIX
+  // SLIDE 20 — SIMPLE SUMMARY: THE UNIVERSAL VALUE SHIFT (ALL STREAMS)
   // =========================================================================
   {
     id: "sunni_slide_20",
     type: "COMPARISON",
-    badge: "THE VALUE MATRIX",
+    badge: "THE VALUE MATRIX FOR ALL STREAMS",
     title: "Simple Summary: The Great Shift",
-    subtitle: "Where the market is commoditizing vs. where the market is investing.",
+    subtitle: "A unified comparison of commoditized work vs. high-value skills across every discipline.",
     columns: [
       {
-        label: "BECOMING CHEAP (Commoditized)",
+        label: "BECOMING CHEAP (Commoditized across Streams)",
         color: "text-zinc-400",
         items: [
-          "First drafts & boilerplate code",
-          "Research summaries & fact lookup",
-          "Routine clerical work & formula memorization",
-          "Repetitive manual tasks & tutorial clones",
-          "Basic textbook formula memorization",
+          "Tech: Boilerplate code, syntax lookup, routine debugging, tutorial clones",
+          "Science: Reading 50 research papers, standard formula lookup, basic calculations",
+          "Commerce: Manual spreadsheet formatting, basic ledger entries, generic reports",
+          "General: Rote memorization of textbook theory, definitions, and exam answers",
+          "Rule: Any repetitive task that follows predictable rules without human judgment",
         ],
       },
       {
-        label: "BECOMING VALUABLE (Premium)",
+        label: "BECOMING VALUABLE (Premium across Streams)",
         color: "text-emerald-400",
         items: [
-          "Judgment & critical evaluation",
-          "Context & problem formulation",
-          "Prioritization (What NOT to build)",
-          "System architecture & fault tolerance",
-          "End-to-end ownership & accountability",
+          "Tech: System design, edge-case verification, RAG/agent orchestration, live cloud deployment",
+          "Science: Scientific domain rigor, hypothesis testing, real-world data validation, Physics-ML",
+          "Commerce: Business judgment, financial anomaly auditing, unit economics, executive strategy",
+          "General: Problem formulation, contextual observation, and end-to-end accountability",
+          "Rule: The ability to direct AI tools, validate correctness, and take final responsibility",
         ],
       },
     ],
     maxBuildSteps: 2,
-    notes: "Shift your identity from a 'syntax memorizer' to a 'systems thinker and problem owner'. Move from the left column to the right column.",
+    notes: "Shift your identity: Tech students become System Architects. Science students become Scientific Validators. Commerce students become Strategic Decision Makers. Move from the left column to the right column.",
   },
 
   // =========================================================================
