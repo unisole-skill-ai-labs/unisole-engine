@@ -141,14 +141,13 @@ export const presentationsService = {
         });
         console.log("[Presentations] Auto-seeded flagship deck: Sunni College PPT");
       } else {
-        const firstTitle = Array.isArray(existingSunni.slides) ? existingSunni.slides[0]?.title : null;
-        const currentTargetTitle = SUNNI_COLLEGE_PPT_SLIDES[0]?.title;
-        const slideCount = Array.isArray(existingSunni.slides) ? existingSunni.slides.length : 0;
+        const existingJson = JSON.stringify(existingSunni.slides || []);
+        const targetJson = JSON.stringify(SUNNI_COLLEGE_PPT_SLIDES);
 
-        if (firstTitle !== currentTargetTitle || slideCount !== SUNNI_COLLEGE_PPT_SLIDES.length) {
+        if (existingJson !== targetJson) {
           await presentationsRepository.updatePresentation("pres_sunni_college_ppt", {
             title: "Atal Bihari Vajpayee Govt Degree College Sunni PPT",
-            description: "28-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+            description: "37-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
             slides: SUNNI_COLLEGE_PPT_SLIDES,
           });
           console.log(`[Presentations] Auto-synced Sunni College PPT to latest ${SUNNI_COLLEGE_PPT_SLIDES.length} master slides.`);

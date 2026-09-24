@@ -86,8 +86,6 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     title: "YOUR CAREER WORLD HAS CHANGED",
     subtitle: "First understand AI → Then decide your path · Was it ChatGPT in 2022? Or does the story go 80 years deeper?",
     maxBuildSteps: 2,
-    questionPrompt: "What do you think… when did AI actually start?",
-    speakerHook: "First understand AI → Then decide your path. Was it ChatGPT in 2022? Or does the story go 80 years deeper?",
     notes: "Before you decide whether to prepare for an exam, do an MBA, or learn coding, you must first understand the fundamental technology that is rewriting every white-collar profession on Earth. Next, let's poll the room on when AI actually started.",
   },
 
@@ -97,18 +95,18 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   {
     id: "sunni_slide_poll_1",
     type: "POLL",
-    badge: "⚡ LIVE AUDIENCE POLL 01",
-    title: "When do you think AI started?",
+    badge: "LIVE POLL 01",
+    title: "Audience Pulse: When Did AI Start?",
+    question: "When do you think AI actually started?",
     subtitle: "Vote on your phone now before we reveal the 80-year-old answer on the next slide.",
+    options: [
+      "Recently in 2022 (ChatGPT)",
+      "In the 1990s (Computer Chess)",
+      "In 1956 (Dartmouth Workshop)",
+      "Way back in 1943 (Neuron Model)",
+    ],
     maxBuildSteps: 1,
-    questionPrompt: "When do you think AI started?",
-    speakerHook: "Lock in your vote on your smartphone: Was it 2022? 1990s? 1956? Or 1943?",
-    poll: {
-      question: "When do you think AI started?",
-      options: ["Recently in 2022 (ChatGPT)", "In the 1990s (Computer Chess)", "In 1956 (Dartmouth Workshop)", "Way back in 1943 (Neuron Model)"],
-      timeLimit: 20,
-    },
-    notes: "Trigger the poll. Watch votes pour in from the student audience. Then advance to Slide 5 to reveal McCulloch & Pitts in 1943!",
+    notes: "Live Poll 01. Give students 20 seconds to vote on their mobile screens. Then reveal McCulloch & Pitts in 1943!",
   },
 
   // =========================================================================
@@ -203,18 +201,18 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   {
     id: "sunni_slide_poll_2",
     type: "POLL",
-    badge: "⚡ LIVE AUDIENCE POLL 02",
-    title: "What is hardest for AI even today?",
-    subtitle: "Which capability remains the toughest barrier for artificial intelligence?",
+    badge: "LIVE POLL 02",
+    title: "Capability Check: The Limits of Machines",
+    question: "What is hardest for AI even today?",
+    subtitle: "Lock in your answer on your phone · Real-time room response",
+    options: [
+      "Common sense & real thinking",
+      "Complex mathematics",
+      "Remembering large data",
+      "Writing code fast",
+    ],
     maxBuildSteps: 1,
-    questionPrompt: "What is hardest for AI even today?",
-    speakerHook: "AI writes code in 5 seconds and calculates complex math... but what is still hardest for it?",
-    poll: {
-      question: "What is hardest for AI even today?",
-      options: ["Common sense & real thinking", "Complex mathematics", "Remembering large data", "Writing code fast"],
-      timeLimit: 20,
-    },
-    notes: "Poll the room. Most students pick math, but common sense and real reasoning are actually the hardest.",
+    notes: "Live Poll 02. Challenge students on why AI solves differential equations but still struggles with physical common sense.",
   },
 
   // =========================================================================
@@ -227,8 +225,6 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     title: "The Turing Test (1950)",
     subtitle: "Alan Turing asked a simple question that defined the field of machine intelligence.",
     maxBuildSteps: 2,
-    questionPrompt: "Can machines think? Or should we ask: Can machines act indistinguishably from humans?",
-    speakerHook: "If a human cannot tell whether they are conversing with a human or a machine, the machine passes.",
     notes: "In 1950, Alan Turing said: don't debate whether machines 'think'. If a machine converses with a human and they cannot tell it's a machine, it behaves intelligently.",
   },
 
@@ -238,18 +234,18 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   {
     id: "sunni_slide_poll_3",
     type: "POLL",
-    badge: "⚡ LIVE AUDIENCE POLL 03",
-    title: "Have you ever felt ChatGPT is almost human?",
+    badge: "LIVE POLL 03",
+    title: "The Turing Benchmark: Human vs. Machine",
+    question: "Have you ever felt ChatGPT is almost human?",
     subtitle: "Share your honest experience talking to modern AI language models.",
+    options: [
+      "Yes, feels like a real human!",
+      "Sometimes, but makes silly mistakes",
+      "No, feels like Google search",
+      "Haven't used it much",
+    ],
     maxBuildSteps: 1,
-    questionPrompt: "Have you ever felt ChatGPT is almost human?",
-    speakerHook: "Alan Turing asked if a machine could fool a human. How human does ChatGPT feel to you?",
-    poll: {
-      question: "Have you ever felt ChatGPT is almost human?",
-      options: ["Yes, feels like a real human!", "Sometimes, but makes silly mistakes", "No, feels like Google search", "Haven't used it much"],
-      timeLimit: 20,
-    },
-    notes: "Get a live pulse on how deeply the students in Sunni are already using LLMs.",
+    notes: "Live Poll 03. Gauge personal hands-on experience with LLMs across the Sunni audience.",
   },
 
   // =========================================================================
@@ -430,8 +426,6 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     title: "तो हम क्या करें?",
     subtitle: "If AI executes every routine task in seconds — what is your real strategy to survive and thrive?",
     maxBuildSteps: 1,
-    questionPrompt: "तो हम क्या करें?",
-    speakerHook: "अगर AI आपके सारे काम चुटकियों में कर सकता है... तो हम क्या करें? How do you make yourself indispensable in the AI job market?",
     notes: "Look straight at the students: 'तो हम क्या करें? If machines can code, write, and calculate... what should you do today so you don't get replaced?'",
   },
 
@@ -441,18 +435,18 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   {
     id: "sunni_slide_poll_4",
     type: "POLL",
-    badge: "⚡ LIVE AUDIENCE POLL 04",
-    title: "How many of you feel scared about future because of AI?",
-    subtitle: "Be honest: When you see AI doing coding, research, and accounting in seconds, how does it make you feel?",
+    badge: "LIVE POLL 04",
+    title: "Sentiment Check: AI & Career Anxiety",
+    question: "How many of you feel scared about the future because of AI?",
+    subtitle: "Vote on your phone now · Be 100% honest",
+    options: [
+      "Very scared about my job",
+      "A little worried, but hopeful",
+      "Not scared — excited to learn AI!",
+      "Haven't thought about it yet",
+    ],
     maxBuildSteps: 1,
-    questionPrompt: "How many of you feel scared about future because of AI?",
-    speakerHook: "Right after 'तो हम क्या करें?' — let's see how much anxiety or excitement is in this room.",
-    poll: {
-      question: "How many of you feel scared about future because of AI?",
-      options: ["Very scared about my job", "A little worried", "Excited & ready to learn", "Haven't thought about it yet"],
-      timeLimit: 20,
-    },
-    notes: "This is a pivotal moment in the roadshow. Acknowledge their fear, then explain the solution in the next slides.",
+    notes: "Live Poll 04. Triggered right after the Hindi hook (तो हम क्या करें?). Sets up the entire Part 2 job market analysis.",
   },
 
   // =========================================================================
@@ -498,18 +492,18 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   {
     id: "sunni_slide_poll_5",
     type: "POLL",
-    badge: "⚡ LIVE AUDIENCE POLL 05",
-    title: "Do your parents still think “degree = sorted life”?",
-    subtitle: "Has the generational career perception shifted in your household?",
+    badge: "LIVE POLL 05",
+    title: "Generational Shift: Parents vs. Reality",
+    question: "Do your parents still think “degree = sorted life”?",
+    subtitle: "Vote on your phone now · The generational expectations gap",
+    options: [
+      "Yes, 100% (Degree = Life Sorted)",
+      "A little bit, but noticing changes",
+      "No, they know skills matter now",
+      "Only pushing for Govt exams",
+    ],
     maxBuildSteps: 1,
-    questionPrompt: "Do your parents still think “degree = sorted life”?",
-    speakerHook: "Do your parents still believe getting a degree guarantees a 30-year secure job?",
-    poll: {
-      question: "Do your parents still think “degree = sorted life”?",
-      options: ["Yes, 100% (Degree = Life Sorted)", "A little bit, but noticing changes", "No, they know skills matter now", "Only pushing for Govt exams"],
-      timeLimit: 20,
-    },
-    notes: "Humorous and highly relatable. Sets up the 1.1 Crore graduate competition reality on the next slide.",
+    notes: "Live Poll 05. A relatable cultural question highlighting the generational gap in career planning.",
   },
 
   // =========================================================================
@@ -889,18 +883,18 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   {
     id: "sunni_slide_poll_6",
     type: "POLL",
-    badge: "⚡ LIVE AUDIENCE POLL 06",
-    title: "Which role feels closest to what you want?",
-    subtitle: "Across tech, science, and commerce — which career path excites you the most?",
+    badge: "LIVE POLL 06",
+    title: "Aspiration Check: Your Ideal Path",
+    question: "Which role feels closest to what you want?",
+    subtitle: "Select your preferred trajectory across tech, science, and commerce",
+    options: [
+      "App & Web Developer (Tech)",
+      "Data & Research Analyst (Science)",
+      "Business & Finance Analyst (Commerce)",
+      "AI Workflow Specialist (Any Stream)",
+    ],
     maxBuildSteps: 1,
-    questionPrompt: "Which role feels closest to what you want?",
-    speakerHook: "Every stream has high-paying AI paths. Which one aligns with your personal goals?",
-    poll: {
-      question: "Which role feels closest to what you want?",
-      options: ["App & Web Developer (Tech)", "Data & Research Analyst (Science)", "Business & Finance Analyst (Commerce)", "AI Workflow Specialist (Any Stream)"],
-      timeLimit: 20,
-    },
-    notes: "Engages all BCA, B.Sc, and B.Com students before deep-diving into individual stream role slides.",
+    notes: "Live Poll 06. Ask students across BCA, B.Sc, B.Com, and BBA to pick their aspirational career trajectory.",
   },
 
   // =========================================================================
@@ -1063,18 +1057,18 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   {
     id: "sunni_slide_poll_7",
     type: "POLL",
-    badge: "⚡ LIVE AUDIENCE POLL 07",
-    title: "Where do most students stop?",
-    subtitle: "Why do 98 out of 100 college students fail to convert their degree into high-paying offers?",
+    badge: "LIVE POLL 07",
+    title: "The Funnel Reality: Where Students Quit",
+    question: "Where do most students stop?",
+    subtitle: "Vote honestly — where does the majority of college students give up?",
+    options: [
+      "Just watching YouTube videos",
+      "Copying projects from friends",
+      "Only passing college exams",
+      "Building real apps & websites",
+    ],
     maxBuildSteps: 1,
-    questionPrompt: "Where do most students stop?",
-    speakerHook: "Look at the funnel. Where do you see your friends and classmates getting stuck?",
-    poll: {
-      question: "Where do most students stop?",
-      options: ["Just watching YouTube videos", "Copying projects from friends", "Only passing college exams", "Building real apps & websites"],
-      timeLimit: 20,
-    },
-    notes: "Hits hard on student complacency. Leads directly into the 5 practical steps to win and the industrial training solution.",
+    notes: "Live Poll 07. Show where 75 out of 100 students drop out and why generic learning produces no job offers.",
   },
 
   // =========================================================================
