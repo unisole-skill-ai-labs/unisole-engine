@@ -5,6 +5,7 @@ import { validateBody } from "../../middleware/validate";
 export const adminPricingRouter: Router = Router();
 
 adminPricingRouter.get("/", pricingController.adminListPricing);
+adminPricingRouter.post("/sync-canonical", pricingController.adminSyncCanonical);
 adminPricingRouter.post(
   "/",
   validateBody({ required: ["itemType", "itemId", "title", "pricePaise", "mrpPaise"] }),
@@ -12,3 +13,4 @@ adminPricingRouter.post(
 );
 adminPricingRouter.put("/:id", pricingController.adminUpdatePricing);
 adminPricingRouter.delete("/:id", pricingController.adminDeletePricing);
+
