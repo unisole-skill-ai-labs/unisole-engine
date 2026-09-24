@@ -3,6 +3,7 @@ import { pathwaysRepository } from "../repositories/pathways.repository";
 import { usersRepository } from "../repositories/users.repository";
 import { Enrollment, NewEnrollment, ItemType, EnrollmentSource } from "../db/schema";
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from "../errors";
+import { CANONICAL_SEO_OFFERINGS } from "../constants/offerings";
 
 export interface ManualGrantDto {
   userId: string;
@@ -56,7 +57,8 @@ export const enrollmentsService = {
     // Verify item existence if pathway
     if (itemType === "PATHWAY") {
       const pathway = await pathwaysRepository.getById(itemId);
-      if (!pathway) throw new NotFoundError("Pathway not found");
+      const isCanonical = CANONICAL_SEO_OFFERINGS.some((o) => o.itemId === itemId || o.slug === itemId);
+      if (!pathway && !isCanonical) throw new NotFoundError("Pathway not found");
     }
 
     const existing = await enrollmentsRepository.getActiveByUserAndItem(targetUserId, itemType, itemId);

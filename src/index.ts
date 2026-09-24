@@ -24,6 +24,8 @@ import { pool, db } from "./db";
 import { initializeDatabase } from "./db/init";
 import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { pathwaysService } from "./services/pathways.service";
+import { pricingService } from "./services/pricing.service";
 
 const app = express();
 const server = http.createServer(app);
@@ -93,6 +95,16 @@ async function bootstrap() {
       console.log("[BOOTSTRAP] Drizzle migrations applied successfully.");
     } catch (migErr: any) {
       // Direct DDL in initializeDatabase ensures schema integrity
+    }
+
+    // 3. Drizzle ORM: Sync Canonical Pathways and Pricing directly to PostgreSQL tables
+    try {
+      const pwyResult = await pathwaysService.syncCanonicalPathways();
+      console.log(`[BOOTSTRAP] Drizzle synced ${pwyResult.synced}/${pwyResult.total} canonical pathways to database.`);
+      const prcResult = await pricingService.syncCanonicalOfferings();
+      console.log(`[BOOTSTRAP] Drizzle synced ${prcResult.total} canonical offerings pricing to database.`);
+    } catch (syncErr: any) {
+      console.warn("[BOOTSTRAP] Warning during canonical pathways sync:", syncErr);
     }
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);
