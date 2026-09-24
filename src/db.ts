@@ -5,7 +5,9 @@ import * as schema from "./db/schema";
 import * as relations from "./db/relations";
 
 dotenv.config({ path: ".env.local" });
-dotenv.config({ path: ".env.staging" });
+if (process.env.NODE_ENV === "staging") {
+  dotenv.config({ path: ".env.staging" });
+}
 dotenv.config();
 
 export const pool = new Pool({

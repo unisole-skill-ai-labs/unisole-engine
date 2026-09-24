@@ -542,16 +542,20 @@ export async function initializeDatabase() {
       );
 
       CREATE TABLE IF NOT EXISTS "public"."presentation_leads" (
-        "id" varchar(50) PRIMARY KEY DEFAULT ('plead_'::text || nextval('public.presentation_leads_id_seq'::regclass)) NOT NULL,
+        "id" varchar(50) PRIMARY KEY DEFAULT ('lead_'::text || nextval('public.presentation_leads_id_seq'::regclass)) NOT NULL,
         "session_id" varchar(50) NOT NULL,
-        "presentation_id" varchar(50) NOT NULL,
+        "college_id" varchar(50),
         "user_id" varchar(50),
         "phone" varchar(20) NOT NULL,
         "name" varchar(150),
-        "academic_branch" varchar(100),
+        "email" varchar(255),
+        "branch" varchar(100),
+        "year_of_study" varchar(50),
         "total_score" integer DEFAULT 0 NOT NULL,
-        "answers" jsonb DEFAULT '[]'::jsonb NOT NULL,
-        "submitted_at" timestamp with time zone DEFAULT now() NOT NULL
+        "rank" integer,
+        "streak" integer DEFAULT 0 NOT NULL,
+        "responses" jsonb DEFAULT '{}'::jsonb NOT NULL,
+        "joined_at" timestamp with time zone DEFAULT now() NOT NULL
       );
 
       CREATE INDEX IF NOT EXISTS "idx_presentations_is_active" ON "public"."presentations" ("is_active");

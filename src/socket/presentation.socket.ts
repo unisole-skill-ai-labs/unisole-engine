@@ -76,6 +76,33 @@ const reactionLimits = new Map<
   string,
   { lastSent: number; penaltyUntil: number; strikes: number }
 >();
+const pollBroadcastTimers = new Map<string, NodeJS.Timeout>();
+const sessionDbCountTimers = new Map<string, NodeJS.Timeout>();
+const leadUpdateBatch = new Map<string, { totalScore: number; streak: number; responses: any }>();
+let leadBatchFlushTimer: NodeJS.Timeout | null = null;
+
+function scheduleAttendeeCountDbUpdate(sessionId: string, count: number) {
+  if (sessionDbCountTimers.has(sessionId)) return;
+  const timer = setTimeout(() => {
+    sessionDbCountTimers.delete(sessionId);
+    presentationsRepository.updateSession(sessionId, { activeAttendeesCount: count }).catch(() => { });
+  }, 2000);
+  sessionDbCountTimers.set(sessionId, timer);
+}
+
+function queueLeadUpdate(leadId: string, data: { totalScore: number; streak: number; responses: any }) {
+  leadUpdateBatch.set(leadId, data);
+  if (!leadBatchFlushTimer) {
+    leadBatchFlushTimer = setTimeout(() => {
+      leadBatchFlushTimer = null;
+      const entries = Array.from(leadUpdateBatch.entries());
+      leadUpdateBatch.clear();
+      for (const [id, updateData] of entries) {
+        presentationsRepository.updateLead(id, updateData).catch(() => { });
+      }
+    }, 1500);
+  }
+}
 
 export function getBranchDistribution(sessionState: SessionState) {
   const counts: Record<string, number> = {};
@@ -287,10 +314,8 @@ export function setupPresentationSocket(io: SocketIOServer) {
         sessionState.socketToLead.set(socket.id, leadId);
         sessionState.attendees.set(leadId, attendeeObj);
 
-        // Update DB attendee count periodically
-        presentationsRepository.updateSession(sessionState.sessionId, {
-          activeAttendeesCount: sessionState.attendees.size,
-        });
+        // Update DB attendee count periodically (debounced to avoid Postgres lock contention)
+        scheduleAttendeeCountDbUpdate(sessionState.sessionId, sessionState.attendees.size);
 
         const branchStats = getBranchDistribution(sessionState);
         const attendeesList = Array.from(sessionState.attendees.values());
@@ -300,22 +325,21 @@ export function setupPresentationSocket(io: SocketIOServer) {
           count: sessionState.attendees.size,
         });
 
-        // Broadcast live joined member notification & updated full attendee list to room
-        io.to(room).emit("attendee_joined", {
+        // Broadcast live joined member notification & updated full attendee list ONLY to Presenter / Projector screen!
+        io.to(`${room}:admin`).emit("attendee_joined", {
           attendee: attendeeObj,
           attendees: attendeesList,
           count: sessionState.attendees.size,
           branchStats,
         });
 
-        // Send current slide, isPresentationStarted & branch stats to joining audience
+        // Send current slide, isPresentationStarted & branch stats to joining audience (omit heavy full attendee array)
         const myAnswer = sessionState.quizState.quizAnswers.get(leadId);
         socket.emit("sync_state", {
           currentSlideIndex: sessionState.currentSlideIndex,
           buildStep: sessionState.buildStep ?? 0,
           isPresentationStarted: sessionState.isPresentationStarted,
           attendeeCount: sessionState.attendees.size,
-          attendees: attendeesList,
           branchStats,
           quizState: {
             ...sessionState.quizState,
@@ -625,17 +649,14 @@ export function setupPresentationSocket(io: SocketIOServer) {
             attendee.streak = 0;
           }
 
-          // Persist lead response to DB asynchronously
-          presentationsRepository.getLeadById(leadId).then((lead) => {
-            if (lead) {
-              const currentResponses = (lead.responses as any) || {};
-              currentResponses[slideId] = responseData;
-              presentationsRepository.updateLead(leadId, {
-                totalScore: attendee.totalScore,
-                streak: attendee.streak,
-                responses: currentResponses,
-              });
-            }
+          // Buffer lead response for batch persistence to DB asynchronously
+          const currentResponses = (attendee as any).responses || {};
+          currentResponses[slideId] = responseData;
+          (attendee as any).responses = currentResponses;
+          queueLeadUpdate(leadId, {
+            totalScore: attendee.totalScore,
+            streak: attendee.streak,
+            responses: currentResponses,
           });
         }
 
@@ -646,11 +667,17 @@ export function setupPresentationSocket(io: SocketIOServer) {
           totalScore: attendee?.totalScore ?? 0,
         });
 
-        // Broadcast live submission count and updated poll distribution to Admin & Room
-        io.to(room).emit("live_poll_update", {
-          totalSubmissions: sessionState.quizState.quizAnswers.size,
-          pollCounts: sessionState.quizState.pollCounts,
-        });
+        // Debounce live submission count broadcast to room (max 4 per sec: 250ms) to prevent event loop choking
+        if (!pollBroadcastTimers.has(code)) {
+          const timer = setTimeout(() => {
+            pollBroadcastTimers.delete(code);
+            io.to(room).emit("live_poll_update", {
+              totalSubmissions: sessionState.quizState.quizAnswers.size,
+              pollCounts: sessionState.quizState.pollCounts,
+            });
+          }, 250);
+          pollBroadcastTimers.set(code, timer);
+        }
       }
     );
 
@@ -669,6 +696,11 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const room = `session:${code}`;
         const sessionState = await getOrCreateSessionState(code);
         if (!sessionState) return;
+
+        if (pollBroadcastTimers.has(code)) {
+          clearTimeout(pollBroadcastTimers.get(code));
+          pollBroadcastTimers.delete(code);
+        }
 
         sessionState.quizState.isQuizActive = false;
         sessionState.quizState.isAnswerRevealed = true;
@@ -834,16 +866,18 @@ export function setupPresentationSocket(io: SocketIOServer) {
           votedAt: new Date().toISOString(),
         };
 
-        // Persist to database lead responses
-        presentationsRepository.getLeadById(leadId).then((lead) => {
-          if (lead) {
-            const currentResponses = (lead.responses as any) || {};
-            currentResponses[pollId] = pollResponseData;
-            presentationsRepository.updateLead(leadId, {
-              responses: currentResponses,
-            });
-          }
-        });
+        // Buffer lead response for batch persistence to DB asynchronously
+        const attendee = sessionState.attendees.get(leadId);
+        if (attendee) {
+          const currentResponses = (attendee as any).responses || {};
+          currentResponses[pollId] = pollResponseData;
+          (attendee as any).responses = currentResponses;
+          queueLeadUpdate(leadId, {
+            totalScore: attendee.totalScore,
+            streak: attendee.streak,
+            responses: currentResponses,
+          });
+        }
 
         // Confirm to user
         socket.emit("instant_poll_confirmed", {
@@ -851,12 +885,19 @@ export function setupPresentationSocket(io: SocketIOServer) {
           optionIndex: validIndex,
         });
 
-        // Broadcast real-time live poll tally to everyone (admin & audience)
-        io.to(room).emit("instant_poll_update", {
-          pollId,
-          counts,
-          totalVotes,
-        });
+        // Debounce instant poll tally broadcast to room (max 4 per sec: 250ms)
+        const instantPollKey = `instant_${code}_${pollId}`;
+        if (!pollBroadcastTimers.has(instantPollKey)) {
+          const timer = setTimeout(() => {
+            pollBroadcastTimers.delete(instantPollKey);
+            io.to(room).emit("instant_poll_update", {
+              pollId,
+              counts,
+              totalVotes: sessionState.instantPoll?.responses.size || totalVotes,
+            });
+          }, 250);
+          pollBroadcastTimers.set(instantPollKey, timer);
+        }
       }
     );
 
@@ -869,6 +910,12 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const room = `session:${code}`;
         const sessionState = await getOrCreateSessionState(code);
         if (!sessionState || !sessionState.instantPoll) return;
+
+        const instantPollKey = `instant_${code}_${sessionState.instantPoll.pollId}`;
+        if (pollBroadcastTimers.has(instantPollKey)) {
+          clearTimeout(pollBroadcastTimers.get(instantPollKey));
+          pollBroadcastTimers.delete(instantPollKey);
+        }
 
         sessionState.instantPoll.isActive = false;
 
@@ -958,20 +1005,18 @@ export function setupPresentationSocket(io: SocketIOServer) {
           sessionState.socketToLead.delete(target.socketId);
           sessionState.attendees.delete(leadId);
 
-          // Update DB attendee count
-          presentationsRepository.updateSession(sessionState.sessionId, {
-            activeAttendeesCount: sessionState.attendees.size,
-          });
+          scheduleAttendeeCountDbUpdate(sessionState.sessionId, sessionState.attendees.size);
 
           const branchStats = getBranchDistribution(sessionState);
           const attendeesList = Array.from(sessionState.attendees.values());
 
-          // Broadcast updated count to all and list to room
+          // Broadcast updated count to all
           io.to(room).emit("attendee_count", {
             count: sessionState.attendees.size,
           });
 
-          io.to(room).emit("attendee_kicked", {
+          // Send full roster update ONLY to admin room
+          io.to(`${room}:admin`).emit("attendee_kicked", {
             leadId,
             attendees: attendeesList,
             count: sessionState.attendees.size,
@@ -1179,9 +1224,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
           sessionState.socketToLead.delete(socket.id);
           sessionState.attendees.delete(leadId);
 
-          presentationsRepository.updateSession(sessionState.sessionId, {
-            activeAttendeesCount: sessionState.attendees.size,
-          });
+          scheduleAttendeeCountDbUpdate(sessionState.sessionId, sessionState.attendees.size);
 
           const branchStats = getBranchDistribution(sessionState);
           const attendeesList = Array.from(sessionState.attendees.values());
@@ -1191,7 +1234,8 @@ export function setupPresentationSocket(io: SocketIOServer) {
             count: sessionState.attendees.size,
           });
 
-          io.to(room).emit("attendee_left", {
+          // Send full roster update ONLY to admin room
+          io.to(`${room}:admin`).emit("attendee_left", {
             leadId,
             attendees: attendeesList,
             count: sessionState.attendees.size,
