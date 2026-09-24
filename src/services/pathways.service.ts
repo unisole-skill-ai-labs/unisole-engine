@@ -1,22 +1,42 @@
 import { pathwaysRepository } from "../repositories/pathways.repository";
 import { Pathway, NewPathway } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
+import { CANONICAL_SEO_OFFERINGS } from "../constants/offerings";
 
 export const pathwaysService = {
   async list(): Promise<Pathway[]> {
-    return pathwaysRepository.list();
+    const dbPathways = await pathwaysRepository.list();
+    const existingIds = new Set(dbPathways.map((p) => p.id));
+    const existingSlugs = new Set(dbPathways.map((p) => p.slug));
+
+    const canonicalPathways: Pathway[] = CANONICAL_SEO_OFFERINGS
+      .filter((o) => !existingIds.has(o.itemId) && !existingSlugs.has(o.slug))
+      .map((o) => ({
+        id: o.itemId,
+        title: o.title,
+        slug: o.slug,
+        shortDescription: o.description,
+        description: o.description,
+        pricePaise: o.pricePaise,
+        status: "PUBLISHED" as const,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
+
+    return [...dbPathways, ...canonicalPathways];
   },
 
   async listPublished() {
-    const all = await pathwaysRepository.list();
+    const all = await this.list();
     const published = all.filter((p) => p.status === "PUBLISHED" && p.isActive);
 
     const enriched = await Promise.all(
       published.map(async (pathway) => {
         const [categories, colleges, courses] = await Promise.all([
-          pathwaysRepository.getCategoriesWithDetails(pathway.id),
-          pathwaysRepository.getCollegesWithDetails(pathway.id),
-          pathwaysRepository.getCoursesWithDetails(pathway.id),
+          pathwaysRepository.getCategoriesWithDetails(pathway.id).catch(() => []),
+          pathwaysRepository.getCollegesWithDetails(pathway.id).catch(() => []),
+          pathwaysRepository.getCoursesWithDetails(pathway.id).catch(() => []),
         ]);
         return {
           ...pathway,
@@ -33,7 +53,26 @@ export const pathwaysService = {
 
   async getById(id: string) {
     const pathway = await pathwaysRepository.getById(id);
-    if (!pathway) throw new NotFoundError("Pathway not found");
+    if (!pathway) {
+      const canonical = CANONICAL_SEO_OFFERINGS.find((o) => o.itemId === id || o.slug === id);
+      if (!canonical) throw new NotFoundError("Pathway not found");
+      return {
+        id: canonical.itemId,
+        title: canonical.title,
+        slug: canonical.slug,
+        shortDescription: canonical.description,
+        description: canonical.description,
+        pricePaise: canonical.pricePaise,
+        status: "PUBLISHED" as const,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        categories: [],
+        colleges: [],
+        courses: [],
+        courseCount: 0,
+      };
+    }
 
     const [categories, colleges, courses] = await Promise.all([
       pathwaysRepository.getCategoriesWithDetails(pathway.id),
@@ -51,7 +90,26 @@ export const pathwaysService = {
 
   async getBySlug(slug: string) {
     const pathway = await pathwaysRepository.getBySlug(slug);
-    if (!pathway) throw new NotFoundError("Pathway not found");
+    if (!pathway) {
+      const canonical = CANONICAL_SEO_OFFERINGS.find((o) => o.slug === slug || o.itemId === slug);
+      if (!canonical) throw new NotFoundError("Pathway not found");
+      return {
+        id: canonical.itemId,
+        title: canonical.title,
+        slug: canonical.slug,
+        shortDescription: canonical.description,
+        description: canonical.description,
+        pricePaise: canonical.pricePaise,
+        status: "PUBLISHED" as const,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        categories: [],
+        colleges: [],
+        courses: [],
+        courseCount: 0,
+      };
+    }
 
     const [categories, colleges, courses] = await Promise.all([
       pathwaysRepository.getCategoriesWithDetails(pathway.id),
