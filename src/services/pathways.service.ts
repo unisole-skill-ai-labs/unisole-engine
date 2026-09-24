@@ -1,3 +1,4 @@
+import { inArray, or } from "drizzle-orm";
 import { pathwaysRepository } from "../repositories/pathways.repository";
 import { pricingRepository } from "../repositories/pricing.repository";
 import { db } from "../db";
@@ -21,6 +22,33 @@ export const pathwaysService = {
    */
   async syncCanonicalPathways(): Promise<{ total: number; synced: number }> {
     let synced = 0;
+
+    // 0. Purge legacy deprecated courses, duplicate crs_ courses, and dummy HTML/CSS placeholder modules and lessons
+    const deprecatedCourseIds = [
+      "crs_cs-genai", "crs_cs-agentic", "crs_cs-p1", "crs_cs-common",
+      "crs_sci-p1", "crs_sci-p2", "crs_mgmt-p1", "crs_arts-p1",
+      "cs-p2", "cs-p3", "crs_1", "crs_2", "crs_3", "crs_4", "crs_5", "crs_6",
+      "crs_cs_ai", "crs_sci_math", "crs_commerce_mgmt", "crs_humanities_arts",
+      "mgmt-p2", "mgmt-p3", "mgmt-common",
+    ];
+    const dummyModuleIds = [
+      "mod_1", "mod_2", "mod_3", "mod_4", "mod_5", "mod_6", "mod_7", "mod_8",
+    ];
+    const dummyLessonIds = [
+      "les_1", "les_2", "les_3", "les_4", "les_5", "les_6", "les_7", "les_8",
+    ];
+
+    try {
+      await db.delete(pathwayCourses).where(inArray(pathwayCourses.courseId, deprecatedCourseIds));
+      await db.delete(courseModules).where(or(inArray(courseModules.courseId, deprecatedCourseIds), inArray(courseModules.moduleId, dummyModuleIds)));
+      await db.delete(moduleLessons).where(or(inArray(moduleLessons.moduleId, dummyModuleIds), inArray(moduleLessons.lessonId, dummyLessonIds)));
+      await db.delete(lessons).where(inArray(lessons.id, dummyLessonIds));
+      await db.delete(modules).where(inArray(modules.id, dummyModuleIds));
+      await db.delete(courses).where(inArray(courses.id, deprecatedCourseIds));
+    } catch (cleanErr) {
+      console.warn("[PATHWAYS-SYNC] Non-critical warning cleaning legacy courses/modules:", cleanErr);
+    }
+
     const pathwaysToSync = CANONICAL_SEO_OFFERINGS.filter((o) => o.itemType === "PATHWAY");
 
     for (const offering of pathwaysToSync) {
@@ -37,15 +65,15 @@ export const pathwaysService = {
       });
 
       const canon = getCanonicalPathway(offering.itemId);
-      const courseId = `crs_${offering.itemId}`;
+      const courseId = offering.itemId;
 
-      // 2. Upsert Associated Primary Course
+      // 2. Upsert Associated Primary Course (Canonical ID matching pathway)
       await db
         .insert(courses)
         .values({
           id: courseId,
           title: offering.title,
-          slug: `course-${offering.slug}`,
+          slug: offering.slug,
           shortDescription: offering.description,
           description: offering.description,
           pricePaise: offering.pricePaise,
@@ -53,7 +81,10 @@ export const pathwaysService = {
           status: "PUBLISHED",
           isActive: true,
           metadata: {
+            group: offering.metadata?.group,
             pathwayId: pwy.id,
+            badge: offering.metadata?.badge || offering.metadata?.eyebrow,
+            shortName: offering.metadata?.groupTitle || offering.title,
             duration: canon?.duration || "12 Weeks",
             level: canon?.level || "Beginner to Advanced",
             syllabusLink: canon?.syllabusLink,
@@ -63,10 +94,22 @@ export const pathwaysService = {
           target: [courses.id],
           set: {
             title: offering.title,
+            slug: offering.slug,
             shortDescription: offering.description,
             description: offering.description,
+            pricePaise: offering.pricePaise,
+            mrpPaise: offering.mrpPaise,
             status: "PUBLISHED",
             isActive: true,
+            metadata: {
+              group: offering.metadata?.group,
+              pathwayId: pwy.id,
+              badge: offering.metadata?.badge || offering.metadata?.eyebrow,
+              shortName: offering.metadata?.groupTitle || offering.title,
+              duration: canon?.duration || "12 Weeks",
+              level: canon?.level || "Beginner to Advanced",
+              syllabusLink: canon?.syllabusLink,
+            },
             updatedAt: new Date().toISOString(),
           },
         });
