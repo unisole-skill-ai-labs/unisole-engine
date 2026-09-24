@@ -338,30 +338,73 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 11 — THE HOOK QUESTION (HINDI ONLY)
+  // SLIDE 11 — IF AI CAN DO ALL THE TASKS YOU CAN PERFORM…
   // =========================================================================
   {
     id: "sunni_slide_11",
+    type: "THREE_CARDS",
+    badge: "THE AUTOMATION REALITY",
+    title: "If AI Can Do All the Tasks You Can Perform…",
+    subtitle: "When algorithms execute your entire college syllabus faster, cheaper, and without errors.",
+    cards: [
+      {
+        num: "01",
+        title: "Tech & Coding Tasks",
+        items: [
+          "Writes complete React apps, Python scripts & backend APIs in 5 seconds",
+          "Generates responsive UI components, detects syntax errors & fixes bugs",
+          "Converts design mockups directly into working fullstack applications",
+        ],
+      },
+      {
+        num: "02",
+        title: "Science & Research Tasks",
+        items: [
+          "Summarizes 50 academic research papers & extracts findings in 2 minutes",
+          "Solves multi-variable differential equations & complex matrix math",
+          "Predicts 3D molecular protein structures and biological interactions",
+        ],
+      },
+      {
+        num: "03",
+        title: "Commerce & Business Tasks",
+        items: [
+          "Formats financial balance sheets, balances ledgers & audits vouchers",
+          "Generates executive business proposals, SWOT analyses & pitch decks",
+          "Calculates multi-state tax liabilities and automates invoicing pipelines",
+        ],
+      },
+    ],
+    punchline: "If AI can execute every routine task taught in college in 5 seconds… where does that leave you?",
+    maxBuildSteps: 3,
+    notes: "Pause and let this sink in: If an AI model on a smartphone can do your coding, solve your science equations, and format your commerce spreadsheets in 5 seconds... what is your value?",
+  },
+
+  // =========================================================================
+  // SLIDE 12 — THE BIG QUESTION (HINDI HOOK)
+  // =========================================================================
+  {
+    id: "sunni_slide_12",
     type: "BIG_QUESTION",
-    badge: "THE HOOK QUESTION",
-    title: "आगे क्या सोचा है?",
-    subtitle: "Think honestly — what have you genuinely planned after graduation?",
+    badge: "THE CRITICAL QUESTION",
+    title: "तो हम क्या करें?",
+    subtitle: "If AI executes every routine task in seconds — what is your real strategy to survive and thrive?",
     maxBuildSteps: 1,
-    questionPrompt: "आगे क्या सोचा है?",
-    speakerHook: "Today AI can write, code, analyse, and design... and it is starting to take over routine entry-level work. What is your actual strategy to stand out?",
+    questionPrompt: "तो हम क्या करें?",
+    speakerHook: "अगर AI आपके सारे काम चुटकियों में कर सकता है... तो हम क्या करें? How do you make yourself indispensable in the AI job market?",
     poll: {
       question: "How many of you feel scared about future because of AI?",
       options: ["Very scared about job security", "A little worried", "Excited & optimistic", "Haven't thought about it yet"],
       timeLimit: 20,
     },
-    notes: "Pause. Look at the students directly: 'आगे क्या सोचा है? Because the private sector and hiring landscape your parents knew no longer exists.'",
+    notes: "Look straight at the students: 'तो हम क्या करें? If machines can code, write, and calculate... what should you do today so you don't get replaced?'",
   },
 
   // =========================================================================
-  // SLIDE 12 — PARENTS' WORLD VS YOUR WORLD
+  // SLIDE 13 — PARENTS' WORLD VS YOUR WORLD
   // =========================================================================
   {
-    id: "sunni_slide_12",
+    id: "sunni_slide_13",
     type: "COMPARISON",
     badge: "THE RECRUITMENT RESET",
     title: "Your Parents' World vs. Your World",
@@ -400,10 +443,10 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 13 — THE HARD NUMBER (1.1 CRORE GRADUATES)
+  // SLIDE 14 — THE HARD NUMBER (1.1 CRORE GRADUATES)
   // =========================================================================
   {
-    id: "sunni_slide_13",
+    id: "sunni_slide_14",
     type: "METRIC_CARD",
     badge: "THE HARD NUMBER",
     title: "1.1 Crore Annual Graduates in India",
@@ -439,10 +482,10 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 14 — YOUR ENVIRONMENT IS CHANGING FASTER THAN EVER
+  // SLIDE 15 — YOUR ENVIRONMENT IS CHANGING FASTER THAN EVER
   // =========================================================================
   {
-    id: "sunni_slide_14",
+    id: "sunni_slide_15",
     type: "THREE_CARDS",
     badge: "THE SHIFTING ENVIRONMENT",
     title: "Your Environment is Changing Faster Than Ever",
@@ -479,10 +522,10 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 15 — WHAT YOU SHOULD WORRY ABOUT (THE DEATH OF AVERAGE)
+  // SLIDE 16 — WHAT YOU SHOULD WORRY ABOUT (THE DEATH OF AVERAGE)
   // =========================================================================
   {
-    id: "sunni_slide_15",
+    id: "sunni_slide_16",
     type: "COMPARISON",
     badge: "THE MINDSET SHIFT",
     title: "What You Should Worry About (The Death of Average)",
@@ -521,29 +564,14 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 16 — THE BIG QUESTION
-  // =========================================================================
-  {
-    id: "sunni_slide_16",
-    type: "BIG_QUESTION",
-    badge: "THE CORE PARADOX",
-    title: "If AI Can Research, Code, Analyse & Design…",
-    subtitle: "Why will companies still hire fresh graduates?",
-    maxBuildSteps: 2,
-    questionPrompt: "If AI can research, code, analyse and design… why will companies still hire fresh graduates?",
-    speakerHook: "If AI drafts code, summarizes 100-page reports, generates graphics, and fixes bugs... why pay a salary to a fresh graduate?",
-    notes: "If AI can draft code, summarize reports, generate UI mockups, and run tests, why would any company pay you a salary? Let's look at how industry actually works to find the answer.",
-  },
-
-  // =========================================================================
-  // SLIDE 17 — FIRST UNDERSTAND WHAT INDUSTRY ACTUALLY DOES
+  // SLIDE 17 — IF AI DOES THE DRAFTING… WHAT DOES INDUSTRY ACTUALLY DO?
   // =========================================================================
   {
     id: "sunni_slide_17",
     type: "STEP_CARDS",
     badge: "INDUSTRY REALITY",
-    title: "First Understand What Industry Actually Does",
-    subtitle: "The 6 sequential phases every production project follows in real companies.",
+    title: "If AI Does the Drafting… What Does Industry Actually Do?",
+    subtitle: "Why companies still hire humans: The 6 sequential phases every production project requires.",
     steps: [
       {
         num: "01",
@@ -582,7 +610,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
       timeLimit: 20,
     },
     maxBuildSteps: 3,
-    notes: "Every company follows these 6 stages. AI has upended every single one. Some phases became cheap; others became 10x more valuable.",
+    notes: "If AI can draft code, summarize reports, and run tests... why pay a salary to a fresh graduate? Because writing the draft is only 1 of 6 phases. Understanding real user needs, designing the architecture, and verifying safety is what companies actually pay for.",
   },
 
   // =========================================================================
