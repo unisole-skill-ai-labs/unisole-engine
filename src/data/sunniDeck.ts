@@ -77,39 +77,25 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 4 — YOUR CAREER WORLD HAS CHANGED
+  // SLIDE 4 — YOUR CAREER WORLD HAS CHANGED & OPENING QUESTION
   // =========================================================================
   {
     id: "sunni_slide_4",
-    type: "COVER",
-    badge: "PART 1: AI HISTORY",
+    type: "BIG_QUESTION",
+    badge: "PART 1: AI HISTORY & FOUNDATION",
     title: "YOUR CAREER WORLD HAS CHANGED",
-    subtitle: "First understand AI → Then decide your path · A clear guide for BCA • BSc • BCom • BBA students",
-    org: "ACT 1: THE FOUNDATION",
+    subtitle: "First understand AI → Then decide your path · What do you think… when did AI actually start?",
     maxBuildSteps: 2,
-    notes: "Before you decide whether to prepare for an exam, do an MBA, or learn coding, you must first understand the fundamental technology that is rewriting every white-collar profession on Earth.",
+    questionPrompt: "What do you think… when did AI actually start?",
+    speakerHook: "First understand AI → Then decide your path. Was it ChatGPT in 2022? Or does the story go 80 years deeper?",
+    notes: "Before you decide whether to prepare for an exam, do an MBA, or learn coding, you must first understand the fundamental technology that is rewriting every white-collar profession on Earth. Ask: 'When did AI start? Was it ChatGPT in 2022?' Let's look back to where it all began.",
   },
 
   // =========================================================================
-  // SLIDE 5 — OPENING QUESTION: WHEN DID AI START?
+  // SLIDE 5 — THE BEGINNING (1943): NEURON AS A SWITCH
   // =========================================================================
   {
     id: "sunni_slide_5",
-    type: "BIG_QUESTION",
-    badge: "OPENING QUESTION",
-    title: "What do you think… when did AI actually start?",
-    subtitle: "Was it ChatGPT in 2022? Or does the story go much deeper?",
-    maxBuildSteps: 1,
-    questionPrompt: "What do you think… when did AI actually start?",
-    speakerHook: "Most students believe AI started in 2022 with ChatGPT. In reality, it began with a biological insight 80 years ago in 1943.",
-    notes: "Pause and ask the audience: 'Raise your hands—how many of you think AI started in 2022 with ChatGPT? Let's take a quick look back to where it all began.'",
-  },
-
-  // =========================================================================
-  // SLIDE 6 — THE BEGINNING (1943): NEURON AS A SWITCH
-  // =========================================================================
-  {
-    id: "sunni_slide_6",
     type: "THREE_CARDS",
     badge: "1943: THE BEGINNING",
     title: "It All Started in 1943: Neuron as a Switch",
@@ -149,10 +135,10 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 7 — WHAT MAKES A MACHINE INTELLIGENT?
+  // SLIDE 6 — WHAT MAKES A MACHINE INTELLIGENT?
   // =========================================================================
   {
-    id: "sunni_slide_7",
+    id: "sunni_slide_6",
     type: "THREE_CARDS",
     badge: "THE 4 CORE QUESTIONS",
     title: "What Makes a Machine Intelligent?",
@@ -192,617 +178,664 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 8 — THE TURING TEST (1950)
+  // SLIDE 7 — THE TURING TEST (1950)
   // =========================================================================
   {
-    id: "sunni_slide_8",
+    id: "sunni_slide_7",
     type: "BIG_QUESTION",
     badge: "1950: THE BENCHMARK",
     title: "The Turing Test (1950)",
-    subtitle: "Alan Turing asked a simple question that defined computing forever.",
-    questionPrompt: "If a machine can talk to a human, and the human cannot tell whether it is a machine or another human… Can we call it intelligent?",
-    speakerHook: "Alan Turing replaced the metaphysical question 'Can machines think?' with a practical test of imitation and communication.",
-    notes: "Alan Turing in 1950 gave us the imitation game. In 2026, large language models pass the Turing Test effortlessly every single second.",
-  },
-
-  // =========================================================================
-  // SLIDE 9 — 1956: THE NAME IS BORN
-  // =========================================================================
-  {
-    id: "sunni_slide_9",
-    type: "TIMELINE_EVOLUTION",
-    badge: "1956: DARTMOUTH",
-    title: "1956 — The Name is Born",
-    subtitle: "The Dartmouth Summer Research Project on Artificial Intelligence.",
-    timeline: [
-      {
-        year: "1956",
-        label: "Dartmouth Conference · John McCarthy, Marvin Minsky, Nathaniel Rochester, and Claude Shannon organize the historic summer workshop at Dartmouth College.",
-      },
-      {
-        year: "The Name",
-        label: "John McCarthy coined the term “Artificial Intelligence” · Defining the quest to make machines simulate every aspect of human learning.",
-      },
-      {
-        year: "Birth",
-        label: "Official Birth of AI · This conference is officially recognized worldwide as the birth of AI as an independent scientific field.",
-      },
-    ],
-    stats: [
-      { value: "1956", label: "DARTMOUTH", sub: "Historic Summer Workshop" },
-      { value: "McCarthy", label: "COINED AI", sub: "Father of Artificial Intelligence" },
-      { value: "Official", label: "BIRTH OF AI", sub: "Scientific Discipline Founded" },
-    ],
-    quote: "“Every aspect of learning or any other feature of intelligence can in principle be simulated.”",
+    subtitle: "Alan Turing asked a simple question that defined the field of machine intelligence.",
     maxBuildSteps: 2,
-    notes: "John McCarthy coined the term in 1956. The ambition was total: they predicted that simulating every aspect of learning and intelligence was just a matter of time and compute.",
+    questionPrompt: "Can machines think? Or should we ask: Can machines act indistinguishably from humans?",
+    speakerHook: "If a human cannot tell whether they are conversing with a human or a machine, the machine passes.",
+    notes: "In 1950, Alan Turing said: don't debate whether machines 'think'. If a machine converses with a human and they cannot tell it's a machine, it behaves intelligently.",
   },
 
   // =========================================================================
-  // SLIDE 10 — AI WINTER → THE COMEBACK
+  // SLIDE 8 — 1956: THE NAME IS BORN
   // =========================================================================
   {
-    id: "sunni_slide_10",
-    type: "TIMELINE_EVOLUTION",
-    badge: "HISTORICAL WAVES",
-    title: "AI Winter → The Comeback",
-    subtitle: "How theoretical mathematics turned into everyday superhuman reality.",
-    timeline: [
-      {
-        year: "1970s–80s",
-        label: "AI Winter · High expectations outpaced compute power → Slow progress → Funding dropped and research froze worldwide.",
-      },
-      {
-        year: "1997",
-        label: "Deep Blue · IBM’s supercomputer defeated World Chess Champion Garry Kasparov through brute-force symbolic search.",
-      },
-      {
-        year: "2010s",
-        label: "Deep Learning · The internet created massive data; GPUs made multi-layer neural networks exponentially powerful.",
-      },
-      {
-        year: "2022+",
-        label: "ChatGPT Era · Large Language Models became useful, interactive, and accessible for everyone on Earth.",
-      },
-    ],
-    stats: [
-      { value: "1970s–80s", label: "AI WINTER", sub: "Funding froze worldwide" },
-      { value: "1997", label: "DEEP BLUE", sub: "Kasparov chess victory" },
-      { value: "2010s", label: "DEEP LEARNING", sub: "Data + GPU revolution" },
-      { value: "2022+", label: "CHATGPT ERA", sub: "LLMs accessible to all" },
-    ],
-    quote: "“Technology moves slowly through skepticism, and then suddenly hits an exponential curve.”",
-    maxBuildSteps: 2,
-    notes: "Notice the cycle: Boom, winter, breakthrough, explosion. When compute and data arrived in the 2010s, AI crossed from academic labs into our everyday pockets.",
-  },
-
-  // =========================================================================
-  // SLIDE 11 — BEYOND CHATBOTS: 83%+ PROTEIN PREDICTION & MATH REINVENTION
-  // =========================================================================
-  {
-    id: "sunni_slide_11",
+    id: "sunni_slide_8",
     type: "THREE_CARDS",
-    badge: "SUPERHUMAN AI CAPABILITY",
-    title: "Beyond Chatbots: Solving Biology & Reinventing Math",
-    subtitle: "AI is not just writing text — it is solving 50-year biological mysteries and discovering algorithms.",
+    badge: "1956: THE BIRTH OF 'AI'",
+    title: "1956 — The Name is Born: Dartmouth Conference",
+    subtitle: "John McCarthy coined the term 'Artificial Intelligence' and launched an official academic field.",
     cards: [
       {
         num: "01",
-        title: "AlphaFold: 83%+ Protein Prediction",
+        title: "The Dartmouth Workshop",
         items: [
-          "Solved the 50-year biological mystery of protein 3D folding",
-          "Predicted 200,000,000+ protein structures with 83%+ atomic accuracy",
-          "Completed in months what would take 1,000,000+ human lab years",
-          "Won the 2024 Nobel Prize in Chemistry (Demis Hassabis & John Jumper)",
+          "Organized in summer 1956 at Dartmouth College",
+          "Gathered top mathematicians, engineers, and psychologists",
+          "Formally separated AI from standard computer science",
         ],
       },
       {
         num: "02",
-        title: "FunSearch: Discovering Math",
+        title: "John McCarthy",
         items: [
-          "DeepMind paired LLMs with mathematical program evaluators",
-          "Discovered novel solutions to the Cap Set Problem in combinatorics",
-          "Discovered faster matrix multiplication algorithms missed for 50 years",
-          "AI generating brand-new mathematical algorithms humans never found",
+          "Dartmouth professor and brilliant mathematician",
+          "Coined the term 'Artificial Intelligence' in the proposal",
+          "Later invented the Lisp programming language (1958)",
         ],
       },
       {
         num: "03",
-        title: "AlphaGeometry: Olympiad Proofs",
+        title: "The Core Premise",
         items: [
-          "Solved International Mathematical Olympiad geometry at silver medal level",
-          "Synthesized complex auxiliary constructions without human hints",
-          "Proved 25 of 30 Olympiad geometry problems within standard time limits",
-          "Proves AI is capable of deep, verifiable multi-step formal reasoning",
+          "Every aspect of learning can in principle be simulated",
+          "Expected machines to match human reasoning within decades",
+          "Set the research agenda for the entire modern computing era",
         ],
       },
     ],
-    punchline: "When AI predicts 200 million proteins and discovers new mathematics, textbook memorization is obsolete.",
+    punchline: "What began as a summer workshop 70 years ago now drives global economies.",
     maxBuildSteps: 3,
-    notes: "AI predicted 200 million proteins with 83%+ accuracy, winning the 2024 Nobel Prize in Chemistry. And with FunSearch, AI is discovering new mathematical algorithms that human mathematicians missed for 50 years. This is an intellectual revolution.",
+    notes: "John McCarthy coined the term in 1956. The dream: any aspect of learning could be simulated. It took decades of compute power to fulfill this vision.",
   },
 
   // =========================================================================
-  // SLIDE 12 — THE TRANSITION: “आगे क्या सोचा है?”
+  // SLIDE 9 — AI WINTER → THE COMEBACK
+  // =========================================================================
+  {
+    id: "sunni_slide_9",
+    type: "TIMELINE",
+    badge: "THE HISTORICAL CYCLES",
+    title: "AI Winter → The Comeback",
+    subtitle: "The major boom-and-bust cycles that forged modern AI.",
+    timeline: [
+      {
+        period: "1970s–80s",
+        event: "AI Winter",
+        desc: "High expectations outpaced compute. Symbolic systems failed real-world tests. Global funding froze.",
+        color: "#F43F5E",
+      },
+      {
+        period: "1997",
+        event: "Deep Blue",
+        desc: "IBM's Deep Blue defeated World Chess Champion Garry Kasparov calculating 200M positions/sec.",
+        color: "#06B6D4",
+      },
+      {
+        period: "2010s",
+        event: "Deep Learning",
+        desc: "Internet generated massive datasets; GPUs provided parallel matrix compute. Neural nets triumphed.",
+        color: "#6366F1",
+      },
+      {
+        period: "2022+",
+        event: "Generative AI",
+        desc: "Transformers and Large Language Models (ChatGPT, Claude, Gemini). Reasoning and code synthesis at scale.",
+        color: "#10B981",
+      },
+    ],
+    maxBuildSteps: 4,
+    notes: "AI went through brutal winters when early hype failed. But in 1997 Deep Blue beat Kasparov, in 2012 Deep Learning took off, and in 2022 ChatGPT exploded into mainstream use.",
+  },
+
+  // =========================================================================
+  // SLIDE 10 — SUPERHUMAN AI BREAKTHROUGHS
+  // =========================================================================
+  {
+    id: "sunni_slide_10",
+    type: "THREE_CARDS",
+    badge: "EXPONENTIAL CAPABILITY",
+    title: "Beyond Text: Superhuman AI Breakthroughs",
+    subtitle: "AI is predicting molecular biology with 83%+ accuracy and reinventing mathematics for itself.",
+    cards: [
+      {
+        num: "01",
+        title: "AlphaFold (83%+ Accuracy)",
+        items: [
+          "Solved a 50-year grand challenge in molecular biology",
+          "Predicted 3D structures for 200,000,000+ proteins with >83%-90% GDT score atomic accuracy",
+          "Completed what would take 1,000,000+ human lab years; 2024 Nobel Prize in Chemistry",
+        ],
+      },
+      {
+        num: "02",
+        title: "Reinventing Mathematics",
+        items: [
+          "DeepMind FunSearch paired LLMs with automated evaluators to find new combinatorial solutions",
+          "Discovered faster matrix algorithms missed for 50 years",
+          "AlphaGeometry solved IMO Olympiad geometry at silver-medal level without human hints",
+        ],
+      },
+      {
+        num: "03",
+        title: "The Reality for Students",
+        items: [
+          "AI is no longer simple autocomplete; it creates verifiable scientific proofs",
+          "Textbook calculation speed is completely commoditized",
+          "If you only do what AI does in 5 seconds, your role is eliminated",
+        ],
+      },
+    ],
+    punchline: "You cannot compete with AI on memory or calculation. You must compete on direction, judgment, and validation.",
+    maxBuildSteps: 3,
+    notes: "AI isn't just writing essays. AlphaFold predicted 200 million protein structures with 83%+ atomic accuracy. FunSearch and AlphaGeometry reinvented mathematics for themselves. Memorizing formulas will never give you a competitive edge again.",
+  },
+
+  // =========================================================================
+  // SLIDE 11 — THE HOOK QUESTION (HINDI ONLY)
+  // =========================================================================
+  {
+    id: "sunni_slide_11",
+    type: "BIG_QUESTION",
+    badge: "THE HOOK QUESTION",
+    title: "आगे क्या सोचा है?",
+    subtitle: "Think honestly — what have you genuinely planned after graduation?",
+    maxBuildSteps: 1,
+    questionPrompt: "आगे क्या सोचा है?",
+    speakerHook: "Today AI can write, code, analyse, and design... and it is starting to take over routine entry-level work. What is your actual strategy to stand out?",
+    notes: "Pause. Look at the students directly: 'आगे क्या सोचा है? Because the private sector and hiring landscape your parents knew no longer exists.'",
+  },
+
+  // =========================================================================
+  // SLIDE 12 — PARENTS' WORLD VS YOUR WORLD
   // =========================================================================
   {
     id: "sunni_slide_12",
-    type: "BIG_QUESTION",
-    badge: "THE PIVOT QUESTION",
-    title: "आगे क्या सोचा है?",
-    subtitle: "Today AI can write, code, analyse and design… And it is starting to take over many human tasks. So the real question becomes…",
-    maxBuildSteps: 1,
-    questionPrompt: "Today AI can write, code, analyse and design… And it is starting to take over many human tasks. So the real question becomes… आगे क्या सोचा है?",
-    speakerHook: "If AI can write code, analyze data, design interfaces, and solve math in seconds... what have YOU planned for your career?",
-    notes: "[THE DRAMATIC PAUSE] Today AI can write code, analyze data, design interfaces, and solve math. It is rapidly automating entry-level white-collar work. So look inside yourself and answer honestly: आगे क्या सोचा है?",
+    type: "COMPARISON",
+    badge: "THE RECRUITMENT RESET",
+    title: "Your Parents' World vs. Your World",
+    subtitle: "The mass recruitment model that sustained Indian graduates for 20 years has permanently reset.",
+    columns: [
+      {
+        label: "THEN (Parents & Professors)",
+        color: "text-zinc-400",
+        items: [
+          "Private sector was small; Government jobs were the primary path",
+          "One degree could lock a 30-year secure career",
+          "Skills stayed useful for 15–20 years",
+          "Learning mostly ended upon college graduation",
+          "Mass IT recruited 6,00,000+ freshers per year for routine typing & testing",
+        ],
+      },
+      {
+        label: "NOW (Your Generation)",
+        color: "text-rose-400",
+        items: [
+          "1.1 Crore students graduate every year across India",
+          "Private sector fresher hiring collapsed from 6,00,000 to ~2,50,000 (~60% crash)",
+          "Skills expire in 3–5 years without active upskilling",
+          "AI executes routine boilerplate and testing in 5 seconds",
+          "Proof of real skill & live projects matter 10x more than degree marksheets",
+        ],
+      },
+    ],
+    maxBuildSteps: 2,
+    notes: "For 20 years, mass IT hired 6 lakh freshers annually. Today, that intake has dropped to 2.5 lakhs because AI does routine entry-level coding and testing. 1.1 crore graduates compete for shrinking seats.",
   },
 
   // =========================================================================
-  // SLIDE 13 — PARENTS' WORLD VS YOUR WORLD
+  // SLIDE 13 — THE HARD NUMBER (1.1 CRORE GRADUATES)
   // =========================================================================
   {
     id: "sunni_slide_13",
-    type: "SCENARIO_SPLIT",
-    badge: "PART 2: THE GENERATIONAL RESET",
-    title: "Your Parents’ World vs. Your World",
-    subtitle: "The rules of the economy changed completely while academic advice stayed frozen.",
-    scenarioA: {
-      title: "THEN (Parents & Professors)",
-      subtitle: "The 1995–2015 Career Landscape",
-      steps: [
-        { time: "ECONOMY", label: "Private sector was still small; Government job was the main path" },
-        { time: "DEGREE", label: "One degree could lock a stable, respected life for 30 years" },
-        { time: "SKILLS", label: "Skills stayed useful for 15–20 years without needing retraining" },
-        { time: "LEARNING", label: "Learning mostly stopped after college convocation" },
-      ],
-      footer: "One degree = lifetime security.",
-    },
-    scenarioB: {
-      title: "NOW (Your Generation)",
-      subtitle: "The 2026 AI Era Reality",
-      steps: [
-        { time: "HIRING SQUEEZE", label: "Private sector fresher hiring fell from 6 Lakh to 2.5 Lakh/year" },
-        { time: "COMPETITION", label: "1.1 Crore students graduate every single year in India" },
-        { time: "LIFECYCLE", label: "Technical skills expire in 3–5 years; AI rewrites entry-level tasks" },
-        { time: "CURRENCY", label: "Proof of real skill and execution matters far more than degree" },
-      ],
-      footer: "Skills expire in 3 years. Proof of work is the only currency.",
-    },
-    maxBuildSteps: 2,
-    notes: "Contrast the two eras clearly. Your parents could get one degree and relax for 25 years. Today, 1.1 Crore students enter the market every year, fresher hiring fell by 60%, and skills expire every 3 years.",
+    type: "METRIC_CARD",
+    badge: "THE HARD NUMBER",
+    title: "1.1 Crore Annual Graduates in India",
+    subtitle: "Your competition is no longer just your college in Sunni — it is every ambitious student nationwide.",
+    metrics: [
+      {
+        val: "1.1 Crore",
+        label: "ANNUAL GRADUATES IN INDIA",
+        sub: "Graduating across all university streams nationwide",
+        color: "#F59E0B",
+      },
+      {
+        val: "60%+ Drop",
+        label: "IN MASS RECRUITMENT",
+        sub: "Shrinking routine fresher seats in private IT & business",
+        color: "#F43F5E",
+      },
+      {
+        val: "Top 2%",
+        label: "SELECTION REALITY",
+        sub: "Candidates with verifiable proof of work and live systems",
+        color: "#10B981",
+      },
+    ],
+    punchline: "Your competition is nationwide. The only signal that breaks through the noise is verified, production-grade proof of work.",
+    maxBuildSteps: 3,
+    notes: "1.1 Crore graduates every year. The competition is not just your classmate in Sunni—it is every hungry student in Bangalore, Pune, and Delhi. A plain marksheet won't save you.",
   },
 
   // =========================================================================
-  // SLIDE 14 — THE HARD NUMBER: 1.1 CRORE
+  // SLIDE 14 — AI IS THE BIGGEST CATALYST OF CHANGE
   // =========================================================================
   {
     id: "sunni_slide_14",
-    type: "COMPARISON_STATS",
-    badge: "THE MACRO SCALE",
-    title: "The Hard Number: 1.1 Crore Graduates",
-    subtitle: "Your competition is no longer just your college. It is every ambitious student across the country.",
-    stat1: {
-      year: "Annual Graduates",
-      count: "1.1 Crore",
-      label: "STUDENTS GRADUATE EVERY YEAR IN INDIA",
-      ratio: "Massive competition for entry-level white-collar roles",
-    },
-    stat2: {
-      year: "Fresher Intake",
-      count: "2.5 Lakh",
-      label: "FRESHERS RECRUITED PER YEAR",
-      ratio: "Slashed from 6 Lakh freshers recruited previously",
-    },
-    statCompetition: {
-      number: "44 : 1",
-      label: "APPLICANTS PER ENTRY SEAT",
-      detail: "Textbook syllabus marks cannot differentiate you in a pool of 1.1 Crore candidates.",
-    },
-    insightBox: {
-      title: "The Hard Truth",
-      text: "When millions hold a degree, companies filter candidates by proof of execution and live projects, not paper certificates.",
-    },
-    maxBuildSteps: 4,
-    notes: "Deliver the number with weight: 1.1 Crore graduates every single year. You cannot stand out by doing what everyone else is doing.",
-  },
-
-  // =========================================================================
-  // SLIDE 15 — AI IS THE BIGGEST CATALYST OF CHANGE
-  // =========================================================================
-  {
-    id: "sunni_slide_15",
     type: "THREE_CARDS",
-    badge: "CATALYST OF CHANGE",
+    badge: "THE CATALYST",
     title: "AI is the Biggest Catalyst of Change",
-    subtitle: "How learning, jobs, and career preparation are being permanently rewritten.",
+    subtitle: "How 4 fundamental pillars of your career journey are shifting.",
     cards: [
       {
         num: "01",
         title: "What You Learn",
         items: [
-          "Memorisation is becoming cheap",
-          "AI already knows more facts than any textbook",
-          "Understanding system architecture beats memorizing syntax",
+          "Memorisation is becoming cheap. AI already knows more facts than any textbook.",
+          "Focus on deep mental models, systems thinking, and synthesis.",
         ],
       },
       {
         num: "02",
-        title: "How You Learn & Prepare",
+        title: "How You Learn",
         items: [
-          "Don’t spend 1 month on one concept; become an absolute quick learner",
-          "Degree opens the door; proof of real skill decides who gets selected",
-          "Build systems instead of reading theory passively",
+          "Don't spend 1 month on basic syntax.",
+          "Become an agile, self-directed rapid learner leveraging AI as a personal tutor.",
         ],
       },
       {
         num: "03",
-        title: "What Jobs Exist",
+        title: "What Jobs Exist & How You Prepare",
         items: [
-          "Many routine entry-level tasks are shrinking",
-          "New roles need people who direct and build with AI",
-          "High-value orchestration replacing manual data entry",
+          "Repetitive entry-level tasks are automated. New roles require orchestrating AI systems.",
+          "Degree opens the door. Live proof of real skill decides who gets selected.",
         ],
       },
     ],
-    punchline: "Memorization is cheap. Your competitive edge is how quickly you learn, apply, and direct AI systems.",
+    punchline: "Shift from memorizing facts to directing systems and validating outcomes.",
     maxBuildSteps: 3,
-    notes: "Memorization is cheap. AI has read every textbook ever printed. Your edge is how quickly you learn, apply, and direct these tools.",
+    notes: "Memorization is obsolete. You must learn faster, master tools that orchestrate AI, and bring proof of work.",
   },
 
   // =========================================================================
-  // SLIDE 16 — WHAT TO WORRY ABOUT (THE DEATH OF AVERAGE)
+  // SLIDE 15 — WHAT YOU SHOULD WORRY ABOUT (THE DEATH OF AVERAGE)
+  // =========================================================================
+  {
+    id: "sunni_slide_15",
+    type: "COMPARISON",
+    badge: "THE MINDSET SHIFT",
+    title: "What You Should Worry About (The Death of Average)",
+    subtitle: "The modern market no longer rewards average effort or generic degree credentials.",
+    columns: [
+      {
+        label: "What You Should NOT Worry About",
+        color: "text-indigo-400",
+        items: [
+          "What AI can do — technology will continue advancing exponentially",
+          "Trillions in global compute investment are driving models outside your control",
+          "Fighting AI or hoping it slows down is a guaranteed losing path",
+          "Routine clerical and repetitive syntax generation will vanish permanently",
+          "These macroeconomic forces are completely outside your personal control",
+        ],
+      },
+      {
+        label: "What You MUST Worry About",
+        color: "text-rose-400",
+        items: [
+          "Staying AVERAGE in a world that no longer pays for average output",
+          "Graduating with only textbook exam marks and zero proof-of-work",
+          "Having an empty GitHub, zero deployed URLs, and generic resumes",
+          "Being unable to answer: 'If AI does this in 10 seconds, why hire you?'",
+          "Failing to master the high-leverage skills that AI cannot automate",
+        ],
+      },
+    ],
+    maxBuildSteps: 2,
+    notes: "Don't worry about what AI can do. Worry about staying average. The market for average is dead.",
+  },
+
+  // =========================================================================
+  // SLIDE 16 — THE BIG QUESTION
   // =========================================================================
   {
     id: "sunni_slide_16",
-    type: "SCENARIO_SPLIT",
-    badge: "THE REAL RISK",
-    title: "What You Should NOT Worry About vs. What You SHOULD",
-    subtitle: "Focus your energy on what is within your control.",
-    scenarioA: {
-      title: "WHAT YOU SHOULD NOT WORRY ABOUT",
-      subtitle: "Forces completely outside your control",
-      steps: [
-        { time: "AI CAPABILITIES", label: "You should not worry about what AI can do" },
-        { time: "ACCELERATION", label: "AI will keep getting better, faster, and cheaper at tasks" },
-        { time: "REALITY", label: "That is not in your control — fighting it is futile" },
-      ],
-      footer: "Stop worrying about the tools.",
-    },
-    scenarioB: {
-      title: "WHAT YOU SHOULD WORRY ABOUT",
-      subtitle: "The only risk that determines your career",
-      steps: [
-        { time: "STAYING AVERAGE", label: "Staying average in a world that no longer rewards average" },
-        { time: "PASSIVE DEGREE", label: "Relying on textbook marks without building real projects" },
-        { time: "NO PROOF", label: "Having zero evidence that you can solve real problems" },
-      ],
-      footer: "The world no longer rewards average. It rewards verified builders.",
-    },
+    type: "BIG_QUESTION",
+    badge: "THE CORE PARADOX",
+    title: "If AI Can Research, Code, Analyse & Design…",
+    subtitle: "Why will companies still hire fresh graduates?",
     maxBuildSteps: 2,
-    notes: "Stop wasting time panicking about AI updates. Panic about staying average. The market will gladly pay high salaries to exceptional builders, but it will pay zero to average graduates.",
+    questionPrompt: "If AI can research, code, analyse and design… why will companies still hire fresh graduates?",
+    speakerHook: "If AI drafts code, summarizes 100-page reports, generates graphics, and fixes bugs... why pay a salary to a fresh graduate?",
+    notes: "If AI can draft code, summarize reports, generate UI mockups, and run tests, why would any company pay you a salary? Let's look at how industry actually works to find the answer.",
   },
 
   // =========================================================================
-  // SLIDE 17 — THE BIG QUESTION
+  // SLIDE 17 — FIRST UNDERSTAND WHAT INDUSTRY ACTUALLY DOES
   // =========================================================================
   {
     id: "sunni_slide_17",
-    type: "BIG_QUESTION",
-    badge: "THE BIG QUESTION",
-    title: "The Big Question",
-    subtitle: "If AI can research, code, analyse and design… Why will companies still hire fresh graduates?",
-    maxBuildSteps: 1,
-    questionPrompt: "If AI can research, code, analyse and design… Why will companies still hire fresh graduates?",
-    speakerHook: "Companies do not hire freshers for raw syntax or clerical typing anymore. They hire candidates who understand the project cycle and own the solution.",
-    notes: "Pause. Ask the room to answer: 'If an AI can write 500 lines of code in 10 seconds, why would a company pay you ₹50,000 a month to write code?' Let us look at what industry actually does.",
+    type: "STEP_CARDS",
+    badge: "INDUSTRY REALITY",
+    title: "First Understand What Industry Actually Does",
+    subtitle: "The 6 sequential phases every production project follows in real companies.",
+    steps: [
+      {
+        num: "01",
+        title: "Market & User Research",
+        desc: "Understand pain points: talking to 50 users, reading reviews, auditing competition",
+      },
+      {
+        num: "02",
+        title: "Product Specification",
+        desc: "Decide exact features: writing clear functional requirements, constraints, and success metrics",
+      },
+      {
+        num: "03",
+        title: "Design & Architecture",
+        desc: "How it looks & works: system diagrams, database schemas, wireframes, and API contracts",
+      },
+      {
+        num: "04",
+        title: "Implementation",
+        desc: "Actually build it: writing production backend/frontend code, data pipelines, and integrations",
+      },
+      {
+        num: "05",
+        title: "Testing & Quality",
+        desc: "Check if it works: automated unit tests, edge-case validation, security audits, and latency tests",
+      },
+      {
+        num: "06",
+        title: "Launch & Monitoring",
+        desc: "Release & improve: deploying to cloud, watching uptime logs, user feedback, and metric telemetry",
+      },
+    ],
+    maxBuildSteps: 3,
+    notes: "Every company follows these 6 stages. AI has upended every single one. Some phases became cheap; others became 10x more valuable.",
   },
 
   // =========================================================================
-  // SLIDE 18 — WHAT INDUSTRY ACTUALLY DOES (THE 6-STAGE CYCLE)
+  // SLIDE 18 — FROM THIS CYCLE… WHAT IS BECOMING CHEAP?
   // =========================================================================
   {
     id: "sunni_slide_18",
-    type: "PIPELINE_FLOW",
-    badge: "PART 3: UNDERSTANDING INDUSTRY",
-    title: "First Understand What Industry Actually Does",
-    subtitle: "Most companies follow a similar 6-stage project cycle from idea to production.",
-    stages: [
-      "1. Understand Problem (Market & User Research: Talking to 50 users, reading reviews)",
-      "2. Product Specification (Decide exact features: Writing clear requirements)",
-      "3. Design Solution (How it looks & works: Wireframes, system design)",
-      "4. Build It (Implementation: Writing code / creating models)",
-      "5. Test & Improve (Check quality + user feedback: Bug testing)",
-      "6. Launch & Monitor (Release and keep improving: Watching live metrics)",
+    type: "THREE_CARDS",
+    badge: "COMMODITIZED TASKS",
+    title: "From This Cycle… What is Becoming CHEAP?",
+    subtitle: "Anything that is repetitive, syntax-level, or first-draft is becoming near-zero cost.",
+    cards: [
+      {
+        num: "01",
+        title: "Research & Summaries",
+        items: [
+          "Reading 50 research papers or financial filings",
+          "AI summarizes key data points in minutes",
+          "Basic factual aggregation is automated",
+          "Textbook knowledge lookup is instant",
+        ],
+      },
+      {
+        num: "02",
+        title: "First Drafts & Boilerplate",
+        items: [
+          "Writing initial code routines, CSS, or scripts",
+          "AI generates working first drafts in 5 seconds",
+          "Drafting basic email pitches & blog outlines",
+          "Creating mock data and routine test cases",
+        ],
+      },
+      {
+        num: "03",
+        title: "Routine Testing & Docs",
+        items: [
+          "Writing repetitive unit test suites",
+          "Translating code between languages",
+          "Writing standard API documentation",
+          "Manual formatting of spreadsheets",
+        ],
+      },
     ],
-    punchline: "College exams only test Stage 4 (memorizing syntax). But industry lives across all 6 stages.",
+    punchline: "Key Rule: If your entire job can be done by a prompt in 10 seconds, it will not exist in 3 years.",
     maxBuildSteps: 3,
-    notes: "Walk through the 6 stages. College exams only test Stage 4 (memorizing syntax). But industry lives across all 6 stages. Now see where AI fits into this cycle.",
+    notes: "If your entire job is writing boilerplate code or summarizing documents, AI does it for $0.001. That work is cheap.",
   },
 
   // =========================================================================
-  // SLIDE 19 — FROM THIS CYCLE… WHAT IS BECOMING CHEAP?
+  // SLIDE 19 — FROM THIS CYCLE… WHAT IS BECOMING VALUABLE?
   // =========================================================================
   {
     id: "sunni_slide_19",
     type: "THREE_CARDS",
-    badge: "COMMODITIZED TASKS",
-    title: "From This Cycle… What is Becoming CHEAP?",
-    subtitle: "Anything that is repetitive, boilerplate, or first-draft is being commoditized by AI.",
+    badge: "PREMIUM CAPABILITIES",
+    title: "From This Cycle… What is Becoming VALUABLE?",
+    subtitle: "Where your human judgment, critical thinking, and ownership create indispensable value.",
     cards: [
       {
         num: "01",
-        title: "Research & Documentation",
+        title: "Problem Understanding",
         items: [
-          "Reading 50 papers / reports → AI summarises them in minutes",
-          "Writing long documents → AI drafts documents quickly",
-          "Summarizing user surveys and industry reports instantly",
+          "AI cannot feel real human pain or frustration",
+          "Talking to real users, customers, and stakeholders",
+          "Deep contextual observation in Himachal markets",
+          "Formulating the right problem before writing code",
         ],
       },
       {
         num: "02",
-        title: "First Drafts & Wireframes",
+        title: "Architecture & Specs",
         items: [
-          "Writing code, content, reports → AI generates first version very fast",
-          "Making initial wireframes → AI generates multiple design options",
-          "Routine boilerplate scaffolding created in seconds",
+          "Deciding what truly matters and what NOT to build",
+          "Designing fault-tolerant, scalable system architectures",
+          "Schema validation, data integrity, and security",
+          "Balancing cloud latency, compute costs, and reliability",
         ],
       },
       {
         num: "03",
-        title: "Routine Testing & Debugging",
+        title: "Ownership & Judgment",
         items: [
-          "Writing basic test cases → AI can generate and run many tests",
-          "Catching common syntax typos and formatting code",
-          "Trivial unit test generation automated",
+          "Auditing AI outputs and catching subtle hallucinations",
+          "Standing behind the product when production goes down",
+          "Accountability to paying clients and employers",
+          "Taking end-to-end responsibility from idea to deployment",
         ],
       },
     ],
-    punchline: "Key point: Anything that is repetitive or first-draft is becoming cheap.",
+    punchline: "Raw typing is cheap. Judgment, architecture, and ownership command premium compensation.",
     maxBuildSteps: 3,
-    notes: "Point out: What used to take junior engineers 3 weeks—drafting boilerplate, reading documents, writing basic tests—now takes an AI 3 minutes. That is why routine fresher hiring dropped.",
+    notes: "Where is the value? Understanding the problem, choosing the architecture, evaluating AI output, and taking responsibility.",
   },
 
   // =========================================================================
-  // SLIDE 20 — FROM THIS CYCLE… WHAT IS BECOMING VALUABLE?
+  // SLIDE 20 — SIMPLE SUMMARY: THE VALUE SHIFT MATRIX
   // =========================================================================
   {
     id: "sunni_slide_20",
-    type: "THREE_CARDS",
-    badge: "PREMIUM HUMAN SKILLS",
-    title: "From This Cycle… What is Becoming VALUABLE?",
-    subtitle: "Where human judgment, critical evaluation, and ownership command premium compensation.",
-    cards: [
+    type: "COMPARISON",
+    badge: "THE VALUE MATRIX",
+    title: "Simple Summary: The Great Shift",
+    subtitle: "Where the market is commoditizing vs. where the market is investing.",
+    columns: [
       {
-        num: "01",
-        title: "Problem Understanding & Specs",
+        label: "BECOMING CHEAP (Commoditized)",
+        color: "text-zinc-400",
         items: [
-          "AI cannot feel real user pain → Talking to real people + deep observation",
-          "AI cannot decide what truly matters → Judgment + ruthless prioritisation",
-          "Framing the right questions and business goals",
+          "First drafts & boilerplate code",
+          "Research summaries & fact lookup",
+          "Routine clerical work & formula memorization",
+          "Repetitive manual tasks & tutorial clones",
+          "Basic textbook formula memorization",
         ],
       },
       {
-        num: "02",
-        title: "Architecture & Quality Judgment",
+        label: "BECOMING VALUABLE (Premium)",
+        color: "text-emerald-400",
         items: [
-          "AI misses long-term reliability → System thinking + ownership",
-          "AI cannot decide if output is good enough → Critical review of AI output",
-          "Designing fault-tolerant databases and resilient pipelines",
-        ],
-      },
-      {
-        num: "03",
-        title: "Final Decision & Accountability",
-        items: [
-          "AI has zero accountability when systems fail",
-          "Human ownership, legal liability, and operational responsibility",
-          "Standing behind the code and making the ultimate call",
+          "Judgment & critical evaluation",
+          "Context & problem formulation",
+          "Prioritization (What NOT to build)",
+          "System architecture & fault tolerance",
+          "End-to-end ownership & accountability",
         ],
       },
     ],
-    punchline: "When first drafts become free, judgment and ownership become priceless.",
-    maxBuildSteps: 3,
-    notes: "AI cannot talk to a customer in Sunni or Shimla and feel their real frustration. AI cannot take legal or operational responsibility when a bank server crashes. Ownership and judgment are where your value lives.",
+    maxBuildSteps: 2,
+    notes: "Shift your identity from a 'syntax memorizer' to a 'systems thinker and problem owner'. Move from the left column to the right column.",
   },
 
   // =========================================================================
-  // SLIDE 21 — SIMPLE SUMMARY: CHEAP VS VALUABLE
+  // SLIDE 21 — GETTING A JOB IS NO LONGER SIMPLE
   // =========================================================================
   {
     id: "sunni_slide_21",
-    type: "COMPARISON_STATS",
-    badge: "THE TAKEAWAY MATRIX",
-    title: "Simple Summary: Becoming Cheap vs. Valuable",
-    subtitle: "A clear compass for where to invest your learning time.",
-    stat1: {
-      year: "BECOMING CHEAP",
-      count: "First Drafts",
-      label: "COMMODITIZED TASKS",
-      ratio: "Research summaries · Routine work · Repetitive tasks",
-    },
-    stat2: {
-      year: "BECOMING VALUABLE",
-      count: "Judgment",
-      label: "HIGH-VALUE SKILLS",
-      ratio: "Context · Prioritisation · Architecture · Ownership",
-    },
-    statCompetition: {
-      number: "10x",
-      label: "ENGINEERING LEVERAGE",
-      detail: "Builders who master judgment and AI orchestration achieve 10x the output of traditional coders.",
-    },
-    insightBox: {
-      title: "The Core Lesson",
-      text: "Stop spending your college years mastering what AI makes cheap. Invest your time mastering what AI makes valuable.",
-    },
-    maxBuildSteps: 4,
-    notes: "Memorize this slide: First drafts, research summaries, routine work, repetitive tasks = CHEAP. Judgment, context, prioritization, ownership = VALUABLE.",
+    type: "COMPARISON",
+    badge: "THE HIRING RESET",
+    title: "Getting a Job is No Longer Simple",
+    subtitle: "The old linear degree path is broken — hiring is now a rigorous 5-layer proof process.",
+    columns: [
+      {
+        label: "EARLIER: Linear Degree Path",
+        color: "text-zinc-400",
+        items: [
+          "Education Level = Job",
+          "Complete college degree → Attend mass campus drive → Receive offer",
+          "Companies hired 600,000 freshers to train them on the job for 6 months",
+          "College brand and marksheet were the primary screening filter",
+          "Formulaic resumes with hobbies and textbook subjects worked",
+        ],
+      },
+      {
+        label: "NOW: The 5-Layer Proof Process",
+        color: "text-indigo-400",
+        items: [
+          "1. Industry-Grade Skills (Beyond academic textbook syllabus)",
+          "2. Production Projects (Live deployed URLs & public GitHub)",
+          "3. High-Signal Resume (Quantified metrics & proof-of-work)",
+          "4. Smart Job Hunting (Targeted outreach & practitioner networks)",
+          "5. Interview Performance (Whiteboard defense without AI assistance)",
+        ],
+      },
+    ],
+    maxBuildSteps: 2,
+    notes: "Earlier, Degree equaled Job. Today, you must clear 5 distinct layers of proof. Miss any one layer, and you get filtered out.",
   },
 
   // =========================================================================
-  // SLIDE 22 — GETTING A JOB IS NO LONGER SIMPLE
+  // SLIDE 22 — WHAT BECOMES VALUABLE IN YOUR STREAM
   // =========================================================================
   {
     id: "sunni_slide_22",
-    type: "PROOF_HIERARCHY",
-    badge: "THE HIRING PROCESS",
-    title: "Getting a Job is No Longer Simple",
-    subtitle: "The old linear path has been replaced by a multi-layered verification process.",
-    layers: [
-      {
-        label: "EARLIER (DEGREE → JOB)",
-        desc: "Your education level was almost equivalent to getting a job. Degree = Placement.",
-      },
-      {
-        label: "LAYER 1: INDUSTRY SKILLS",
-        desc: "Modern core foundations beyond textbook theory (Git, Docker, APIs, Local LLMs).",
-      },
-      {
-        label: "LAYER 2: REAL PROJECTS",
-        desc: "Production-grade projects with live cloud endpoints, tests, and real data.",
-      },
-      {
-        label: "LAYER 3: STRONG RESUME",
-        desc: "Quantified Google X-Y-Z formula proving measurable engineering impact.",
-      },
-      {
-        label: "LAYER 4: SMART OUTREACH",
-        desc: "High-signal proof-of-work outreach bypassing crowded ATS black holes.",
-      },
-      {
-        label: "LAYER 5: INTERVIEW PERFORMANCE",
-        desc: "Whiteboard architecture defense, trade-offs, and failure mode resilience.",
-      },
-    ],
-    punchline: "Degree alone is step zero. The other five layers decide who actually gets hired.",
-    maxBuildSteps: 3,
-    notes: "In 2005, having a degree was enough to get hired. In 2026, the degree only gets you to the starting line. You need skills, projects, a proof resume, smart outreach, and interview defense.",
-  },
-
-  // =========================================================================
-  // SLIDE 23 — WHAT BECOMES MORE VALUABLE IN YOUR STREAM
-  // =========================================================================
-  {
-    id: "sunni_slide_23",
     type: "THREE_CARDS",
-    badge: "PART 4: SOLUTION — HOW TO WIN",
+    badge: "STREAM VALUE MAPPING",
     title: "What Becomes More Valuable in Your Stream",
-    subtitle: "How students from BCA, B.Sc, and B.Com/BBA differentiate themselves.",
+    subtitle: "Tailored high-leverage value vectors for BCA, B.Sc, and B.Com / BBA students.",
     cards: [
       {
-        num: "01",
+        num: "BCA",
         title: "BCA / Tech",
         items: [
           "System Design & Architecture",
-          "Building Production AI Applications",
-          "Reliability, Testing & System Ownership",
+          "Building End-to-End AI Applications",
+          "Reliability, Schema Validation & Ownership",
+          "Vector databases, RAG & agentic loops",
+          "PostgreSQL, Docker & CI/CD deployment",
         ],
       },
       {
-        num: "02",
-        title: "BSc / Science",
+        num: "BSC",
+        title: "B.Sc / Science & Math",
         items: [
-          "Deep Scientific Domain Expertise",
-          "Scientific Validation of AI Models",
-          "Applying AI Models to Real Research & Data",
+          "Scientific Domain Rigor & Modeling",
+          "Scientific Validation of AI Outputs",
+          "Physics-Informed ML & Simulations",
+          "Statistical hypothesis testing & regression",
+          "Bioinformatics & agricultural analytics",
         ],
       },
       {
-        num: "03",
-        title: "BCom / BBA",
+        num: "BCOM",
+        title: "B.Com / BBA / Commerce",
         items: [
-          "Business Judgment & Unit Economics",
-          "Applying AI Tools to Real Corporate Decisions",
-          "Financial Forecasting, Auditing & Growth",
+          "Business Judgment & Prioritization",
+          "Applying AI to Real Strategic Decisions",
+          "Automating Auditing & Financial Anomaly Detection",
+          "Unit economics, CAC/LTV & growth analytics",
+          "AI-driven operations & process reengineering",
         ],
       },
     ],
-    punchline: "Every stream has a direct superpower in the AI age if you pair domain knowledge with AI orchestration.",
+    punchline: "Every degree stream has high-value AI roles — but only for students who master practical execution.",
     maxBuildSteps: 3,
-    notes: "Look at your specific stream: BCA students must master system design and AI apps. B.Sc students must master scientific validation. B.Com/BBA students must master business judgment and applying AI to financial decisions.",
+    notes: "Whether you are in BCA, B.Sc, or B.Com, your degree gives you domain depth. Couple that depth with AI systems and you become unstoppable.",
   },
 
   // =========================================================================
-  // SLIDE 24 — RISING ROLES FOR BCA STUDENTS
+  // SLIDE 23 — RISING ROLES FOR BCA STUDENTS
   // =========================================================================
   {
-    id: "sunni_slide_24",
+    id: "sunni_slide_23",
     type: "STREAM_ROLES",
-    badge: "BCA SPECIALIZATION",
+    badge: "BCA & TECH SPECIALIZATION",
     stream: "BCA / TECH",
     title: "Rising Roles for BCA Students",
-    subtitle: "High-growth career tracks replacing legacy service desk positions.",
+    subtitle: "High-growth specializations moving beyond routine syntax coding.",
     roles: [
       {
         num: "01",
         title: "Generative AI Engineer",
-        desc: "Build applications using Large Language Models, embeddings, and vector RAG pipelines.",
+        desc: "Build applications using Large Language Models, RAG pipelines, and vector databases.",
       },
       {
         num: "02",
         title: "Agentic AI Engineer",
-        desc: "Design and build AI agents that autonomously complete multi-step business tasks.",
+        desc: "Design and build autonomous AI agents that complete multi-step tasks with tool-use.",
       },
       {
         num: "03",
         title: "Full-Stack AI Engineer",
-        desc: "Build complete AI-powered products connecting modern web/mobile interfaces to microservices.",
+        desc: "Build complete products connecting reactive frontends to streaming AI backends.",
       },
       {
         num: "04",
         title: "AI Application Developer",
-        desc: "Create production-ready AI features, streaming endpoints, and tools inside real products.",
+        desc: "Integrate production-ready AI capabilities into real-world software products.",
       },
     ],
     maxBuildSteps: 4,
-    notes: "These are the exact job titles hiring in 2026. Stop applying as a generic 'PHP developer' or 'HTML/CSS coder.' Position yourself as an AI Application Developer or Generative AI Engineer.",
+    notes: "For BCA students: Stop building basic calculators. Aim for GenAI Engineer, Agentic AI Architect, or Full-Stack AI Developer.",
   },
 
   // =========================================================================
-  // SLIDE 25 — RISING ROLES FOR B.SC STUDENTS
+  // SLIDE 24 — RISING ROLES FOR B.SC STUDENTS
   // =========================================================================
   {
-    id: "sunni_slide_25",
+    id: "sunni_slide_24",
     type: "STREAM_ROLES",
-    badge: "B.SC SPECIALIZATION",
-    stream: "B.SC SCIENCE",
-    title: "Rising Roles for BSc Students",
-    subtitle: "Applying mathematical and scientific rigor to modern computational problems.",
+    badge: "B.SC SCIENCE & MATH SPECIALIZATION",
+    stream: "B.SC / SCIENCE",
+    title: "Rising Roles for B.Sc Students",
+    subtitle: "Combining scientific domain rigor with modern computational intelligence.",
     roles: [
       {
         num: "01",
         title: "Machine Learning Engineer",
-        desc: "Build and improve machine learning models using real-world messy domain data.",
+        desc: "Build and improve machine learning models using real structured numerical datasets.",
       },
       {
         num: "02",
         title: "Scientific ML / Research Engineer",
-        desc: "Build models that respect scientific principles (PINNs, molecular modeling, biochemistry).",
+        desc: "Build computational models that respect scientific principles (Physics-Informed PINNs).",
       },
       {
         num: "03",
         title: "Predictive Modeler",
-        desc: "Create models that predict outcomes, weather patterns, crop yields, and support decisions.",
+        desc: "Create models that forecast outcomes for agriculture, hydrology, climate, and soil.",
       },
       {
         num: "04",
         title: "Data Scientist",
-        desc: "Turn complex scientific and business data into insights that drive real decisions.",
+        desc: "Turn complex multi-dimensional data into insights that drive executive decisions.",
       },
     ],
     maxBuildSteps: 4,
-    notes: "B.Sc students have the quantitative foundation. Combine your science background with Python, data modeling, and machine learning to become a Data Scientist or Scientific ML Engineer.",
+    notes: "For B.Sc students: Your math and science foundation is invaluable for Scientific ML, predictive modeling, and data science.",
   },
 
   // =========================================================================
-  // SLIDE 26 — RISING ROLES FOR B.COM / BBA STUDENTS
+  // SLIDE 25 — RISING ROLES FOR B.COM / BBA STUDENTS
   // =========================================================================
   {
-    id: "sunni_slide_26",
+    id: "sunni_slide_25",
     type: "STREAM_ROLES",
     badge: "COMMERCE & BBA SPECIALIZATION",
     stream: "B.COM / BBA",
-    title: "Rising Roles for BCom / BBA Students",
+    title: "Rising Roles for B.Com / BBA Students",
     subtitle: "Leading the AI transformation across corporate finance, auditing, and business strategy.",
     roles: [
       {
@@ -831,10 +864,10 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 27 — THE REAL STUDENT FUNNEL
+  // SLIDE 26 — THE REAL STUDENT FUNNEL
   // =========================================================================
   {
-    id: "sunni_slide_27",
+    id: "sunni_slide_26",
     type: "DROPOUT_FUNNEL",
     badge: "THE CANDIDATE FUNNEL",
     title: "The Real Student Funnel",
@@ -877,10 +910,10 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 28 — THE 5 PRACTICAL STEPS TO WIN
+  // SLIDE 27 — THE 5 PRACTICAL STEPS TO WIN
   // =========================================================================
   {
-    id: "sunni_slide_28",
+    id: "sunni_slide_27",
     type: "DEDICATED_ROADMAP",
     badge: "ACTION PLAYBOOK",
     title: "The 5 Practical Steps to Win",
@@ -900,27 +933,51 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 29 — INDUSTRIAL TRAINING PROGRAM: YOUR GUIDED PATH
+  // SLIDE 28 — INDUSTRIAL TRAINING PROGRAM: YOUR GUIDED PATH
   // =========================================================================
   {
-    id: "sunni_slide_29",
+    id: "sunni_slide_28",
     type: "PROGRAM_OVERVIEW",
     badge: "YOUR GUIDED PATH",
     title: "Industrial Training Program",
     subtitle: "3-MONTH INTENSIVE TRACK · ATAL BIHARI VAJPAYEE GOVT. DEGREE COLLEGE SUNNI",
     pillars: [
-      "3-Month Intensive Training — Focused on real industry skills and containerized production projects",
-      "Unisole Talent Pool — Get selected into the vetted talent pool after successful training",
-      "Internship Opportunity — Direct chance to work with partner tech startups and companies",
-      "Joint Certification — Nationally recognized accreditation: NIT Hamirpur • Unisole • IAPT",
-      "Dedicated Mentorship — Weekly labs guided by engineers from NIT Hamirpur, IIT Delhi & BlackRock",
+      "3-Month Intensive Training — Focused on real industry skills, containerized microservices, and production capstone projects",
+      "Unisole Talent Pool — Top-performing students get inducted into the vetted talent pool for direct industry recommendations",
+      "Internship Opportunity — Direct chance to work with partner tech startups and companies on live client systems",
+      "Dedicated Mentorship — Weekly hands-on labs guided by engineers and researchers from NIT Hamirpur, IIT Delhi & BlackRock",
     ],
     maxBuildSteps: 2,
-    notes: "This is our commitment to ABV GDC Sunni. 3 months of hands-on training, 2 containerized capstone systems, joint certification with NIT Hamirpur and IAPT, and direct induction into the UNISOLE Talent Pool for internships.",
+    notes: "This is our commitment to ABV GDC Sunni. 3 months of hands-on training, 2 containerized capstone systems, direct induction into the UNISOLE Talent Pool, and dedicated practitioner mentorship.",
   },
 
   // =========================================================================
-  // SLIDE 30 — CLOSING: TAKE RESPONSIBILITY
+  // SLIDE 29 — JOINT CERTIFICATION: NIT HAMIRPUR × IAPT × UNISOLE
+  // =========================================================================
+  {
+    id: "sunni_slide_29",
+    type: "CERTIFICATE_SHOWCASE",
+    badge: "OFFICIAL ACCREDITATION",
+    title: "JOINT CERTIFICATE",
+    subtitle: "NIT HAMIRPUR × IAPT × UNISOLE",
+    note: "Awarded upon successful completion of the industrial training & milestone projects.",
+    credentials: [
+      "National Institute of Technology, Hamirpur (NIT Hamirpur)",
+      "Indian Association of Physics Teachers (IAPT)",
+      "UNISOLE Skill AI Labs",
+    ],
+    highlights: [
+      "Validates production-grade AI system architecture, schema integrity, and live cloud deployment",
+      "Cryptographically verifiable credential recognized by hiring partner networks",
+      "Awarded exclusively upon successful defense of 2 containerized milestone projects",
+      "Direct fast-track into the UNISOLE Talent Pool for paid internship matching",
+    ],
+    maxBuildSteps: 2,
+    notes: "Look at this credential. This is a joint certificate backed by NIT Hamirpur, IAPT, and UNISOLE. It is not an attendance slip. It proves to any employer in the country that you built and deployed real, verified production software.",
+  },
+
+  // =========================================================================
+  // SLIDE 30 — CLOSING: TAKE RESPONSIBILITY & REGISTER
   // =========================================================================
   {
     id: "sunni_slide_30",
