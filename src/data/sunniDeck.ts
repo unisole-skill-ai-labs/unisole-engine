@@ -96,7 +96,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
   {
     id: "sunni_slide_poll_1",
-    type: "BIG_QUESTION",
+    type: "POLL",
     badge: "⚡ LIVE AUDIENCE POLL 01",
     title: "When do you think AI started?",
     subtitle: "Vote on your phone now before we reveal the 80-year-old answer on the next slide.",
@@ -202,7 +202,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
   {
     id: "sunni_slide_poll_2",
-    type: "BIG_QUESTION",
+    type: "POLL",
     badge: "⚡ LIVE AUDIENCE POLL 02",
     title: "What is hardest for AI even today?",
     subtitle: "Which capability remains the toughest barrier for artificial intelligence?",
@@ -237,7 +237,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
   {
     id: "sunni_slide_poll_3",
-    type: "BIG_QUESTION",
+    type: "POLL",
     badge: "⚡ LIVE AUDIENCE POLL 03",
     title: "Have you ever felt ChatGPT is almost human?",
     subtitle: "Share your honest experience talking to modern AI language models.",
@@ -440,7 +440,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
   {
     id: "sunni_slide_poll_4",
-    type: "BIG_QUESTION",
+    type: "POLL",
     badge: "⚡ LIVE AUDIENCE POLL 04",
     title: "How many of you feel scared about future because of AI?",
     subtitle: "Be honest: When you see AI doing coding, research, and accounting in seconds, how does it make you feel?",
@@ -497,7 +497,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
   {
     id: "sunni_slide_poll_5",
-    type: "BIG_QUESTION",
+    type: "POLL",
     badge: "⚡ LIVE AUDIENCE POLL 05",
     title: "Do your parents still think “degree = sorted life”?",
     subtitle: "Has the generational career perception shifted in your household?",
@@ -888,7 +888,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
   {
     id: "sunni_slide_poll_6",
-    type: "BIG_QUESTION",
+    type: "POLL",
     badge: "⚡ LIVE AUDIENCE POLL 06",
     title: "Which role feels closest to what you want?",
     subtitle: "Across tech, science, and commerce — which career path excites you the most?",
@@ -1062,7 +1062,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
   // =========================================================================
   {
     id: "sunni_slide_poll_7",
-    type: "BIG_QUESTION",
+    type: "POLL",
     badge: "⚡ LIVE AUDIENCE POLL 07",
     title: "Where do most students stop?",
     subtitle: "Why do 98 out of 100 college students fail to convert their degree into high-paying offers?",
