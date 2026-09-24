@@ -473,7 +473,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     ],
     punchline: "Your competition is nationwide. The only signal that breaks through the noise is verified, production-grade proof of work.",
     poll: {
-      question: "What’s your first feeling when you hear 1.1 Crore graduates?",
+      question: "What’s your first feeling when you hear 1.1 Crore?",
       options: ["Severe competition anxiety", "Urgency to stand out with skills", "Overwhelmed / Demotivated", "Confident I can beat the average"],
       timeLimit: 20,
     },
@@ -702,7 +702,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     ],
     punchline: "Raw output is cheap. Human judgment, scientific validation, and business ownership command the highest salaries.",
     poll: {
-      question: "Which skill will be most valuable for your career stream?",
+      question: "Which will be most valuable for your career?",
       options: ["System Architecture & Edge-Case Verification (Tech)", "Scientific Rigor & Validation of AI Models (Science)", "Business Judgment & Financial Anomaly Auditing (Commerce)", "End-to-End Ownership & Communication"],
       timeLimit: 20,
     },
