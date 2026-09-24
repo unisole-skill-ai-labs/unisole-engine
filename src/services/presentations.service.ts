@@ -15,6 +15,7 @@ import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
 import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck.js";
 import { SUNNI_COLLEGE_PPT_SLIDES } from "../data/sunniDeck.js";
+import { broadcastSessionEnded } from "../socket/presentation.socket";
 
 function generateSessionCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -395,6 +396,9 @@ export const presentationsService = {
     const payload: Partial<PresentationSession> = { status };
     if (status === "ENDED") {
       payload.endedAt = new Date().toISOString();
+      if (session.sessionCode) {
+        broadcastSessionEnded(session.sessionCode, sessionId);
+      }
     }
 
     const updated = await presentationsRepository.updateSession(
