@@ -809,13 +809,18 @@ export function setupPresentationSocket(io: SocketIOServer) {
         const pollOptions = options && options.length >= 2 ? options : ["YES", "NO"];
         const prompt = question && question.trim() ? question.trim() : "YES or NO?";
 
+        const initialCounts: Record<number, number> = {};
+        pollOptions.forEach((_, idx) => {
+          initialCounts[idx] = 0;
+        });
+
         sessionState.instantPoll = {
           pollId,
           question: prompt,
           options: pollOptions,
           startedAt: now,
           timeLimit: duration,
-          counts: { 0: 0, 1: 0 },
+          counts: initialCounts,
           responses: new Map(),
           isActive: true,
         };
@@ -826,7 +831,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
           options: pollOptions,
           timeLimit: duration,
           startedAt: now,
-          counts: { 0: 0, 1: 0 },
+          counts: initialCounts,
           totalVotes: 0,
         });
 
@@ -885,7 +890,12 @@ export function setupPresentationSocket(io: SocketIOServer) {
           return;
         }
 
-        const validIndex = optionIndex === 1 ? 1 : 0;
+        const maxOptions = sessionState.instantPoll.options.length;
+        if (typeof optionIndex !== "number" || optionIndex < 0 || optionIndex >= maxOptions) {
+          return;
+        }
+
+        const validIndex = Math.floor(optionIndex);
         sessionState.instantPoll.responses.set(leadId, validIndex);
         sessionState.instantPoll.counts[validIndex] =
           (sessionState.instantPoll.counts[validIndex] || 0) + 1;
@@ -901,7 +911,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
           pollId,
           question: sessionState.instantPoll.question,
           optionIndex: validIndex,
-          choice: validIndex === 0 ? "YES" : "NO",
+          choice: sessionState.instantPoll.options[validIndex] || `Option ${validIndex + 1}`,
           responseTimeMs: elapsedMs,
           votedAt: new Date().toISOString(),
         };
@@ -923,6 +933,7 @@ export function setupPresentationSocket(io: SocketIOServer) {
         socket.emit("instant_poll_confirmed", {
           pollId,
           optionIndex: validIndex,
+          choice: sessionState.instantPoll.options[validIndex] || `Option ${validIndex + 1}`,
         });
 
         // Debounce instant poll tally broadcast to room (max 4 per sec: 250ms)
