@@ -4,27 +4,27 @@ import { NotFoundError, ValidationError, ConflictError } from "../errors";
 import { CANONICAL_SEO_OFFERINGS } from "../constants/offerings";
 
 export const pathwaysService = {
-  async list(): Promise<Pathway[]> {
-    const dbPathways = await pathwaysRepository.list();
-    const existingIds = new Set(dbPathways.map((p) => p.id));
-    const existingSlugs = new Set(dbPathways.map((p) => p.slug));
-
-    const canonicalPathways: Pathway[] = CANONICAL_SEO_OFFERINGS
-      .filter((o) => !existingIds.has(o.itemId) && !existingSlugs.has(o.slug))
-      .map((o) => ({
-        id: o.itemId,
-        title: o.title,
-        slug: o.slug,
-        shortDescription: o.description,
-        description: o.description,
-        pricePaise: o.pricePaise,
-        status: "PUBLISHED" as const,
+  async syncCanonicalPathways(): Promise<{ total: number; synced: number }> {
+    let synced = 0;
+    const pathwaysToSync = CANONICAL_SEO_OFFERINGS.filter((o) => o.itemType === "PATHWAY");
+    for (const offering of pathwaysToSync) {
+      await pathwaysRepository.upsert({
+        id: offering.itemId,
+        title: offering.title,
+        slug: offering.slug,
+        shortDescription: offering.description,
+        description: offering.description,
+        pricePaise: offering.pricePaise,
+        status: "PUBLISHED",
         isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }));
+      });
+      synced++;
+    }
+    return { total: pathwaysToSync.length, synced };
+  },
 
-    return [...dbPathways, ...canonicalPathways];
+  async list(): Promise<Pathway[]> {
+    return pathwaysRepository.list();
   },
 
   async listPublished() {
@@ -53,31 +53,12 @@ export const pathwaysService = {
 
   async getById(id: string) {
     const pathway = await pathwaysRepository.getById(id);
-    if (!pathway) {
-      const canonical = CANONICAL_SEO_OFFERINGS.find((o) => o.itemId === id || o.slug === id);
-      if (!canonical) throw new NotFoundError("Pathway not found");
-      return {
-        id: canonical.itemId,
-        title: canonical.title,
-        slug: canonical.slug,
-        shortDescription: canonical.description,
-        description: canonical.description,
-        pricePaise: canonical.pricePaise,
-        status: "PUBLISHED" as const,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        categories: [],
-        colleges: [],
-        courses: [],
-        courseCount: 0,
-      };
-    }
+    if (!pathway) throw new NotFoundError("Pathway not found");
 
     const [categories, colleges, courses] = await Promise.all([
-      pathwaysRepository.getCategoriesWithDetails(pathway.id),
-      pathwaysRepository.getCollegesWithDetails(pathway.id),
-      pathwaysRepository.getCoursesWithDetails(pathway.id),
+      pathwaysRepository.getCategoriesWithDetails(pathway.id).catch(() => []),
+      pathwaysRepository.getCollegesWithDetails(pathway.id).catch(() => []),
+      pathwaysRepository.getCoursesWithDetails(pathway.id).catch(() => []),
     ]);
 
     return {
@@ -90,31 +71,12 @@ export const pathwaysService = {
 
   async getBySlug(slug: string) {
     const pathway = await pathwaysRepository.getBySlug(slug);
-    if (!pathway) {
-      const canonical = CANONICAL_SEO_OFFERINGS.find((o) => o.slug === slug || o.itemId === slug);
-      if (!canonical) throw new NotFoundError("Pathway not found");
-      return {
-        id: canonical.itemId,
-        title: canonical.title,
-        slug: canonical.slug,
-        shortDescription: canonical.description,
-        description: canonical.description,
-        pricePaise: canonical.pricePaise,
-        status: "PUBLISHED" as const,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        categories: [],
-        colleges: [],
-        courses: [],
-        courseCount: 0,
-      };
-    }
+    if (!pathway) throw new NotFoundError("Pathway not found");
 
     const [categories, colleges, courses] = await Promise.all([
-      pathwaysRepository.getCategoriesWithDetails(pathway.id),
-      pathwaysRepository.getCollegesWithDetails(pathway.id),
-      pathwaysRepository.getCoursesWithDetails(pathway.id),
+      pathwaysRepository.getCategoriesWithDetails(pathway.id).catch(() => []),
+      pathwaysRepository.getCollegesWithDetails(pathway.id).catch(() => []),
+      pathwaysRepository.getCoursesWithDetails(pathway.id).catch(() => []),
     ]);
 
     return {

@@ -27,6 +27,28 @@ export const pathwaysRepository = {
     return rows[0];
   },
 
+  async upsert(data: NewPathway): Promise<Pathway> {
+    const existing = await this.getBySlug(data.slug);
+    if (!existing) {
+      const rows = await db.insert(pathways).values(data).returning();
+      return rows[0];
+    }
+    const rows = await db
+      .update(pathways)
+      .set({
+        title: data.title,
+        shortDescription: data.shortDescription,
+        description: data.description,
+        pricePaise: data.pricePaise,
+        status: data.status,
+        isActive: data.isActive,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(pathways.id, existing.id))
+      .returning();
+    return rows[0];
+  },
+
   async update(id: string, data: Partial<Omit<NewPathway, "id">>): Promise<Pathway | null> {
     const rows = await db
       .update(pathways)
