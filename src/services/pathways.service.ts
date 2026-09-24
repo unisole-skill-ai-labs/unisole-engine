@@ -5,6 +5,9 @@ import { db } from "../db";
 import {
   Pathway,
   NewPathway,
+  pathways,
+  pathwayCategories,
+  pathwayColleges,
   courses,
   pathwayCourses,
   modules,
@@ -23,7 +26,8 @@ export const pathwaysService = {
   async syncCanonicalPathways(): Promise<{ total: number; synced: number }> {
     let synced = 0;
 
-    // 0. Purge legacy deprecated courses, duplicate crs_ courses, and dummy HTML/CSS placeholder modules and lessons
+    // 0. Purge legacy deprecated courses, duplicate crs_ courses, dummy HTML/CSS placeholder modules and lessons, and legacy demo pathways
+    const deprecatedPathwayIds = ["pwy_1", "pwy_2", "pwy_3"];
     const deprecatedCourseIds = [
       "crs_cs-genai", "crs_cs-agentic", "crs_cs-p1", "crs_cs-common",
       "crs_sci-p1", "crs_sci-p2", "crs_mgmt-p1", "crs_arts-p1",
@@ -39,7 +43,13 @@ export const pathwaysService = {
     ];
 
     try {
-      await db.delete(pathwayCourses).where(inArray(pathwayCourses.courseId, deprecatedCourseIds));
+      // Clean legacy pathways and relationships
+      await db.delete(pathwayCategories).where(inArray(pathwayCategories.pathwayId, deprecatedPathwayIds));
+      await db.delete(pathwayColleges).where(inArray(pathwayColleges.pathwayId, deprecatedPathwayIds));
+      await db.delete(pathwayCourses).where(or(inArray(pathwayCourses.courseId, deprecatedCourseIds), inArray(pathwayCourses.pathwayId, deprecatedPathwayIds)));
+      await db.delete(pathways).where(inArray(pathways.id, deprecatedPathwayIds));
+
+      // Clean deprecated courses, modules, and lessons
       await db.delete(courseModules).where(or(inArray(courseModules.courseId, deprecatedCourseIds), inArray(courseModules.moduleId, dummyModuleIds)));
       await db.delete(moduleLessons).where(or(inArray(moduleLessons.moduleId, dummyModuleIds), inArray(moduleLessons.lessonId, dummyLessonIds)));
       await db.delete(lessons).where(inArray(lessons.id, dummyLessonIds));

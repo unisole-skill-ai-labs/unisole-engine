@@ -5,6 +5,7 @@ import { validateBody } from "../../middleware/validate";
 export const adminCoursesRouter: Router = Router();
 
 adminCoursesRouter.get("/", coursesController.list);
+adminCoursesRouter.post("/sync-canonical", coursesController.syncCanonical);
 adminCoursesRouter.get("/:id", coursesController.getById);
 adminCoursesRouter.post("/", validateBody({ required: ["title", "slug"] }), coursesController.create);
 adminCoursesRouter.put("/:id", coursesController.update);

@@ -120,6 +120,10 @@ export const pricingService = {
     await pricingRepository.removeByItem("PATHWAY" as ItemType, "mgmt-common").catch(() => {});
     await pricingRepository.removeByItem("PATHWAY" as ItemType, "mgmt-p2").catch(() => {});
     await pricingRepository.removeByItem("PATHWAY" as ItemType, "mgmt-p3").catch(() => {});
+    await pricingRepository.removeByItem("PATHWAY" as ItemType, "cs-p2").catch(() => {});
+    await pricingRepository.removeByItem("PATHWAY" as ItemType, "cs-p3").catch(() => {});
+    await pricingRepository.removeByItem("COURSE" as ItemType, "cs-p2").catch(() => {});
+    await pricingRepository.removeByItem("COURSE" as ItemType, "cs-p3").catch(() => {});
 
     for (const offering of CANONICAL_SEO_OFFERINGS) {
       const existing = await pricingRepository.getByItem(offering.itemType as ItemType, offering.itemId);

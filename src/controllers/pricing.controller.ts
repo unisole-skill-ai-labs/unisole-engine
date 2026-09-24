@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { pricingService } from "../services/pricing.service";
+import { pathwaysService } from "../services/pathways.service";
 import { asyncHandler } from "../middleware/async-handler";
 import { CustomRequest } from "../middleware/auth";
 import { ValidationError } from "../errors";
@@ -74,12 +75,14 @@ export const pricingController = {
   }),
 
   adminSyncCanonical: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const pwyResult = await pathwaysService.syncCanonicalPathways();
     const result = await pricingService.syncCanonicalOfferings();
     const list = await pricingService.listAllPricing();
     res.json({
       success: true,
-      message: `Successfully synchronized ${result.total} SEO offerings (${result.inserted} added, ${result.updated} verified).`,
+      message: `Successfully synchronized ${result.total} SEO offerings (${result.inserted} added, ${result.updated} verified) and ${pwyResult.synced}/${pwyResult.total} curriculum pathways.`,
       syncResult: result,
+      pathwaysSyncResult: pwyResult,
       items: list,
     });
   }),

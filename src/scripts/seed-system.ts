@@ -184,16 +184,28 @@ export async function seedSystemData() {
     );
     console.log(`[Seed:System] Synchronized flagship deck: AI Campus Deck (${UNISOLE_AI_CAMPUS_DECK_SLIDES.length} slides)`);
 
-    // 4. Seed / Sync Foundational Courses (11 Stream Pathways across 4 Groups + AI Masterclass)
-    // First, clean any legacy or old placeholder IDs
+    // 4. Seed / Sync Foundational Courses (8 Canonical Academic Pathways + 1 AI Masterclass)
+    // First, clean any legacy or old placeholder IDs, courses, modules, lessons, and old demo pathways
     await pool.query(`
-      DELETE FROM pathway_courses WHERE course_id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts');
-      DELETE FROM course_modules WHERE course_id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts');
-      DELETE FROM courses WHERE id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts');
+      -- Clean legacy demo pathways (pwy_1, pwy_2, pwy_3)
+      DELETE FROM pathway_categories WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
+      DELETE FROM pathway_colleges WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
+      DELETE FROM pathway_courses WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
+      UPDATE enrollments SET pathway_id = NULL WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
+      UPDATE payments SET pathway_id = NULL WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
+      DELETE FROM pathways WHERE id IN ('pwy_1', 'pwy_2', 'pwy_3');
+
+      -- Clean deprecated courses, modules, and lessons
+      DELETE FROM pathway_courses WHERE course_id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1');
+      DELETE FROM course_modules WHERE course_id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1') OR module_id IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
+      DELETE FROM module_lessons WHERE module_id IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8') OR lesson_id IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
+      DELETE FROM lessons WHERE id IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
+      DELETE FROM modules WHERE id IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
+      DELETE FROM courses WHERE id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1');
     `);
 
     const foundationalCourses = [
-      // --- GROUP 01: Computer Science & IT (6 Courses) ---
+      // --- GROUP 01: Computer Science & IT (4 Courses) ---
       {
         id: "cs-genai",
         title: "Generative AI & LLM Systems Engineering",
@@ -252,46 +264,6 @@ export async function seedSystemData() {
           level: "Intermediate",
           roles: ["ML Engineer", "AI Backend Developer", "MLOps Specialist"],
           tools: ["Python", "NumPy", "Pandas", "PyTorch", "FastAPI", "Docker", "RAG"]
-        }
-      },
-      {
-        id: "cs-p2",
-        title: "Full Stack Web Development (AI-Powered)",
-        slug: "cs-p2",
-        short_description: "Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI capabilities like document Q&A and chatbots.",
-        price_paise: 149900,
-        mrp_paise: 699900,
-        status: "PUBLISHED",
-        metadata: {
-          group: "group-1",
-          pathwayId: "cs-p2",
-          badge: "GROUP 01 • PATHWAY 04",
-          shortName: "CS & IT: Full Stack Web",
-          target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
-          duration: "3 Months",
-          level: "Beginner to Intermediate",
-          roles: ["Full Stack Developer", "React / Node Engineer", "AI Web Integrator"],
-          tools: ["React", "Node.js", "Express", "MongoDB", "Vite", "REST APIs", "LLM APIs"]
-        }
-      },
-      {
-        id: "cs-p3",
-        title: "Complete Machine Learning + Full Stack",
-        slug: "cs-p3",
-        short_description: "Comprehensive dual curriculum merging Machine Learning, Deep Learning, and MLOps with full-stack React, Node.js, and cloud systems.",
-        price_paise: 399900,
-        mrp_paise: 1499900,
-        status: "PUBLISHED",
-        metadata: {
-          group: "group-1",
-          pathwayId: "cs-p3",
-          badge: "GROUP 01 • PATHWAY 05",
-          shortName: "CS & IT: Dual Track ML + Web",
-          target: "BCA • MCA • B.Sc CS/IT • B.Tech CSE/IT",
-          duration: "6 Months",
-          level: "Dual-Track Mastery",
-          roles: ["Senior AI Engineer", "Lead Full Stack Architect", "AI Systems Specialist"],
-          tools: ["Python", "PyTorch", "FastAPI", "React", "Node.js", "MongoDB", "Docker", "CI/CD"]
         }
       },
       {
@@ -357,7 +329,7 @@ export async function seedSystemData() {
         }
       },
 
-      // --- GROUP 03: Commerce, BBA & Management (4 Courses) ---
+      // --- GROUP 03: Commerce, BBA & Management (1 Course) ---
       {
         id: "mgmt-p1",
         title: "Business Analytics & Data Engineering",
@@ -376,66 +348,6 @@ export async function seedSystemData() {
           level: "Undergraduate / Postgraduate",
           roles: ["Business Intelligence Analyst", "Data Engineer for Analytics", "Corporate Strategist"],
           tools: ["Excel", "SQL", "DuckDB", "Power BI", "ETL", "Prompt Engineering"]
-        }
-      },
-      {
-        id: "mgmt-p2",
-        title: "AI in Finance & FinTech Systems",
-        slug: "mgmt-p2",
-        short_description: "Explores digital banking, financial modeling, credit risk scoring, fraud detection algorithms, and responsible AI in finance.",
-        price_paise: 200000,
-        mrp_paise: 699900,
-        status: "PUBLISHED",
-        metadata: {
-          group: "group-3",
-          pathwayId: "mgmt-p2",
-          badge: "GROUP 03 • PATHWAY 02",
-          shortName: "Commerce: FinTech & Finance AI",
-          target: "Finance & Banking Students",
-          duration: "3 Months",
-          level: "Finance & Banking Students",
-          roles: ["FinTech Risk Analyst", "Financial Forecaster", "Credit Risk Specialist"],
-          tools: ["Python", "Financial Modeling", "Credit Scoring ML", "Fraud Detection", "SHAP"]
-        }
-      },
-      {
-        id: "mgmt-p3",
-        title: "Complete Business AI Pathway",
-        slug: "mgmt-p3",
-        short_description: "Comprehensive dual-track program merging Business Analytics, SQL & modern Data Engineering with FinTech AI, credit scoring, fraud risk intelligence, and executive BI dashboards.",
-        price_paise: 299900,
-        mrp_paise: 999900,
-        status: "PUBLISHED",
-        metadata: {
-          group: "group-3",
-          pathwayId: "mgmt-p3",
-          badge: "GROUP 03 • PATHWAY 03",
-          shortName: "Commerce: Dual Track Business AI",
-          target: "B.Com • BBA • M.Com • MBA • Economics • Finance",
-          duration: "6 Months",
-          level: "Dual-Track Mastery",
-          roles: ["Chief Analytics Officer Track", "Senior FinTech Analyst", "Enterprise BI Consultant"],
-          tools: ["Excel", "SQL", "DuckDB", "Power BI", "Python", "Credit Scoring ML", "Kafka"]
-        }
-      },
-      {
-        id: "mgmt-common",
-        title: "AI Entrepreneurship & Business Innovation",
-        slug: "mgmt-common",
-        short_description: "Learn how to launch AI-enabled business services, SaaS tools, SME automation platforms, and investor pitch decks.",
-        price_paise: 59900,
-        mrp_paise: 299900,
-        status: "PUBLISHED",
-        metadata: {
-          group: "group-3",
-          pathwayId: "mgmt-common",
-          badge: "GROUP 03 • WEEKEND",
-          shortName: "Commerce: AI Entrepreneurship",
-          target: "All Commerce & Management",
-          duration: "Weekend Track",
-          level: "All Commerce & Management",
-          roles: ["AI Venture Builder", "SaaS Business Analyst", "Corporate Innovation Manager"],
-          tools: ["SaaS Economics", "MVP Wireframing", "Pitch Decks", "GTM Strategy"]
         }
       },
 
@@ -535,7 +447,7 @@ export async function seedSystemData() {
         minOrderPaise: 100000,
         maxDiscountPaise: null,
         maxUses: 500,
-        applicableItemIds: ["cs-p1", "cs-p2", "cs-p3", "mgmt-p1", "mgmt-p3"],
+        applicableItemIds: ["cs-genai", "cs-agentic", "cs-p1", "mgmt-p1"],
         isActive: true,
       },
     ];
