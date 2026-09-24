@@ -2,6 +2,7 @@ import { pool, db } from "../db";
 import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
+import { pricingService } from "../services/pricing.service";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -312,8 +313,9 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "is_public" boolean DEFAULT true NOT NULL;
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "description" text;
-      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
-      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_offerings_pricing_item" ON "public"."offerings_pricing" ("item_type", "item_id");
+      CREATE INDEX IF NOT EXISTS "idx_offerings_pricing_item" ON "public"."offerings_pricing" ("item_type", "item_id");
+      CREATE INDEX IF NOT EXISTS "idx_offerings_pricing_is_active" ON "public"."offerings_pricing" ("is_active");
 
       -- Ensure columns on existing orders table if created in earlier runs
       ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "order_number" varchar(60);
@@ -835,7 +837,15 @@ export async function initializeDatabase() {
       console.warn("[DB-INIT] Warning syncing survey responders:", e);
     }
 
-    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
+    // 17. Seed & Sync Canonical SEO Course Offerings into offerings_pricing table
+    try {
+      const syncResult = await pricingService.syncCanonicalOfferings();
+      console.log(`[DB-INIT] ✅ Seeded & synchronized canonical SEO offerings: ${syncResult.total} total (${syncResult.inserted} newly added, ${syncResult.updated} verified).`);
+    } catch (e) {
+      console.warn("[DB-INIT] Warning syncing canonical offerings:", e);
+    }
+
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }

@@ -4,6 +4,7 @@ import { pathwaysRepository } from "../repositories/pathways.repository";
 import { coursesRepository } from "../repositories/courses.repository";
 import { OfferingPricing, Coupon, ItemType, DiscountType, NewOfferingPricing, NewCoupon } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
+import { CANONICAL_SEO_OFFERINGS, CanonicalOffering } from "../constants/offerings";
 
 export interface ResolvedPrice {
   itemType: ItemType;
@@ -24,7 +25,7 @@ export interface CouponEvaluation {
 export const pricingService = {
   /**
    * Resolve live pricing for a specific item.
-   * Checks dynamic offerings_pricing first, then falls back to catalog tables (courses / pathways).
+   * Checks dynamic offerings_pricing first, then falls back to catalog tables (courses / pathways) or canonical catalog.
    */
   async resolveItemPrice(itemType: ItemType, itemId: string): Promise<ResolvedPrice> {
     // 1. Check dynamic offerings pricing table
@@ -68,50 +69,27 @@ export const pricingService = {
           currency: "INR",
         };
       }
+    }
 
-      // Standard catalog static fallback lookup
-      const PATHWAY_CATALOG: Record<string, { title: string; pricePaise: number; mrpPaise: number }> = {
-        "cs-genai": { title: "Generative AI & LLM Systems Engineering", pricePaise: 299900, mrpPaise: 999900 },
-        "cs-agentic": { title: "Agentic AI & Autonomous Multi-Agent Systems", pricePaise: 299900, mrpPaise: 999900 },
-        "cs-p1": { title: "Machine Learning Engineering in Production", pricePaise: 299900, mrpPaise: 999900 },
-        "cs-p2": { title: "Full Stack Web Development (AI-Powered)", pricePaise: 149900, mrpPaise: 699900 },
-        "cs-p3": { title: "Complete Machine Learning + Full Stack (Dual Track)", pricePaise: 399900, mrpPaise: 1499900 },
-        "cs-common": { title: "AI Entrepreneurship & Innovation (CS Edition)", pricePaise: 59900, mrpPaise: 299900 },
-        "sci-p1": { title: "Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)", pricePaise: 299900, mrpPaise: 899900 },
-        "sci-p2": { title: "Mathematics + AI / Computational Intelligence", pricePaise: 150000, mrpPaise: 599900 },
-        "mgmt-p1": { title: "Business Analytics & Data Engineering", pricePaise: 200000, mrpPaise: 699900 },
-        "mgmt-p2": { title: "AI in Finance & FinTech Systems", pricePaise: 200000, mrpPaise: 699900 },
-        "mgmt-p3": { title: "Complete Business AI Pathway (Dual Track)", pricePaise: 299900, mrpPaise: 999900 },
-        "mgmt-common": { title: "AI Entrepreneurship & Business Innovation", pricePaise: 59900, mrpPaise: 299900 },
-        "arts-p1": { title: "Applied AI for Humanities, Research & Careers", pricePaise: 99900, mrpPaise: 399900 },
+    // 4. Canonical SEO Offerings Fallback
+    const canonical = CANONICAL_SEO_OFFERINGS.find(
+      (o) =>
+        (o.itemId.toLowerCase() === itemId.toLowerCase() || o.slug.toLowerCase() === itemId.toLowerCase()) &&
+        (o.itemType === itemType || itemType === "COURSE" || itemType === "PATHWAY" || itemType === "WORKSHOP")
+    );
+
+    if (canonical) {
+      return {
+        itemType: (canonical.itemType as ItemType),
+        itemId: canonical.itemId,
+        title: canonical.title,
+        pricePaise: canonical.pricePaise,
+        mrpPaise: canonical.mrpPaise,
+        currency: canonical.currency || "INR",
       };
-
-      if (PATHWAY_CATALOG[itemId]) {
-        return {
-          itemType: "PATHWAY",
-          itemId,
-          title: PATHWAY_CATALOG[itemId].title,
-          pricePaise: PATHWAY_CATALOG[itemId].pricePaise,
-          mrpPaise: PATHWAY_CATALOG[itemId].mrpPaise,
-          currency: "INR",
-        };
-      }
     }
 
     if (itemType === "WORKSHOP" && (itemId === "AI_MASTERCLASS_2026" || itemId === "DEFAULT" || itemId === "ai-masterclass")) {
-      // Check if ai-masterclass is in courses table
-      const mcCourse = await coursesRepository.getBySlugOrId("ai-masterclass");
-      if (mcCourse && mcCourse.isActive && mcCourse.pricePaise > 0) {
-        return {
-          itemType: "WORKSHOP",
-          itemId: "AI_MASTERCLASS_2026",
-          title: mcCourse.title,
-          pricePaise: mcCourse.pricePaise,
-          mrpPaise: mcCourse.mrpPaise || 99900,
-          currency: "INR",
-        };
-      }
-
       return {
         itemType: "WORKSHOP",
         itemId: "AI_MASTERCLASS_2026",
@@ -123,6 +101,48 @@ export const pricingService = {
     }
 
     throw new NotFoundError(`Pricing not found or inactive for ${itemType} item: ${itemId}`);
+  },
+
+  /**
+   * Sync all Canonical SEO Offerings to offerings_pricing table.
+   * If an offering doesn't exist, insert it. If it exists, preserve admin custom price/mrp.
+   */
+  async syncCanonicalOfferings(): Promise<{ total: number; inserted: number; updated: number }> {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const offering of CANONICAL_SEO_OFFERINGS) {
+      const existing = await pricingRepository.getByItem(offering.itemType as ItemType, offering.itemId);
+      if (!existing) {
+        await pricingRepository.upsert({
+          itemType: offering.itemType as ItemType,
+          itemId: offering.itemId,
+          title: offering.title,
+          description: offering.description,
+          slug: offering.slug,
+          pricePaise: offering.pricePaise,
+          mrpPaise: offering.mrpPaise,
+          currency: offering.currency || "INR",
+          isFree: offering.isFree ?? false,
+          isActive: offering.isActive ?? true,
+          isPublic: offering.isPublic ?? true,
+          metadata: offering.metadata || {},
+        });
+        inserted++;
+      } else {
+        // Sync metadata or title if needed without overwriting admin's pricePaise
+        await pricingRepository.update(existing.id, {
+          slug: offering.slug,
+          metadata: {
+            ...(existing.metadata as Record<string, any> || {}),
+            ...(offering.metadata || {}),
+          },
+        });
+        updated++;
+      }
+    }
+
+    return { total: CANONICAL_SEO_OFFERINGS.length, inserted, updated };
   },
 
   /**
