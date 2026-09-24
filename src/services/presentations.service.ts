@@ -14,6 +14,7 @@ import {
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
 import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck.js";
+import { SUNNI_COLLEGE_PPT_SLIDES } from "../data/sunniDeck.js";
 
 function generateSessionCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -31,6 +32,10 @@ export const presentationsService = {
 
   getSanjauliTemplateSlides(): any[] {
     return SANJAULI_COLLEGE_PPT_SLIDES;
+  },
+
+  getSunniTemplateSlides(): any[] {
+    return SUNNI_COLLEGE_PPT_SLIDES;
   },
 
   async ensureFlagshipDecks(): Promise<void> {
@@ -94,6 +99,60 @@ export const presentationsService = {
           console.log(`[Presentations] Auto-synced Sanjauli College PPT to latest ${SANJAULI_COLLEGE_PPT_SLIDES.length} master slides.`);
         }
       }
+
+      const existingSunni = await presentationsRepository.getPresentationById("pres_sunni_college_ppt");
+      if (!existingSunni) {
+        let sunniCollegeId: string | null = null;
+        let sunniCollegeName = "Atal Bihari Vajpayee Govt Degree College, Sunni";
+        try {
+          const collegesList = await collegesRepository.list();
+          let sunniCollege = collegesList.find(
+            (c) =>
+              c.slug?.includes("sunni") ||
+              c.name?.toLowerCase().includes("sunni")
+          );
+          if (!sunniCollege) {
+            sunniCollege = await collegesRepository.create({
+              name: "Atal Bihari Vajpayee Govt Degree College, Sunni",
+              shortName: "ABV GDC Sunni",
+              slug: "gdc-sunni",
+              description: "Premier government degree college in Sunni, Shimla offering undergraduate programs across Arts, Commerce, Science, and Computer Applications affiliated with Himachal Pradesh University.",
+              isActive: true,
+            });
+          }
+          if (sunniCollege) {
+            sunniCollegeId = sunniCollege.id;
+            sunniCollegeName = sunniCollege.name;
+          }
+        } catch (colErr) {
+          // ignore
+        }
+
+        await presentationsRepository.createPresentation({
+          id: "pres_sunni_college_ppt",
+          collegeId: sunniCollegeId,
+          collegeName: sunniCollegeName,
+          title: "Atal Bihari Vajpayee Govt Degree College Sunni PPT",
+          description: "28-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+          theme: "dark",
+          slides: SUNNI_COLLEGE_PPT_SLIDES,
+          isActive: true,
+        });
+        console.log("[Presentations] Auto-seeded flagship deck: Sunni College PPT");
+      } else {
+        const firstTitle = Array.isArray(existingSunni.slides) ? existingSunni.slides[0]?.title : null;
+        const currentTargetTitle = SUNNI_COLLEGE_PPT_SLIDES[0]?.title;
+        const slideCount = Array.isArray(existingSunni.slides) ? existingSunni.slides.length : 0;
+
+        if (firstTitle !== currentTargetTitle || slideCount !== SUNNI_COLLEGE_PPT_SLIDES.length) {
+          await presentationsRepository.updatePresentation("pres_sunni_college_ppt", {
+            title: "Atal Bihari Vajpayee Govt Degree College Sunni PPT",
+            description: "28-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+            slides: SUNNI_COLLEGE_PPT_SLIDES,
+          });
+          console.log(`[Presentations] Auto-synced Sunni College PPT to latest ${SUNNI_COLLEGE_PPT_SLIDES.length} master slides.`);
+        }
+      }
     } catch (err) {
       console.warn("[Presentations] Could not auto-sync flagship decks:", err);
     }
@@ -105,7 +164,7 @@ export const presentationsService = {
   },
 
   async getById(id: string): Promise<Presentation> {
-    if (id === "pres_sanjauli_college_ppt") {
+    if (id === "pres_sanjauli_college_ppt" || id === "pres_sunni_college_ppt") {
       await this.ensureFlagshipDecks();
     }
     const presentation = await presentationsRepository.getPresentationById(id);
