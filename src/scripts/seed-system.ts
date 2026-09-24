@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { pool } from "../db";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck";
 import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck";
+import { SUNNI_COLLEGE_PPT_SLIDES } from "../data/sunniDeck";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck";
 
 /**
@@ -128,6 +129,48 @@ export async function seedSystemData() {
       console.log(`[Seed:System] Synchronized GDC Sanjauli branches.`);
     }
 
+    // 1C. Sync Atal Bihari Vajpayee Government Degree College Sunni (gdc-sunni)
+    const sunniClgRes = await pool.query(
+      `INSERT INTO colleges (name, short_name, slug, description, is_active)
+       VALUES ('Atal Bihari Vajpayee Govt Degree College, Sunni', 'ABV GDC Sunni', 'gdc-sunni', 'Premier government degree college in Sunni, Shimla offering undergraduate programs across Arts, Commerce, Science, and Computer Applications affiliated with Himachal Pradesh University.', TRUE)
+       ON CONFLICT (slug) DO UPDATE 
+       SET name = EXCLUDED.name, short_name = EXCLUDED.short_name, description = EXCLUDED.description, is_active = TRUE
+       RETURNING id, name`
+    );
+
+    const sunniCollegeId = sunniClgRes.rows[0]?.id;
+    const sunniCollegeName = sunniClgRes.rows[0]?.name ?? "Atal Bihari Vajpayee Govt Degree College, Sunni";
+
+    if (sunniCollegeId) {
+      const sunniBranches = [
+        { name: "BCA", code: "BCA", desc: "Bachelor of Computer Applications." },
+        { name: "BSC Non-Med", code: "BSC_NM", desc: "Bachelor of Science (Non-Medical)." },
+        { name: "BSC Med", code: "BSC_MED", desc: "Bachelor of Science (Medical)." },
+        { name: "BCOM", code: "BCOM", desc: "Bachelor of Commerce." },
+        { name: "BA", code: "BA", desc: "Bachelor of Arts." },
+        { name: "Others", code: "OTHERS", desc: "Other / Multidisciplinary streams." },
+      ];
+
+      for (const br of sunniBranches) {
+        const brCheck = await pool.query(
+          "SELECT id FROM branches WHERE college_id = $1 AND (name = $2 OR code = $3) LIMIT 1",
+          [sunniCollegeId, br.name, br.code]
+        );
+        if (brCheck.rows && brCheck.rows[0]) {
+          await pool.query(
+            "UPDATE branches SET name = $1, code = $2, description = $3, is_active = TRUE WHERE id = $4",
+            [br.name, br.code, br.desc, brCheck.rows[0].id]
+          );
+        } else {
+          await pool.query(
+            "INSERT INTO branches (college_id, name, code, description, is_active) VALUES ($1, $2, $3, $4, TRUE)",
+            [sunniCollegeId, br.name, br.code, br.desc]
+          );
+        }
+      }
+      console.log(`[Seed:System] Synchronized ABV GDC Sunni branches.`);
+    }
+
     // 2. Seed / Sync Flagship Deck: Theog College PPT
     const theogPresTitle = "Theog College PPT";
     await pool.query(
@@ -167,6 +210,26 @@ export async function seedSystemData() {
       ]
     );
     console.log(`[Seed:System] Synchronized flagship deck: Sanjauli College PPT (${SANJAULI_COLLEGE_PPT_SLIDES.length} slides)`);
+
+    // 2C. Seed / Sync Flagship Deck: Sunni College PPT
+    const sunniPresTitle = "Atal Bihari Vajpayee Govt Degree College Sunni PPT";
+    await pool.query(
+      `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+       VALUES ('pres_sunni_college_ppt', $1, $2, $3, $4, 'dark', $5, TRUE)
+       ON CONFLICT (id) DO UPDATE 
+       SET slides = EXCLUDED.slides, 
+           title = EXCLUDED.title, 
+           college_id = COALESCE(EXCLUDED.college_id, presentations.college_id), 
+           college_name = COALESCE(EXCLUDED.college_name, presentations.college_name)`,
+      [
+        sunniCollegeId,
+        sunniCollegeName,
+        sunniPresTitle,
+        "28-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+        JSON.stringify(SUNNI_COLLEGE_PPT_SLIDES),
+      ]
+    );
+    console.log(`[Seed:System] Synchronized flagship deck: Sunni College PPT (${SUNNI_COLLEGE_PPT_SLIDES.length} slides)`);
 
     // 3. Seed / Sync Flagship Deck: Unisole AI Campus Deck
     const aiDeckTitle = "UNISOLE AI Campus Program Presentation Deck";

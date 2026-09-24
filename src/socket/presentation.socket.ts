@@ -140,6 +140,9 @@ export async function getOrCreateSessionState(
   if (!sessionState) {
     const session = await presentationsRepository.getSessionByCode(code);
     if (!session && !fallbackSessionId) return null;
+    if (session?.status === "ENDED") {
+      return null;
+    }
     const presentation = session
       ? await presentationsRepository.getPresentationById(session.presentationId)
       : null;
@@ -181,7 +184,39 @@ export async function getOrCreateSessionState(
   return sessionState;
 }
 
+let ioInstance: SocketIOServer | null = null;
+
+export function broadcastSessionEnded(sessionCode: string, sessionId?: string) {
+  if (!sessionCode) return;
+  const code = sessionCode.toUpperCase();
+  const room = `session:${code}`;
+  const sessionState = activeSessions.get(code);
+
+  const targetSessionId = sessionState?.sessionId || sessionId;
+  if (targetSessionId) {
+    presentationsRepository
+      .updateSession(targetSessionId, {
+        status: "ENDED",
+        endedAt: new Date().toISOString(),
+        activeAttendeesCount: 0,
+      })
+      .catch(() => {});
+  }
+
+  if (sessionState) {
+    sessionState.isPresentationStarted = false;
+    activeSessions.delete(code);
+  }
+
+  if (ioInstance) {
+    ioInstance.to(room).emit("session_ended", {
+      message: "Thank you for attending the Unisole College Roadshow!",
+    });
+  }
+}
+
 export function setupPresentationSocket(io: SocketIOServer) {
+  ioInstance = io;
   io.on("connection", (socket: Socket) => {
     // Helper to purge previous session rooms on this socket to prevent cross-session event leakage
     const sanitizeSessionRooms = (currentCode: string) => {
@@ -283,7 +318,12 @@ export function setupPresentationSocket(io: SocketIOServer) {
         socket.join(room);
 
         const sessionState = await getOrCreateSessionState(code);
-        if (!sessionState) return;
+        if (!sessionState) {
+          socket.emit("session_ended", {
+            message: "This presentation session has already concluded. Thank you for attending!",
+          });
+          return;
+        }
 
         // Fetch lead details if existing
         let currentScore = 0;
@@ -1196,23 +1236,15 @@ export function setupPresentationSocket(io: SocketIOServer) {
     // ==================== PRESENTER: END SESSION ====================
     socket.on(
       "admin:end_session",
-      async ({ sessionCode }: { sessionCode: string }) => {
+      async (
+        { sessionCode }: { sessionCode: string },
+        callback?: (res?: any) => void
+      ) => {
         if (!sessionCode) return;
-        const code = sessionCode.toUpperCase();
-        const room = `session:${code}`;
-        const sessionState = await getOrCreateSessionState(code);
-        if (sessionState) {
-          presentationsRepository.updateSession(sessionState.sessionId, {
-            status: "ENDED",
-            endedAt: new Date().toISOString(),
-            activeAttendeesCount: 0,
-          });
-          activeSessions.delete(code);
+        broadcastSessionEnded(sessionCode);
+        if (typeof callback === "function") {
+          callback({ success: true });
         }
-
-        io.to(room).emit("session_ended", {
-          message: "Thank you for attending the Unisole College Roadshow!",
-        });
       }
     );
 
