@@ -9,6 +9,9 @@ export const pathwaysController = {
   listPublished: asyncHandler(async (_req: Request, res: Response) => {
     res.json(await pathwaysService.listPublished());
   }),
+  getPublicPrograms: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await pathwaysService.getPublicPrograms());
+  }),
   getById: asyncHandler(async (req: Request, res: Response) => {
     res.json(await pathwaysService.getById(req.params.id));
   }),

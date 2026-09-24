@@ -1,3 +1,5 @@
+import { getCanonicalPathway } from "./canonical-catalog";
+
 export interface CanonicalOffering {
   itemType: "PATHWAY" | "COURSE" | "WORKSHOP" | "PROGRAM" | "BUNDLE";
   itemId: string;
@@ -13,7 +15,7 @@ export interface CanonicalOffering {
   metadata?: Record<string, any>;
 }
 
-export const CANONICAL_SEO_OFFERINGS: CanonicalOffering[] = [
+const RAW_CANONICAL_SEO_OFFERINGS: CanonicalOffering[] = [
   // ============================================================
   // GROUP 01: Computer Science & IT
   // ============================================================
@@ -227,3 +229,29 @@ export const CANONICAL_SEO_OFFERINGS: CanonicalOffering[] = [
     },
   },
 ];
+
+export const CANONICAL_SEO_OFFERINGS: CanonicalOffering[] = RAW_CANONICAL_SEO_OFFERINGS.map(
+  (offering) => {
+    if (offering.itemType === "PATHWAY") {
+      const canon = getCanonicalPathway(offering.itemId);
+      if (canon) {
+        return {
+          ...offering,
+          metadata: {
+            ...offering.metadata,
+            modules: canon.modules || [],
+            capstone: canon.capstone,
+            roles: canon.roles || [],
+            tools: canon.tools || [],
+            duration: canon.duration || offering.metadata?.duration,
+            level: canon.level || offering.metadata?.level,
+            handsOn: canon.handsOn || offering.metadata?.handsOn,
+            syllabusLink: canon.syllabusLink || offering.metadata?.syllabusLink,
+          },
+        };
+      }
+    }
+    return offering;
+  }
+);
+

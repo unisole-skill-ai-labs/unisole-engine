@@ -14,6 +14,7 @@ publicRouter.get("/courses", coursesController.listPublished);
 publicRouter.get("/courses/:slug", coursesController.getBySlug);
 publicRouter.get("/pathways", pathwaysController.listPublished);
 publicRouter.get("/pathways/:slug", pathwaysController.getBySlug);
+publicRouter.get("/programs", pathwaysController.getPublicPrograms);
 publicRouter.get("/categories", categoriesController.listActive);
 publicRouter.get("/colleges", collegesController.listActive);
 publicRouter.get("/branches", branchesController.listActive);

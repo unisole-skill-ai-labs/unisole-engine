@@ -13,6 +13,7 @@ import {
   Lesson,
 } from "../db/schema";
 import { ForbiddenError, NotFoundError } from "../errors";
+import { getCanonicalPathway, CANONICAL_GROUPS } from "../constants/canonical-catalog";
 
 const PATHWAY_CATALOG: Record<string, { title: string; description: string; duration: string; level: string }> = {
   "cs-p1": {
@@ -104,7 +105,9 @@ export const lmsService = {
         pathways,
         or(
           eq(enrollments.pathwayId, pathways.id),
-          eq(enrollments.itemId, pathways.id)
+          eq(enrollments.itemId, pathways.id),
+          eq(enrollments.pathwayId, pathways.slug),
+          eq(enrollments.itemId, pathways.slug)
         )
       )
       .where(
@@ -126,11 +129,12 @@ export const lmsService = {
       }
 
       const targetId = enr.itemId || enr.pathwayId || "cs-p1";
+      const canon = getCanonicalPathway(targetId);
       const cat = PATHWAY_CATALOG[targetId] || {
-        title: "Unisole Career Skill Pathway",
-        description: "Verified academic training track.",
-        duration: "3 Months",
-        level: "All Learners",
+        title: canon?.title || "Unisole Career Skill Pathway",
+        description: canon?.description || "Verified academic training track.",
+        duration: canon?.duration || "3 Months",
+        level: canon?.level || "All Learners",
       };
 
       return {
@@ -147,7 +151,7 @@ export const lmsService = {
           level: cat.level,
           isActive: true,
           isPublic: true,
-          pricePaise: 299900,
+          pricePaise: canon?.price ? canon.price * 100 : 299900,
           createdAt: enr.enrolledAt,
           updatedAt: enr.enrolledAt,
         },
@@ -160,6 +164,18 @@ export const lmsService = {
    * Enforces that student is actively enrolled (or isAdmin is true).
    */
   async getPathwayContent(userId: string, pathwayId: string, isAdmin = false) {
+    const pathwayRows = await db
+      .select()
+      .from(pathways)
+      .where(or(eq(pathways.id, pathwayId), eq(pathways.slug, pathwayId)))
+      .limit(1);
+
+    if (pathwayRows.length === 0) {
+      throw new NotFoundError("Pathway not found");
+    }
+
+    const pathway = pathwayRows[0];
+
     if (!isAdmin) {
       const activeEnrollment = await db
         .select()
@@ -167,8 +183,15 @@ export const lmsService = {
         .where(
           and(
             eq(enrollments.userId, userId),
-            eq(enrollments.pathwayId, pathwayId),
-            eq(enrollments.status, "ACTIVE")
+            eq(enrollments.status, "ACTIVE"),
+            or(
+              eq(enrollments.pathwayId, pathwayId),
+              eq(enrollments.itemId, pathwayId),
+              eq(enrollments.pathwayId, pathway.id),
+              eq(enrollments.itemId, pathway.id),
+              eq(enrollments.pathwayId, pathway.slug),
+              eq(enrollments.itemId, pathway.slug)
+            )
           )
         )
         .limit(1);
@@ -178,18 +201,6 @@ export const lmsService = {
       }
     }
 
-    const pathwayRows = await db
-      .select()
-      .from(pathways)
-      .where(eq(pathways.id, pathwayId))
-      .limit(1);
-
-    if (pathwayRows.length === 0) {
-      throw new NotFoundError("Pathway not found");
-    }
-
-    const pathway = pathwayRows[0];
-
     // Fetch linked courses
     const linkedCourses = await db
       .select({
@@ -198,10 +209,10 @@ export const lmsService = {
       })
       .from(pathwayCourses)
       .innerJoin(courses, eq(pathwayCourses.courseId, courses.id))
-      .where(eq(pathwayCourses.pathwayId, pathwayId))
+      .where(or(eq(pathwayCourses.pathwayId, pathway.id), eq(pathwayCourses.pathwayId, pathway.slug)))
       .orderBy(asc(pathwayCourses.position));
 
-    const courseList = [];
+    const courseList: any[] = [];
 
     for (const { position: coursePos, course } of linkedCourses) {
       // Fetch linked modules for this course
@@ -215,7 +226,7 @@ export const lmsService = {
         .where(eq(courseModules.courseId, course.id))
         .orderBy(asc(courseModules.position));
 
-      const moduleList = [];
+      const moduleList: any[] = [];
 
       for (const { position: modPos, module: mod } of linkedModules) {
         // Fetch linked lessons for this module
@@ -251,6 +262,78 @@ export const lmsService = {
       });
     }
 
+    // Resilient fallback: If no linked courses or modules in relational table yet, synthesize from canonical catalog
+    if (courseList.length === 0 || courseList.every((c) => !c.modules || c.modules.length === 0)) {
+      const canon = getCanonicalPathway(pathway.id) || getCanonicalPathway(pathway.slug);
+      if (canon?.modules && canon.modules.length > 0) {
+        const syntheticModules = canon.modules.map((mod, mIdx) => ({
+          id: `mod_${pathway.id}_${mod.num}`,
+          title: mod.title,
+          slug: `${pathway.slug}-w${mod.num}`,
+          description: mod.practical || mod.title,
+          status: "PUBLISHED",
+          isActive: true,
+          position: mIdx + 1,
+          lessons: [
+            ...(mod.topics || []).map((topic, tIdx) => ({
+              id: `les_${pathway.id}_${mod.num}_${tIdx + 1}`,
+              title: topic,
+              slug: `${pathway.slug}-w${mod.num}-t${tIdx + 1}`,
+              description: topic,
+              durationMinutes: 45,
+              status: "PUBLISHED",
+              position: tIdx + 1,
+            })),
+            ...(mod.practical
+              ? [
+                  {
+                    id: `les_${pathway.id}_${mod.num}_lab`,
+                    title: `Lab: ${mod.title}`,
+                    slug: `${pathway.slug}-w${mod.num}-lab`,
+                    description: mod.practical,
+                    durationMinutes: 60,
+                    status: "PUBLISHED",
+                    position: (mod.topics?.length || 0) + 1,
+                  },
+                ]
+              : []),
+          ],
+        }));
+
+        if (canon.capstone) {
+          syntheticModules.push({
+            id: `mod_${pathway.id}_cap`,
+            title: `Capstone: ${canon.capstone.title}`,
+            slug: `${pathway.slug}-capstone`,
+            description: `Capstone Project Flow: ${canon.capstone.flow?.join(" ➔ ")}`,
+            status: "PUBLISHED",
+            isActive: true,
+            position: canon.modules.length + 1,
+            lessons: (canon.capstone.outputs || []).map((out, oIdx) => ({
+              id: `les_${pathway.id}_cap_${oIdx + 1}`,
+              title: `Deliverable ${oIdx + 1}: ${out}`,
+              slug: `${pathway.slug}-cap-out-${oIdx + 1}`,
+              description: out,
+              durationMinutes: 90,
+              status: "PUBLISHED",
+              position: oIdx + 1,
+            })),
+          });
+        }
+
+        courseList.push({
+          id: `crs_${pathway.id}`,
+          title: pathway.title,
+          slug: `course-${pathway.slug}`,
+          shortDescription: pathway.shortDescription,
+          description: pathway.description,
+          status: "PUBLISHED",
+          position: 1,
+          modules: syntheticModules,
+        });
+      }
+    }
+
     return {
       pathway,
       courses: courseList,
@@ -261,55 +344,91 @@ export const lmsService = {
    * Get specific lesson content with access verification chain:
    * Lesson -> Module -> Course -> Pathway -> Active Enrollment
    */
-  async getLessonContent(userId: string, lessonId: string, isAdmin = false): Promise<Lesson> {
+  async getLessonContent(userId: string, lessonId: string, isAdmin = false): Promise<any> {
     const lessonRows = await db
       .select()
       .from(lessons)
       .where(eq(lessons.id, lessonId))
       .limit(1);
 
-    if (lessonRows.length === 0) {
-      throw new NotFoundError("Lesson not found");
-    }
+    if (lessonRows.length > 0) {
+      const lesson = lessonRows[0];
+      if (isAdmin) {
+        return lesson;
+      }
 
-    const lesson = lessonRows[0];
+      // Check if user has active enrollment in this lesson's pathway
+      const accessiblePathways = await db
+        .select({ pathwayId: pathwayCourses.pathwayId })
+        .from(moduleLessons)
+        .innerJoin(courseModules, eq(moduleLessons.moduleId, courseModules.moduleId))
+        .innerJoin(pathwayCourses, eq(courseModules.courseId, pathwayCourses.courseId))
+        .where(eq(moduleLessons.lessonId, lessonId));
 
-    if (isAdmin) {
+      const pathwayIds = Array.from(new Set(accessiblePathways.map((p) => p.pathwayId)));
+
+      if (pathwayIds.length > 0) {
+        const userEnrollments = await db
+          .select()
+          .from(enrollments)
+          .where(
+            and(
+              eq(enrollments.userId, userId),
+              eq(enrollments.status, "ACTIVE"),
+              or(
+                inArray(enrollments.pathwayId, pathwayIds),
+                inArray(enrollments.itemId, pathwayIds)
+              )
+            )
+          )
+          .limit(1);
+
+        if (userEnrollments.length === 0) {
+          throw new ForbiddenError("You do not have access to this lesson. Please enroll in the relevant pathway.");
+        }
+      }
+
       return lesson;
     }
 
-    // Access check: User -> Enrollment -> Pathway -> Course -> Module -> Lesson (PRD §37)
-    // Find all pathways containing this lesson
-    const accessiblePathways = await db
-      .select({ pathwayId: pathwayCourses.pathwayId })
-      .from(moduleLessons)
-      .innerJoin(courseModules, eq(moduleLessons.moduleId, courseModules.moduleId))
-      .innerJoin(pathwayCourses, eq(courseModules.courseId, pathwayCourses.courseId))
-      .where(eq(moduleLessons.lessonId, lessonId));
-
-    const pathwayIds = Array.from(new Set(accessiblePathways.map((p) => p.pathwayId)));
-
-    if (pathwayIds.length === 0) {
-      throw new ForbiddenError("Lesson is not part of any published pathway");
+    // Fallback: search canonical catalog for lesson
+    for (const group of CANONICAL_GROUPS) {
+      for (const p of group.pathways) {
+        if (!lessonId.includes(p.id)) continue;
+        for (const mod of p.modules || []) {
+          if (lessonId.includes(`_${mod.num}_lab`)) {
+            return {
+              id: lessonId,
+              title: `Lab: ${mod.title}`,
+              slug: `${p.id}-w${mod.num}-lab`,
+              description: mod.practical,
+              content: `Hands-on Practical Lab Exercise:\n\n${mod.practical}\n\nDeliverable: Commit and push your code to your designated repository branch.`,
+              durationMinutes: 60,
+              status: "PUBLISHED",
+              isActive: true,
+            };
+          }
+          if (mod.topics) {
+            for (let i = 0; i < mod.topics.length; i++) {
+              if (lessonId.endsWith(`_${mod.num}_${i + 1}`)) {
+                return {
+                  id: lessonId,
+                  title: mod.topics[i],
+                  slug: `${p.id}-w${mod.num}-t${i + 1}`,
+                  description: mod.topics[i],
+                  content: `Curriculum Module ${mod.num}: ${mod.title}\n\nCore Topic: ${mod.topics[i]}\n\nReview the guided lecture notes and execute the lab walkthrough.`,
+                  durationMinutes: 45,
+                  status: "PUBLISHED",
+                  isActive: true,
+                };
+              }
+            }
+          }
+        }
+      }
     }
 
-    // Check if user has active enrollment in any of these pathways
-    const userEnrollments = await db
-      .select()
-      .from(enrollments)
-      .where(
-        and(
-          eq(enrollments.userId, userId),
-          eq(enrollments.status, "ACTIVE"),
-          inArray(enrollments.pathwayId, pathwayIds)
-        )
-      )
-      .limit(1);
-
-    if (userEnrollments.length === 0) {
-      throw new ForbiddenError("You do not have access to this lesson. Please enroll in the relevant pathway.");
-    }
-
-    return lesson;
+    throw new NotFoundError("Lesson not found");
   },
 };
+
