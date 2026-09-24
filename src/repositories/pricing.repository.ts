@@ -75,5 +75,13 @@ export const pricingRepository = {
     const [row] = await db.delete(offeringsPricing).where(eq(offeringsPricing.id, id)).returning();
     return row ?? null;
   },
+
+  async removeByItem(itemType: ItemType, itemId: string): Promise<OfferingPricing | null> {
+    const [row] = await db
+      .delete(offeringsPricing)
+      .where(and(eq(offeringsPricing.itemType, itemType), eq(offeringsPricing.itemId, itemId)))
+      .returning();
+    return row ?? null;
+  },
 };
 

@@ -28,6 +28,11 @@ export const pricingService = {
    * Checks dynamic offerings_pricing first, then falls back to catalog tables (courses / pathways) or canonical catalog.
    */
   async resolveItemPrice(itemType: ItemType, itemId: string): Promise<ResolvedPrice> {
+    // 0. Alias handling
+    if (itemId.toLowerCase() === "mgmt-common") {
+      return this.resolveItemPrice(itemType, "cs-common");
+    }
+
     // 1. Check dynamic offerings pricing table
     const dynamicPrice = await pricingRepository.getByItem(itemType, itemId);
     if (dynamicPrice && dynamicPrice.isActive) {
@@ -111,6 +116,11 @@ export const pricingService = {
     let inserted = 0;
     let updated = 0;
 
+    // Clean up deprecated / duplicate offerings
+    await pricingRepository.removeByItem("PATHWAY" as ItemType, "mgmt-common").catch(() => {});
+    await pricingRepository.removeByItem("PATHWAY" as ItemType, "mgmt-p2").catch(() => {});
+    await pricingRepository.removeByItem("PATHWAY" as ItemType, "mgmt-p3").catch(() => {});
+
     for (const offering of CANONICAL_SEO_OFFERINGS) {
       const existing = await pricingRepository.getByItem(offering.itemType as ItemType, offering.itemId);
       if (!existing) {
@@ -130,8 +140,9 @@ export const pricingService = {
         });
         inserted++;
       } else {
-        // Sync metadata or title if needed without overwriting admin's pricePaise
+        // Sync metadata, title and slug without overwriting admin's custom pricePaise
         await pricingRepository.update(existing.id, {
+          title: offering.title,
           slug: offering.slug,
           metadata: {
             ...(existing.metadata as Record<string, any> || {}),
