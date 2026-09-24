@@ -73,6 +73,17 @@ export const pricingController = {
     });
   }),
 
+  adminSyncCanonical: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const result = await pricingService.syncCanonicalOfferings();
+    const list = await pricingService.listAllPricing();
+    res.json({
+      success: true,
+      message: `Successfully synchronized ${result.total} SEO offerings (${result.inserted} added, ${result.updated} verified).`,
+      syncResult: result,
+      items: list,
+    });
+  }),
+
   adminUpdatePricing: asyncHandler(async (req: CustomRequest, res: Response) => {
     const id = req.params.id;
     if (!id) throw new ValidationError("Pricing item ID is required");

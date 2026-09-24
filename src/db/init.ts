@@ -2,6 +2,7 @@ import { pool, db } from "../db";
 import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
+import { pricingService } from "../services/pricing.service";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -312,8 +313,9 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "is_public" boolean DEFAULT true NOT NULL;
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
       ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "description" text;
-      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
-      ALTER TABLE "public"."offerings_pricing" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_offerings_pricing_item" ON "public"."offerings_pricing" ("item_type", "item_id");
+      CREATE INDEX IF NOT EXISTS "idx_offerings_pricing_item" ON "public"."offerings_pricing" ("item_type", "item_id");
+      CREATE INDEX IF NOT EXISTS "idx_offerings_pricing_is_active" ON "public"."offerings_pricing" ("is_active");
 
       -- Ensure columns on existing orders table if created in earlier runs
       ALTER TABLE "public"."orders" ADD COLUMN IF NOT EXISTS "order_number" varchar(60);
@@ -697,7 +699,7 @@ export async function initializeDatabase() {
         ('PATHWAY', 'cs-p2', 'Full Stack Web Development (AI-Powered)', 'Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI capabilities.', 149900, 699900, true, true),
         ('PATHWAY', 'cs-p3', 'Complete Machine Learning + Full Stack', 'Comprehensive dual curriculum merging Machine Learning, Deep Learning, and MLOps with full-stack React and Node.js.', 399900, 1499900, true, true),
         ('PATHWAY', 'cs-common', 'AI Entrepreneurship & Innovation', 'Structured incubator track teaching students how to convert AI technical capability into commercial startups.', 59900, 299900, true, true),
-        ('PATHWAY', 'sci-p1', 'Scientific AI & Machine Learning Professional Program', 'Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Physics-Informed Neural Networks.', 299900, 899900, true, true),
+        ('PATHWAY', 'sci-p1', 'Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)', 'Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Physics-Informed Neural Networks.', 299900, 899900, true, true),
         ('PATHWAY', 'sci-p2', 'Mathematics + AI / Computational Intelligence', 'Mathematics-oriented pathway focusing on optimization theory, statistical learning, and computational algorithms.', 150000, 599900, true, true),
         ('PATHWAY', 'mgmt-p1', 'Business Analytics & Data Engineering', 'Advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, true, true),
         ('PATHWAY', 'mgmt-p2', 'AI in Finance & FinTech Systems', 'Digital banking, financial modeling, credit risk scoring, fraud detection algorithms, and responsible AI.', 200000, 699900, true, true),
@@ -721,7 +723,7 @@ export async function initializeDatabase() {
         ('cs-p2', 'Full Stack Web Development (AI-Powered)', 'cs-p2', 'Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI capabilities like document Q&A and chatbots.', 149900, 699900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-p2", "badge": "GROUP 01 • PATHWAY 04", "shortName": "CS & IT: Full Stack Web"}'::jsonb, TRUE),
         ('cs-p3', 'Complete Machine Learning + Full Stack', 'cs-p3', 'Comprehensive dual curriculum merging Machine Learning, Deep Learning, and MLOps with full-stack React, Node.js, and cloud systems.', 399900, 1499900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-p3", "badge": "GROUP 01 • PATHWAY 05", "shortName": "CS & IT: Dual Track ML + Web"}'::jsonb, TRUE),
         ('cs-common', 'AI Entrepreneurship & Innovation', 'cs-common', 'Structured incubator track teaching students how to convert AI technical capability into validated commercial products and startups.', 59900, 299900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-common", "badge": "GROUP 01 • WEEKEND", "shortName": "CS & IT: AI Entrepreneurship"}'::jsonb, TRUE),
-        ('sci-p1', 'Scientific AI & Machine Learning Professional Program', 'sci-p1', 'Combines mathematical principles with modern scientific computing, differential equations, and Physics-Informed Neural Networks (PINNs).', 299900, 899900, 'PUBLISHED'::content_status, '{"group": "group-2", "pathwayId": "sci-p1", "badge": "GROUP 02 • PATHWAY 01", "shortName": "Science & Math: SciML & AI"}'::jsonb, TRUE),
+        ('sci-p1', 'Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)', 'sci-p1', 'Combines mathematical principles with modern scientific computing, differential equations, and Physics-Informed Neural Networks (PINNs).', 299900, 899900, 'PUBLISHED'::content_status, '{"group": "group-2", "pathwayId": "sci-p1", "badge": "GROUP 02 • PATHWAY 01", "shortName": "Science & Math: SciML & AI"}'::jsonb, TRUE),
         ('sci-p2', 'Mathematics + AI / Computational Intelligence', 'sci-p2', 'Rigorous mathematics-oriented pathway focusing on mathematical proofs, optimization theory, statistical learning, and computational algorithms.', 150000, 599900, 'PUBLISHED'::content_status, '{"group": "group-2", "pathwayId": "sci-p2", "badge": "GROUP 02 • PATHWAY 02", "shortName": "Science & Math: Computational Math"}'::jsonb, TRUE),
         ('mgmt-p1', 'Business Analytics & Data Engineering', 'mgmt-p1', 'Equips business students with advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-3", "pathwayId": "mgmt-p1", "badge": "GROUP 03 • PATHWAY 01", "shortName": "Commerce: Business Analytics"}'::jsonb, TRUE),
         ('mgmt-p2', 'AI in Finance & FinTech Systems', 'mgmt-p2', 'Explores digital banking, financial modeling, credit risk scoring, fraud detection algorithms, and responsible AI in finance.', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-3", "pathwayId": "mgmt-p2", "badge": "GROUP 03 • PATHWAY 02", "shortName": "Commerce: FinTech & Finance AI"}'::jsonb, TRUE),
@@ -835,7 +837,15 @@ export async function initializeDatabase() {
       console.warn("[DB-INIT] Warning syncing survey responders:", e);
     }
 
-    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Foundational Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
+    // 17. Seed & Sync Canonical SEO Course Offerings into offerings_pricing table
+    try {
+      const syncResult = await pricingService.syncCanonicalOfferings();
+      console.log(`[DB-INIT] ✅ Seeded & synchronized canonical SEO offerings: ${syncResult.total} total (${syncResult.inserted} newly added, ${syncResult.updated} verified).`);
+    } catch (e) {
+      console.warn("[DB-INIT] Warning syncing canonical offerings:", e);
+    }
+
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }

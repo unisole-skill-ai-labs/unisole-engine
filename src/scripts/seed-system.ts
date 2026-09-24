@@ -318,7 +318,7 @@ export async function seedSystemData() {
       // --- GROUP 02: Science & Mathematics (2 Courses) ---
       {
         id: "sci-p1",
-        title: "Scientific AI & Machine Learning Professional Program",
+        title: "Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)",
         slug: "sci-p1",
         short_description: "Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Formulate differential equations as learning constraints, implement PINNs via PyTorch autograd, and solve forward/inverse problems.",
         price_paise: 299900,
