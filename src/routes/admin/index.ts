@@ -26,8 +26,8 @@ import { adminSurveysRouter } from "./surveys";
 
 export const adminRouter: Router = Router();
 
-// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES)
-adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES"]));
+// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES, MENTOR)
+adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR"]));
 
 // My Work - Centralized Staff Task & Lead Workspace
 adminRouter.use("/my-work", adminMyWorkRouter);

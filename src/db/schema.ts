@@ -25,6 +25,7 @@ import { sql, InferSelectModel, InferInsertModel } from "drizzle-orm";
 export const userRole = pgEnum("user_role", [
   "STUDENT",
   "MEMBER",
+  "MENTOR",
   "ADMIN",
   "SUPER_ADMIN",
   "SALES",
