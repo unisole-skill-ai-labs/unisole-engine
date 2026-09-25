@@ -28,6 +28,7 @@ import { pathwaysService } from "./services/pathways.service";
 import { pricingService } from "./services/pricing.service";
 
 const app = express();
+app.set("trust proxy", true);
 const server = http.createServer(app);
 
 // Initialize Real-time Socket.io Engine
