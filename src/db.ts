@@ -14,6 +14,9 @@ export const pool = new Pool({
   connectionString:
     process.env.DATABASE_URL ??
     "postgres://postgres:postgres@localhost:5432/unisole",
+  max: 50,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 
 export const db = drizzle(pool, { schema: { ...schema, ...relations } });
