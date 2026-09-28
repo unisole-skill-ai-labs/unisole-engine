@@ -18,6 +18,7 @@ import {
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 import { CANONICAL_SEO_OFFERINGS } from "../constants/offerings";
 import { CANONICAL_GROUPS, getCanonicalPathway } from "../constants/canonical-catalog";
+import { getQuestionsForModule } from "../constants/curriculum-quizzes";
 
 export const pathwaysService = {
   /**
@@ -177,6 +178,7 @@ export const pathwaysService = {
               const topic = mod.topics[tIdx];
               const lessonId = `les_${offering.itemId}_${mod.num}_${tIdx + 1}`;
               const lessonSlug = `${offering.slug}-w${mod.num}-t${tIdx + 1}`;
+              const lectureVideoUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1";
 
               await db
                 .insert(lessons)
@@ -186,6 +188,7 @@ export const pathwaysService = {
                   slug: lessonSlug,
                   description: topic,
                   content: `Curriculum Module ${mod.num}: ${mod.title}\n\nCore Topic: ${topic}\n\nKey Concepts & Theory: Review the lecture materials and implement the guided coding exercises.`,
+                  videoUrl: lectureVideoUrl,
                   durationMinutes: 45,
                   status: "PUBLISHED",
                   isActive: true,
@@ -195,6 +198,7 @@ export const pathwaysService = {
                   set: {
                     title: topic,
                     description: topic,
+                    videoUrl: lectureVideoUrl,
                     status: "PUBLISHED",
                     isActive: true,
                     updatedAt: new Date().toISOString(),
@@ -212,7 +216,53 @@ export const pathwaysService = {
             }
           }
 
-          // If practical lab, create lab lesson
+          // Sync weekly Quiz lesson
+          const quizLessonId = `les_${offering.itemId}_${mod.num}_quiz`;
+          const quizLessonSlug = `${offering.slug}-w${mod.num}-quiz`;
+          const quizQuestions = getQuestionsForModule(offering.itemId, mod.num);
+
+          await db
+            .insert(lessons)
+            .values({
+              id: quizLessonId,
+              title: `Quiz: ${mod.title}`,
+              slug: quizLessonSlug,
+              description: `Weekly Graded Quiz & Concept Check for ${mod.title}`,
+              content: JSON.stringify({
+                type: "QUIZ",
+                passingScore: 70,
+                questions: quizQuestions,
+              }),
+              durationMinutes: 20,
+              status: "PUBLISHED",
+              isActive: true,
+            })
+            .onConflictDoUpdate({
+              target: [lessons.id],
+              set: {
+                title: `Quiz: ${mod.title}`,
+                description: `Weekly Graded Quiz & Concept Check for ${mod.title}`,
+                content: JSON.stringify({
+                  type: "QUIZ",
+                  passingScore: 70,
+                  questions: quizQuestions,
+                }),
+                status: "PUBLISHED",
+                isActive: true,
+                updatedAt: new Date().toISOString(),
+              },
+            });
+
+          await db
+            .insert(moduleLessons)
+            .values({
+              moduleId: moduleId,
+              lessonId: quizLessonId,
+              position: (mod.topics?.length || 0) + 1,
+            })
+            .onConflictDoNothing();
+
+          // Sync practical lab / milestone assignment lesson
           if (mod.practical) {
             const labLessonId = `les_${offering.itemId}_${mod.num}_lab`;
             const labLessonSlug = `${offering.slug}-w${mod.num}-lab`;
@@ -221,10 +271,14 @@ export const pathwaysService = {
               .insert(lessons)
               .values({
                 id: labLessonId,
-                title: `Lab: ${mod.title}`,
+                title: `Hands-on Lab: ${mod.title}`,
                 slug: labLessonSlug,
                 description: mod.practical,
-                content: `Hands-on Practical Lab Exercise:\n\n${mod.practical}\n\nDeliverable: Commit and push your code to the designated repository branch or sandbox environment.`,
+                content: JSON.stringify({
+                  type: "ASSIGNMENT",
+                  instructions: mod.practical,
+                  allowedTypes: ["GITHUB", "URL", "FILE"],
+                }),
                 durationMinutes: 60,
                 status: "PUBLISHED",
                 isActive: true,
@@ -232,9 +286,13 @@ export const pathwaysService = {
               .onConflictDoUpdate({
                 target: [lessons.id],
                 set: {
-                  title: `Lab: ${mod.title}`,
+                  title: `Hands-on Lab: ${mod.title}`,
                   description: mod.practical,
-                  content: `Hands-on Practical Lab Exercise:\n\n${mod.practical}\n\nDeliverable: Commit and push your code to the designated repository branch or sandbox environment.`,
+                  content: JSON.stringify({
+                    type: "ASSIGNMENT",
+                    instructions: mod.practical,
+                    allowedTypes: ["GITHUB", "URL", "FILE"],
+                  }),
                   status: "PUBLISHED",
                   isActive: true,
                   updatedAt: new Date().toISOString(),
@@ -246,7 +304,7 @@ export const pathwaysService = {
               .values({
                 moduleId: moduleId,
                 lessonId: labLessonId,
-                position: (mod.topics?.length || 0) + 1,
+                position: (mod.topics?.length || 0) + 2,
               })
               .onConflictDoNothing();
           }
@@ -294,6 +352,8 @@ export const pathwaysService = {
             const capLessonId = `les_${offering.itemId}_cap_${oIdx + 1}`;
             const capLessonSlug = `${offering.slug}-cap-out-${oIdx + 1}`;
 
+            const capVideoUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1";
+
             await db
               .insert(lessons)
               .values({
@@ -302,6 +362,7 @@ export const pathwaysService = {
                 slug: capLessonSlug,
                 description: out,
                 content: `Capstone Final Deliverable Requirement:\n\n${out}\n\nSubmission & Defense: Present this component to the evaluation panel during your final capstone defense review.`,
+                videoUrl: capVideoUrl,
                 durationMinutes: 90,
                 status: "PUBLISHED",
                 isActive: true,
@@ -311,6 +372,7 @@ export const pathwaysService = {
                 set: {
                   title: `Deliverable ${oIdx + 1}: ${out}`,
                   description: out,
+                  videoUrl: capVideoUrl,
                   status: "PUBLISHED",
                   isActive: true,
                   updatedAt: new Date().toISOString(),
