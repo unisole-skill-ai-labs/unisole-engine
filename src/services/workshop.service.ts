@@ -22,6 +22,11 @@ export interface RegisterWorkshopDto {
   branch?: string;
   occupation?: string; // Student, Working Professional, Professor / Faculty, Other
   yearOfStudy?: string;
+  workshopSlug?: string;
+  workshopName?: string;
+  slot?: string;
+  slotId?: string;
+  sessionDate?: string;
 }
 
 export interface WorkshopSurveyDto {
@@ -121,6 +126,14 @@ export const workshopService = {
       }
     }
 
+    const isJev = (data.workshopSlug && data.workshopSlug.toLowerCase().includes("jev")) ||
+      (data.workshopName && data.workshopName.toLowerCase().includes("jev"));
+    const workshopSlug = data.workshopSlug || (isJev ? "workshop-jev" : "ai-workshop");
+    const workshopTitle = data.workshopName || (isJev ? "Discover JEV — The Future of Decision-Making AI" : "AI Prompting & Systemizing Masterclass");
+    const sessionDate = data.sessionDate || (isJev ? "2026-09-29" : "2026-09-12");
+    const slot = data.slot || undefined;
+    const slotId = data.slotId || undefined;
+
     // 3. Authenticate or create user account seamlessly
     const authResult = await authService.login({
       phone: cleanPhone,
@@ -129,14 +142,18 @@ export const workshopService = {
       collegeName: formattedCollege || undefined,
       collegeId: resolvedCollegeId || undefined,
       branch: formattedBranch || undefined,
-      signupSource: "AI_WORKSHOP",
-      source: "AI_WORKSHOP",
+      signupSource: isJev ? "WORKSHOP_JEV" : "AI_WORKSHOP",
+      source: isJev ? "WORKSHOP_JEV" : "AI_WORKSHOP",
       metadata: {
         registeredForWorkshop: true,
         email: formattedEmail,
         occupation,
         yearOfStudy,
-        workshopDate: "2026-09-12",
+        workshopSlug,
+        workshopName: workshopTitle,
+        workshopDate: sessionDate,
+        slot,
+        slotId,
         registeredAt: new Date().toISOString(),
       },
     });
@@ -162,6 +179,11 @@ export const workshopService = {
         email: formattedEmail || existingMeta.email,
         occupation: occupation || existingMeta.occupation,
         yearOfStudy: yearOfStudy || existingMeta.yearOfStudy,
+        workshopSlug,
+        workshopName: workshopTitle,
+        workshopDate: sessionDate,
+        slot: slot || existingMeta.slot,
+        slotId: slotId || existingMeta.slotId,
         lastWorkshopLoginAt: new Date().toISOString(),
       },
     });
@@ -187,9 +209,23 @@ export const workshopService = {
         new Set([
           ...(existingLead[0]?.tags as string[] || []),
           "AI_WORKSHOP",
+          isJev ? "JEV_WORKSHOP" : "MASTERCLASS",
+          slotId ? `SLOT_${slotId.toUpperCase()}` : null,
           occupation,
-        ])
+        ].filter(Boolean) as string[])
       );
+
+      const leadNote = isJev
+        ? `Registered for JEV Workshop${slot ? ` | Slot: ${slot}` : ""}`
+        : "Registered for AI Prompting & Systemizing Masterclass";
+
+      const sourceDetails = {
+        workshopSlug,
+        workshopName: workshopTitle,
+        workshopDate: sessionDate,
+        slot,
+        slotId,
+      };
 
       if (existingLead.length > 0) {
         await db
@@ -201,10 +237,11 @@ export const workshopService = {
             branch: formattedBranch || existingLead[0].branch,
             yearOfStudy: yearOfStudy || existingLead[0].yearOfStudy,
             source: "AI_WORKSHOP" as any,
+            sourceDetails,
             tags,
             notes: existingLead[0].notes
-              ? `${existingLead[0].notes} | AI Workshop Registered`
-              : "Registered for AI Prompting & Systemizing Masterclass",
+              ? `${existingLead[0].notes} | ${leadNote}`
+              : leadNote,
             updatedAt: new Date().toISOString(),
           })
           .where(eq(leads.id, existingLead[0].id));
@@ -221,8 +258,9 @@ export const workshopService = {
           quality: "HOT",
           status: "INTERESTED",
           source: "AI_WORKSHOP" as any,
+          sourceDetails,
           tags,
-          notes: "Registered for AI Prompting & Systemizing Masterclass",
+          notes: leadNote,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
