@@ -56,4 +56,29 @@ export const lmsController = {
     const activities = await lmsService.getStudentActivities(userId);
     res.json(activities);
   }),
+
+  saveNote: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const result = await lmsService.saveNote(userId, req.body);
+    res.json(result);
+  }),
+
+  getNotes: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const pathwayId = req.params.pathwayId || (req.query.pathwayId as string);
+    const result = await lmsService.getNotes(userId, pathwayId);
+    res.json(result);
+  }),
+
+  getCohortData: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const pathwayId = req.params.pathwayId || (req.query.pathwayId as string);
+    const result = await lmsService.getCohortData(pathwayId);
+    res.json(result);
+  }),
+
+  updateProfile: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const result = await lmsService.updateUserProfile(userId, req.body);
+    res.json(result);
+  }),
 };

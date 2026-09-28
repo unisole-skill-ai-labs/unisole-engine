@@ -424,6 +424,8 @@ export const users = pgTable(
     username: varchar({ length: 100 }),
     password: varchar({ length: 255 }),
     name: varchar({ length: 150 }),
+    email: varchar({ length: 255 }),
+    avatar: text(),
     collegeId: varchar("college_id", { length: 50 }),
     collegeName: varchar("college_name", { length: 200 }),
     branch: varchar({ length: 100 }),
@@ -1970,6 +1972,36 @@ export const submissions = pgTable(
   ]
 );
 
+export const notes = pgTable(
+  "notes",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    lessonId: varchar("lesson_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }),
+    lessonTitle: varchar("lesson_title", { length: 255 }),
+    content: text().notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_notes_user").on(table.userId),
+    index("idx_notes_lesson").on(table.lessonId),
+    index("idx_notes_pathway").on(table.pathwayId),
+    unique("uq_notes_user_lesson").on(table.userId, table.lessonId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_notes_user",
+    }).onDelete("cascade"),
+  ]
+);
+
 // ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
@@ -1991,6 +2023,7 @@ export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Enrollment = InferSelectModel<typeof enrollments>;
 export type LessonProgress = InferSelectModel<typeof lessonProgress>;
 export type Submission = InferSelectModel<typeof submissions>;
+export type Note = InferSelectModel<typeof notes>;
 export type Payment = InferSelectModel<typeof payments>;
 export type Order = InferSelectModel<typeof orders>;
 export type OrderItem = InferSelectModel<typeof orderItems>;
@@ -2034,6 +2067,7 @@ export type NewModuleLesson = InferInsertModel<typeof moduleLessons>;
 export type NewEnrollment = InferInsertModel<typeof enrollments>;
 export type NewLessonProgress = InferInsertModel<typeof lessonProgress>;
 export type NewSubmission = InferInsertModel<typeof submissions>;
+export type NewNote = InferInsertModel<typeof notes>;
 export type NewPayment = InferInsertModel<typeof payments>;
 export type NewOrder = InferInsertModel<typeof orders>;
 export type NewOrderItem = InferInsertModel<typeof orderItems>;

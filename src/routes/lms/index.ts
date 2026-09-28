@@ -13,6 +13,7 @@ lmsRouter.use(authMiddleware);
 
 // Profile
 lmsRouter.get("/me", authController.me);
+lmsRouter.put("/me", lmsController.updateProfile);
 
 // Pathways & Content
 lmsRouter.get("/pathways", lmsController.getMyPathways);
@@ -27,6 +28,13 @@ lmsRouter.post("/submissions", validateBody({ required: ["lessonId"] }), lmsCont
 lmsRouter.get("/submissions", lmsController.getSubmissions);
 lmsRouter.get("/submissions/:pathwayId", lmsController.getSubmissions);
 lmsRouter.get("/activities", lmsController.getActivities);
+
+// Lecture Notes & Cohort Community
+lmsRouter.post("/notes", validateBody({ required: ["lessonId", "content"] }), lmsController.saveNote);
+lmsRouter.get("/notes", lmsController.getNotes);
+lmsRouter.get("/notes/:pathwayId", lmsController.getNotes);
+lmsRouter.get("/cohort", lmsController.getCohortData);
+lmsRouter.get("/cohort/:pathwayId", lmsController.getCohortData);
 
 // Enrollments
 lmsRouter.get("/enrollments", enrollmentsController.list);

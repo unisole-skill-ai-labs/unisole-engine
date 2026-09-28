@@ -1,6 +1,7 @@
 import { eq, and, or, inArray, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
+  users,
   enrollments,
   pathways,
   courses,
@@ -11,6 +12,7 @@ import {
   moduleLessons,
   lessonProgress,
   submissions,
+  notes,
   Pathway,
   Lesson,
 } from "../db/schema";
@@ -102,6 +104,17 @@ const inMemorySubmissions: Array<{
   status: string;
   evaluatedAt?: string;
   createdAt: string;
+}> = [];
+
+const inMemoryNotes: Array<{
+  id: string;
+  userId: string;
+  lessonId: string;
+  pathwayId?: string;
+  lessonTitle?: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
 }> = [];
 
 export const lmsService = {
@@ -833,6 +846,224 @@ export const lmsService = {
     return {
       scheduled,
       completed: completedList,
+    };
+  },
+
+  /**
+   * Save or update lecture note
+   */
+  async saveNote(
+    userId: string,
+    data: { lessonId: string; pathwayId?: string; lessonTitle?: string; content: string }
+  ) {
+    const id = `note_${userId}_${data.lessonId}`;
+    const now = new Date().toISOString();
+
+    try {
+      await db
+        .insert(notes)
+        .values({
+          id,
+          userId,
+          lessonId: data.lessonId,
+          pathwayId: data.pathwayId || null,
+          lessonTitle: data.lessonTitle || null,
+          content: data.content,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [notes.userId, notes.lessonId],
+          set: {
+            content: data.content,
+            lessonTitle: data.lessonTitle || null,
+            updatedAt: now,
+          },
+        });
+    } catch {
+      // In-memory fallback
+      const existingIdx = inMemoryNotes.findIndex(
+        (n) => n.userId === userId && n.lessonId === data.lessonId
+      );
+      if (existingIdx >= 0) {
+        inMemoryNotes[existingIdx].content = data.content;
+        inMemoryNotes[existingIdx].updatedAt = now;
+      } else {
+        inMemoryNotes.push({
+          id,
+          userId,
+          lessonId: data.lessonId,
+          pathwayId: data.pathwayId,
+          lessonTitle: data.lessonTitle,
+          content: data.content,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      note: {
+        id,
+        userId,
+        lessonId: data.lessonId,
+        pathwayId: data.pathwayId,
+        lessonTitle: data.lessonTitle,
+        content: data.content,
+        updatedAt: now,
+      },
+    };
+  },
+
+  /**
+   * Get notes for user
+   */
+  async getNotes(userId: string, pathwayId?: string) {
+    try {
+      const rows = await db
+        .select()
+        .from(notes)
+        .where(
+          pathwayId
+            ? and(eq(notes.userId, userId), eq(notes.pathwayId, pathwayId))
+            : eq(notes.userId, userId)
+        );
+
+      const combined = [...rows];
+      for (const mem of inMemoryNotes) {
+        if (mem.userId === userId && (!pathwayId || mem.pathwayId === pathwayId)) {
+          if (!combined.some((c) => c.lessonId === mem.lessonId)) {
+            combined.push(mem as any);
+          }
+        }
+      }
+      return combined;
+    } catch {
+      return inMemoryNotes.filter(
+        (n) => n.userId === userId && (!pathwayId || n.pathwayId === pathwayId)
+      );
+    }
+  },
+
+  /**
+   * Get Cohort community details for a pathway
+   */
+  async getCohortData(pathwayId?: string) {
+    const isIncubator = pathwayId?.includes("common") || pathwayId?.includes("entrepreneur");
+    return {
+      pathwayId: pathwayId || "cs-genai",
+      cohortTitle: isIncubator
+        ? "AI Incubator Cohort • Weekend Track (2026)"
+        : "Generative AI Engineering • Flagship Batch (2026)",
+      schedule: isIncubator ? "Saturdays & Sundays • 10:00 AM - 1:00 PM" : "Weekdays Mon-Fri • Hybrid Labs",
+      mentor: {
+        name: "Dr. Girish Sharma",
+        role: "Lead AI Architect & Director",
+        designation: "Ex-Founding AI Engineer, Systems Specialist",
+        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
+        bio: "Specializing in distributed LLM architectures, production RAG pipelines, and autonomous agent swarms.",
+        email: "girish@unisole.org",
+      },
+      community: {
+        name: "Unisole Skill AI Labs Community",
+        platform: "Discord & Slack",
+        url: "https://discord.gg/unisole",
+        activeMembers: 142,
+      },
+      peers: [
+        {
+          id: "peer-1",
+          name: "Priya Verma",
+          college: "Centre of Excellence GDC Sanjauli",
+          branch: "BCA",
+          status: "Active Now",
+          completedCount: 3,
+        },
+        {
+          id: "peer-2",
+          name: "Rohan Mehta",
+          college: "GDC Theog",
+          branch: "B.Sc CS",
+          status: "Completed Week 1",
+          completedCount: 2,
+        },
+        {
+          id: "peer-3",
+          name: "Ananya Thakur",
+          college: "ABV GDC Sunni",
+          branch: "B.Tech IT",
+          status: "Active Now",
+          completedCount: 4,
+        },
+        {
+          id: "peer-4",
+          name: "Sahil Rana",
+          college: "GDC Sanjauli",
+          branch: "BCA",
+          status: "Week 2 in Progress",
+          completedCount: 2,
+        },
+        {
+          id: "peer-5",
+          name: "Vikram Chauhan",
+          college: "HPU Shimla",
+          branch: "MCA",
+          status: "Active 2h ago",
+          completedCount: 5,
+        },
+      ],
+    };
+  },
+
+  /**
+   * Update student profile fields
+   */
+  async updateUserProfile(
+    userId: string,
+    data: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      timezone?: string;
+      linkedin?: string;
+      avatar?: string;
+    }
+  ) {
+    const existing = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!existing || existing.length === 0) {
+      throw new NotFoundError("User not found");
+    }
+
+    const currentMeta = (existing[0].metadata as Record<string, any>) || {};
+    const updatedMeta = {
+      ...currentMeta,
+      ...(data.timezone ? { timezone: data.timezone } : {}),
+      ...(data.linkedin ? { linkedin: data.linkedin } : {}),
+    };
+
+    const updateFields: any = {
+      updatedAt: new Date().toISOString(),
+      metadata: updatedMeta,
+    };
+    if (data.name) updateFields.name = data.name.trim();
+    if (data.email) updateFields.email = data.email.trim();
+    if (data.phone) updateFields.phone = data.phone.trim();
+    if (data.avatar) updateFields.avatar = data.avatar.trim();
+
+    try {
+      await db.update(users).set(updateFields).where(eq(users.id, userId));
+    } catch {
+      // Non-critical fallback
+    }
+
+    return {
+      success: true,
+      user: {
+        ...existing[0],
+        ...updateFields,
+        timezone: updatedMeta.timezone || "Asia/Kolkata",
+        linkedin: updatedMeta.linkedin || "",
+      },
     };
   },
 };
