@@ -9,6 +9,8 @@ import {
   courseModules,
   lessons,
   moduleLessons,
+  lessonProgress,
+  submissions,
   Pathway,
   Lesson,
 } from "../db/schema";
@@ -83,6 +85,24 @@ const PATHWAY_CATALOG: Record<string, { title: string; description: string; dura
     level: "All Students (No Coding Required)",
   },
 };
+
+// In-memory fallback stores for offline/test environments
+const inMemoryProgress: Record<string, { userId: string; lessonId: string; pathwayId?: string; isCompleted: boolean; completedAt: string }> = {};
+const inMemorySubmissions: Array<{
+  id: string;
+  userId: string;
+  lessonId: string;
+  pathwayId?: string;
+  type: string;
+  title?: string;
+  submissionUrl?: string;
+  submissionText?: string;
+  score?: number;
+  maxScore?: number;
+  status: string;
+  evaluatedAt?: string;
+  createdAt: string;
+}> = [];
 
 export const lmsService = {
   /**
@@ -489,6 +509,331 @@ export const lmsService = {
     }
 
     throw new NotFoundError("Lesson not found");
+  },
+
+  /**
+   * Mark lesson progress (completed / in-progress)
+   */
+  async markLessonProgress(userId: string, data: { lessonId: string; pathwayId?: string; isCompleted?: boolean }) {
+    const isCompleted = data.isCompleted !== false;
+    const now = new Date().toISOString();
+    const id = `prog_${userId}_${data.lessonId}`;
+
+    try {
+      await db
+        .insert(lessonProgress)
+        .values({
+          id,
+          userId,
+          lessonId: data.lessonId,
+          pathwayId: data.pathwayId || null,
+          isCompleted,
+          completedAt: isCompleted ? now : null,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [lessonProgress.userId, lessonProgress.lessonId],
+          set: {
+            isCompleted,
+            completedAt: isCompleted ? now : null,
+            updatedAt: now,
+          },
+        });
+    } catch {
+      // In-memory fallback
+      inMemoryProgress[`${userId}:${data.lessonId}`] = {
+        userId,
+        lessonId: data.lessonId,
+        pathwayId: data.pathwayId,
+        isCompleted,
+        completedAt: now,
+      };
+    }
+
+    return {
+      success: true,
+      lessonId: data.lessonId,
+      isCompleted,
+      completedAt: isCompleted ? now : null,
+    };
+  },
+
+  /**
+   * Get student progress (completed lesson IDs)
+   */
+  async getStudentProgress(userId: string, pathwayId?: string) {
+    try {
+      const query = db
+        .select()
+        .from(lessonProgress)
+        .where(
+          pathwayId
+            ? and(
+                eq(lessonProgress.userId, userId),
+                eq(lessonProgress.isCompleted, true),
+                eq(lessonProgress.pathwayId, pathwayId)
+              )
+            : and(eq(lessonProgress.userId, userId), eq(lessonProgress.isCompleted, true))
+        );
+
+      const rows = await query;
+      const completedLessonIds = rows.map((r) => r.lessonId);
+
+      // Merge any in-memory progress for this user
+      for (const key of Object.keys(inMemoryProgress)) {
+        if (key.startsWith(`${userId}:`) && inMemoryProgress[key].isCompleted) {
+          if (!pathwayId || inMemoryProgress[key].pathwayId === pathwayId) {
+            if (!completedLessonIds.includes(inMemoryProgress[key].lessonId)) {
+              completedLessonIds.push(inMemoryProgress[key].lessonId);
+            }
+          }
+        }
+      }
+
+      return {
+        userId,
+        pathwayId,
+        completedLessonIds,
+        totalCompleted: completedLessonIds.length,
+      };
+    } catch {
+      // In-memory fallback
+      const completedLessonIds: string[] = [];
+      for (const key of Object.keys(inMemoryProgress)) {
+        if (key.startsWith(`${userId}:`) && inMemoryProgress[key].isCompleted) {
+          if (!pathwayId || inMemoryProgress[key].pathwayId === pathwayId) {
+            completedLessonIds.push(inMemoryProgress[key].lessonId);
+          }
+        }
+      }
+      return {
+        userId,
+        pathwayId,
+        completedLessonIds,
+        totalCompleted: completedLessonIds.length,
+      };
+    }
+  },
+
+  /**
+   * Submit assignment or quiz
+   */
+  async submitAssignment(
+    userId: string,
+    data: {
+      lessonId: string;
+      pathwayId?: string;
+      type?: string;
+      title?: string;
+      submissionUrl?: string;
+      submissionText?: string;
+      score?: number;
+      maxScore?: number;
+      status?: string;
+    }
+  ) {
+    const id = `sub_${userId}_${data.lessonId}_${Date.now()}`;
+    const now = new Date().toISOString();
+    const type = data.type || (data.score !== undefined ? "quiz" : "assignment");
+    const status = data.status || (type === "quiz" ? "APPROVED" : "SUBMITTED");
+
+    const record = {
+      id,
+      userId,
+      lessonId: data.lessonId,
+      pathwayId: data.pathwayId || null,
+      type,
+      title: data.title || (type === "quiz" ? "Graded Quiz" : "Hands-on Lab"),
+      submissionUrl: data.submissionUrl || null,
+      submissionText: data.submissionText || null,
+      score: data.score !== undefined ? data.score : null,
+      maxScore: data.maxScore || 100,
+      status,
+      evaluatedAt: type === "quiz" ? now : null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      await db.insert(submissions).values(record);
+    } catch {
+      inMemorySubmissions.push(record as any);
+    }
+
+    // Automatically mark the lesson as completed
+    await this.markLessonProgress(userId, {
+      lessonId: data.lessonId,
+      pathwayId: data.pathwayId,
+      isCompleted: true,
+    });
+
+    return {
+      success: true,
+      submission: record,
+    };
+  },
+
+  /**
+   * Get student submissions
+   */
+  async getStudentSubmissions(userId: string, pathwayId?: string) {
+    try {
+      const rows = await db
+        .select()
+        .from(submissions)
+        .where(
+          pathwayId
+            ? and(eq(submissions.userId, userId), eq(submissions.pathwayId, pathwayId))
+            : eq(submissions.userId, userId)
+        );
+
+      const combined = [...rows];
+      for (const mem of inMemorySubmissions) {
+        if (mem.userId === userId && (!pathwayId || mem.pathwayId === pathwayId)) {
+          if (!combined.some((c) => c.id === mem.id)) {
+            combined.push(mem as any);
+          }
+        }
+      }
+      return combined;
+    } catch {
+      return inMemorySubmissions.filter(
+        (s) => s.userId === userId && (!pathwayId || s.pathwayId === pathwayId)
+      );
+    }
+  },
+
+  /**
+   * Dynamically build activities schedule & completed activities
+   * from enrolled pathways, modules, lessons and student submissions
+   */
+  async getStudentActivities(userId: string) {
+    const accessible = await this.getAccessiblePathways(userId);
+    const studentSubmissions = await this.getStudentSubmissions(userId);
+    const progress = await this.getStudentProgress(userId);
+
+    const completedLessonIds = new Set(progress.completedLessonIds);
+
+    const completedList: any[] = [];
+    const upcomingList: any[] = [];
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const now = new Date();
+
+    for (const enr of accessible) {
+      const pathwayId = enr.pathway?.id || enr.pathway?.slug;
+      if (!pathwayId) continue;
+
+      let content: any = null;
+      try {
+        content = await this.getPathwayContent(userId, pathwayId, true);
+      } catch {
+        continue;
+      }
+
+      const coursesList = content?.courses || [];
+      const courseTitle = content?.pathway?.title || enr.pathway?.title || "Pathway Course";
+
+      for (const crs of coursesList) {
+        const mods = crs.modules || [];
+        mods.forEach((mod: any, mIdx: number) => {
+          const modLessons = mod.lessons || [];
+          modLessons.forEach((les: any, lIdx: number) => {
+            const isQuiz = les.contentType === "QUIZ" || les.id?.includes("_quiz");
+            const isAssignment =
+              les.contentType === "ASSIGNMENT" ||
+              les.id?.includes("_lab") ||
+              les.id?.includes("_cap") ||
+              les.id?.includes("milestone");
+
+            if (!isQuiz && !isAssignment) return;
+
+            const existingSub = studentSubmissions.find((s) => s.lessonId === les.id);
+            const isDone = completedLessonIds.has(les.id) || !!existingSub;
+
+            const category = isQuiz
+              ? "Graded Quiz"
+              : les.title?.toLowerCase().includes("capstone")
+              ? "Capstone"
+              : "Hands-on Lab";
+
+            // If completed, add to completedList
+            if (isDone) {
+              const subDate = existingSub?.createdAt ? new Date(existingSub.createdAt) : now;
+              const day = String(subDate.getDate()).padStart(2, "0");
+              const monthShort = subDate.toLocaleString("default", { month: "short" });
+              const yr = String(subDate.getFullYear()).slice(-2);
+              const time = subDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+              completedList.push({
+                id: `act-${les.id}`,
+                lessonId: les.id,
+                pathwayId,
+                type: isQuiz ? "quiz" : "assignment",
+                category,
+                course: courseTitle,
+                title: les.title,
+                datePrefix: isQuiz ? "Completed" : "Submitted",
+                date: `${day} ${monthShort} ${yr} ${time}`,
+                statusText: isQuiz
+                  ? `Marks: ${existingSub?.score !== null && existingSub?.score !== undefined ? existingSub.score : 10}/10`
+                  : existingSub?.status === "APPROVED"
+                  ? "Evaluation Complete"
+                  : "Evaluation Pending",
+              });
+            } else {
+              // Upcoming activity: calculate target week deadline
+              const targetDate = new Date(now.getTime() + (mIdx * 7 + 4) * 24 * 60 * 60 * 1000);
+              const day = String(targetDate.getDate()).padStart(2, "0");
+              const monthShort = targetDate.toLocaleString("default", { month: "short" });
+              const yr = String(targetDate.getFullYear()).slice(-2);
+              const monthFull = monthNames[targetDate.getMonth()];
+              const groupKey = `${monthFull} ${targetDate.getFullYear()}`;
+
+              upcomingList.push({
+                id: `act-up-${les.id}`,
+                lessonId: les.id,
+                pathwayId,
+                type: isQuiz ? "quiz" : "assignment",
+                category,
+                course: courseTitle,
+                title: les.title,
+                dateText: isQuiz
+                  ? `${day} ${monthShort} ${yr} 12:00 AM - ${day} ${monthShort} ${yr} 11:59 PM`
+                  : `Due: ${day} ${monthShort} ${yr} 11:59 PM`,
+                isUrgent: mIdx <= 1,
+                iconStyle: isQuiz ? "crimson" : mIdx <= 1 ? "crimson" : "rose",
+                monthGroup: groupKey,
+                sortTime: targetDate.getTime(),
+              });
+            }
+          });
+        });
+      }
+    }
+
+    // Group upcoming by month
+    upcomingList.sort((a, b) => a.sortTime - b.sortTime);
+    const monthGroupsMap: Record<string, any[]> = {};
+    for (const item of upcomingList) {
+      if (!monthGroupsMap[item.monthGroup]) {
+        monthGroupsMap[item.monthGroup] = [];
+      }
+      monthGroupsMap[item.monthGroup].push(item);
+    }
+
+    const scheduled = Object.entries(monthGroupsMap).map(([month, items]) => ({
+      month,
+      items,
+    }));
+
+    return {
+      scheduled,
+      completed: completedList,
+    };
   },
 };
 

@@ -23,4 +23,37 @@ export const lmsController = {
     const lesson = await lmsService.getLessonContent(userId, req.params.id, isStaffOrMentor);
     res.json(lesson);
   }),
+
+  markProgress: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { lessonId, pathwayId, isCompleted } = req.body;
+    const result = await lmsService.markLessonProgress(userId, { lessonId, pathwayId, isCompleted });
+    res.json(result);
+  }),
+
+  getProgress: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const pathwayId = req.params.pathwayId || (req.query.pathwayId as string);
+    const progress = await lmsService.getStudentProgress(userId, pathwayId);
+    res.json(progress);
+  }),
+
+  submitAssignment: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const result = await lmsService.submitAssignment(userId, req.body);
+    res.json(result);
+  }),
+
+  getSubmissions: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const pathwayId = req.params.pathwayId || (req.query.pathwayId as string);
+    const subs = await lmsService.getStudentSubmissions(userId, pathwayId);
+    res.json(subs);
+  }),
+
+  getActivities: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const activities = await lmsService.getStudentActivities(userId);
+    res.json(activities);
+  }),
 };

@@ -1902,6 +1902,75 @@ export const surveyResponses = pgTable(
 );
 
 // ============================================================
+// LMS PROGRESS & SUBMISSIONS
+// ============================================================
+
+export const lessonProgress = pgTable(
+  "lesson_progress",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    lessonId: varchar("lesson_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }),
+    isCompleted: boolean("is_completed").default(true).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_lesson_progress_user").on(table.userId),
+    index("idx_lesson_progress_lesson").on(table.lessonId),
+    index("idx_lesson_progress_pathway").on(table.pathwayId),
+    unique("uq_lesson_progress_user_lesson").on(table.userId, table.lessonId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_lesson_progress_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const submissions = pgTable(
+  "submissions",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    lessonId: varchar("lesson_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }),
+    type: varchar({ length: 50 }).default("assignment").notNull(), // "assignment" | "quiz"
+    title: varchar({ length: 255 }),
+    submissionUrl: text("submission_url"),
+    submissionText: text("submission_text"),
+    score: integer(),
+    maxScore: integer().default(100),
+    status: varchar({ length: 50 }).default("SUBMITTED").notNull(), // "SUBMITTED" | "APPROVED" | "EVALUATION_PENDING"
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true, mode: "string" }),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_submissions_user").on(table.userId),
+    index("idx_submissions_lesson").on(table.lessonId),
+    index("idx_submissions_pathway").on(table.pathwayId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_submissions_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+// ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
@@ -1920,6 +1989,8 @@ export type CourseModule = InferSelectModel<typeof courseModules>;
 export type Lesson = InferSelectModel<typeof lessons>;
 export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Enrollment = InferSelectModel<typeof enrollments>;
+export type LessonProgress = InferSelectModel<typeof lessonProgress>;
+export type Submission = InferSelectModel<typeof submissions>;
 export type Payment = InferSelectModel<typeof payments>;
 export type Order = InferSelectModel<typeof orders>;
 export type OrderItem = InferSelectModel<typeof orderItems>;
@@ -1961,6 +2032,8 @@ export type NewCourseModule = InferInsertModel<typeof courseModules>;
 export type NewLesson = InferInsertModel<typeof lessons>;
 export type NewModuleLesson = InferInsertModel<typeof moduleLessons>;
 export type NewEnrollment = InferInsertModel<typeof enrollments>;
+export type NewLessonProgress = InferInsertModel<typeof lessonProgress>;
+export type NewSubmission = InferInsertModel<typeof submissions>;
 export type NewPayment = InferInsertModel<typeof payments>;
 export type NewOrder = InferInsertModel<typeof orders>;
 export type NewOrderItem = InferInsertModel<typeof orderItems>;

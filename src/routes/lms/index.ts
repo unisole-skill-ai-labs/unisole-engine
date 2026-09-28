@@ -19,6 +19,15 @@ lmsRouter.get("/pathways", lmsController.getMyPathways);
 lmsRouter.get("/pathways/:id", lmsController.getPathwayContent);
 lmsRouter.get("/lessons/:id", lmsController.getLessonContent);
 
+// Progress & Submissions
+lmsRouter.post("/progress", validateBody({ required: ["lessonId"] }), lmsController.markProgress);
+lmsRouter.get("/progress", lmsController.getProgress);
+lmsRouter.get("/progress/:pathwayId", lmsController.getProgress);
+lmsRouter.post("/submissions", validateBody({ required: ["lessonId"] }), lmsController.submitAssignment);
+lmsRouter.get("/submissions", lmsController.getSubmissions);
+lmsRouter.get("/submissions/:pathwayId", lmsController.getSubmissions);
+lmsRouter.get("/activities", lmsController.getActivities);
+
 // Enrollments
 lmsRouter.get("/enrollments", enrollmentsController.list);
 
