@@ -152,6 +152,7 @@ export const workshopService = {
         workshopSlug,
         workshopName: workshopTitle,
         workshopDate: sessionDate,
+        sessionDate,
         slot,
         slotId,
         registeredAt: new Date().toISOString(),
@@ -182,6 +183,7 @@ export const workshopService = {
         workshopSlug,
         workshopName: workshopTitle,
         workshopDate: sessionDate,
+        sessionDate,
         slot: slot || existingMeta.slot,
         slotId: slotId || existingMeta.slotId,
         lastWorkshopLoginAt: new Date().toISOString(),
@@ -391,6 +393,10 @@ export const workshopService = {
       isRegistered: !!meta.registeredForWorkshop,
       isTokenPaid: !!meta.tokenPaid,
       survey: meta.workshopSurvey || null,
+      slot: meta.slot || null,
+      slotId: meta.slotId || null,
+      workshopSlug: meta.workshopSlug || null,
+      sessionDate: meta.sessionDate || meta.workshopDate || null,
     };
   },
 
