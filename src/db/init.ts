@@ -3,6 +3,7 @@ import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
 import { pricingService } from "../services/pricing.service";
+import { seedLmsDemoData } from "../scripts/seed-lms-demo";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -174,6 +175,8 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_session_code" varchar(50);
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_college_id" varchar(50);
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_college_name" varchar(200);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "email" varchar(255);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "avatar" text;
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
     `);
 
@@ -853,7 +856,66 @@ export async function initializeDatabase() {
       console.warn("[DB-INIT] Warning syncing canonical offerings:", e);
     }
 
-    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
+    // 18. LMS Tables (lesson_progress, submissions, notes)
+    await execSqlSafe("lms_tables", `
+      CREATE TABLE IF NOT EXISTS "public"."lesson_progress" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('prog_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "pathway_id" varchar(100) NOT NULL,
+        "lesson_id" varchar(100) NOT NULL,
+        "completed" boolean DEFAULT false NOT NULL,
+        "watched_duration_seconds" integer DEFAULT 0 NOT NULL,
+        "completed_at" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_user_lesson" UNIQUE("user_id", "lesson_id")
+      );
+
+      CREATE TABLE IF NOT EXISTS "public"."submissions" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('sub_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "pathway_id" varchar(100) NOT NULL,
+        "lesson_id" varchar(100) NOT NULL,
+        "type" varchar(20) NOT NULL,
+        "content" text,
+        "repo_url" text,
+        "score" integer,
+        "max_score" integer,
+        "feedback" text,
+        "status" varchar(30) DEFAULT 'SUBMITTED' NOT NULL,
+        "submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS "public"."notes" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('note_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "pathway_id" varchar(100) NOT NULL,
+        "lesson_id" varchar(100),
+        "lesson_title" varchar(255),
+        "content" text NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS "idx_lesson_progress_user" ON "public"."lesson_progress" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_lesson_progress_pathway" ON "public"."lesson_progress" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_user" ON "public"."submissions" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_pathway" ON "public"."submissions" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_notes_user" ON "public"."notes" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_notes_pathway" ON "public"."notes" ("pathway_id");
+    `);
+
+    // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)
+    try {
+      await seedLmsDemoData();
+      console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
+    } catch (lmsSeedErr) {
+      console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
+    }
+
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment, LMS, and Survey tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }
