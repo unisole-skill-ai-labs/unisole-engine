@@ -116,12 +116,10 @@ export const presentationsService = {
           WHERE id = 'pres_sunni_college_ppt' AND (college_name ILIKE '%Bilaspur%' OR title ILIKE '%Bilaspur%');
 
           UPDATE presentations
-          SET college_name = COALESCE((SELECT name FROM colleges WHERE slug = 'gdc-theog' LIMIT 1), 'Government Degree College Theog'),
-              college_id = (SELECT id FROM colleges WHERE slug = 'gdc-theog' LIMIT 1),
+          SET college_name = 'PG Govt Degree College Bilaspur',
+              college_id = (SELECT id FROM colleges WHERE slug = 'pg-gdc-bilaspur' OR name ILIKE '%Bilaspur%' LIMIT 1),
               title = 'AI Training Program Roadshow'
-          WHERE id = 'pres_ai_training_roadshow' AND (college_name ILIKE '%Bilaspur%' OR title ILIKE '%Bilaspur%');
-
-          DELETE FROM colleges WHERE slug = 'pg-gdc-bilaspur';
+          WHERE id = 'pres_ai_training_roadshow';
         `);
       } catch (cleanupErr) {
         // ignore
@@ -189,23 +187,27 @@ export const presentationsService = {
 
       const existingRoadshow = await presentationsRepository.getPresentationById("pres_ai_training_roadshow");
       let roadshowCollegeId: string | null = null;
-      let roadshowCollegeName = "Government Degree College Theog";
+      let roadshowCollegeName = "PG Govt Degree College Bilaspur";
       try {
         const collegesList = await collegesRepository.list();
-        const theogCollege = collegesList.find(
-          (c) => c.slug === "gdc-theog" || c.name?.toLowerCase().includes("theog")
+        let bilaspurCollege = collegesList.find(
+          (c) =>
+            c.slug === "pg-gdc-bilaspur" ||
+            c.name?.toLowerCase().includes("pg govt degree college bilaspur") ||
+            c.name?.toLowerCase().includes("bilaspur")
         );
-        if (theogCollege) {
-          roadshowCollegeId = theogCollege.id;
-          roadshowCollegeName = theogCollege.name;
-        } else if (collegesList.length > 0) {
-          const nonBilaspur = collegesList.find(
-            (c) => !c.slug?.includes("bilaspur") && !c.name?.toLowerCase().includes("bilaspur")
-          );
-          if (nonBilaspur) {
-            roadshowCollegeId = nonBilaspur.id;
-            roadshowCollegeName = nonBilaspur.name;
-          }
+        if (!bilaspurCollege) {
+          bilaspurCollege = await collegesRepository.create({
+            name: "PG Govt Degree College Bilaspur",
+            shortName: "PG GDC Bilaspur",
+            slug: "pg-gdc-bilaspur",
+            description: "Post Graduate Government Degree College Bilaspur, Himachal Pradesh.",
+            isActive: true,
+          });
+        }
+        if (bilaspurCollege) {
+          roadshowCollegeId = bilaspurCollege.id;
+          roadshowCollegeName = bilaspurCollege.name;
         }
       } catch (colErr) {
         // ignore
@@ -228,7 +230,8 @@ export const presentationsService = {
         const targetJson = JSON.stringify(AI_TRAINING_ROADSHOW_DECK_SLIDES);
 
         if (
-          existingRoadshow.collegeName?.includes("Bilaspur") ||
+          existingRoadshow.collegeName !== roadshowCollegeName ||
+          existingRoadshow.collegeId !== roadshowCollegeId ||
           existingRoadshow.title !== "AI Training Program Roadshow" ||
           existingJson !== targetJson
         ) {
@@ -239,7 +242,7 @@ export const presentationsService = {
             description: "27-slide industrial training cum internship roadshow presentation featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
             slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
           });
-          console.log(`[Presentations] Auto-synced AI Training Program Roadshow to latest ${AI_TRAINING_ROADSHOW_DECK_SLIDES.length} master slides.`);
+          console.log(`[Presentations] Auto-synced AI Training Program Roadshow (collegeName: ${roadshowCollegeName})`);
         }
       }
     } catch (err) {
