@@ -109,26 +109,26 @@ export const presentationsService = {
       const existingSunni = await presentationsRepository.getPresentationById("pres_sunni_college_ppt");
       if (!existingSunni) {
         let sunniCollegeId: string | null = null;
-        let sunniCollegeName = "PG Govt. College Bilaspur";
+        let sunniCollegeName = "Atal Bihari Vajpayee Govt Degree College, Sunni";
         try {
           const collegesList = await collegesRepository.list();
-          let bilaspurCollege = collegesList.find(
+          let sunniCollege = collegesList.find(
             (c) =>
-              c.slug?.includes("bilaspur") ||
-              c.name?.toLowerCase().includes("bilaspur")
+              c.slug?.includes("sunni") ||
+              c.name?.toLowerCase().includes("sunni")
           );
-          if (!bilaspurCollege) {
-            bilaspurCollege = await collegesRepository.create({
-              name: "PG Govt. College Bilaspur",
-              shortName: "PG GDC Bilaspur",
-              slug: "pg-gdc-bilaspur",
-              description: "Premier government post-graduate degree college in Bilaspur offering undergraduate and postgraduate programs across Arts, Commerce, Science, and Computer Applications affiliated with Himachal Pradesh University.",
+          if (!sunniCollege) {
+            sunniCollege = await collegesRepository.create({
+              name: "Atal Bihari Vajpayee Govt Degree College, Sunni",
+              shortName: "ABV GDC Sunni",
+              slug: "gdc-sunni",
+              description: "Premier government degree college in Sunni, Shimla offering undergraduate programs across Arts, Commerce, Science, and Computer Applications affiliated with Himachal Pradesh University.",
               isActive: true,
             });
           }
-          if (bilaspurCollege) {
-            sunniCollegeId = bilaspurCollege.id;
-            sunniCollegeName = bilaspurCollege.name;
+          if (sunniCollege) {
+            sunniCollegeId = sunniCollege.id;
+            sunniCollegeName = sunniCollege.name;
           }
         } catch (colErr) {
           // ignore
@@ -138,43 +138,34 @@ export const presentationsService = {
           id: "pres_sunni_college_ppt",
           collegeId: sunniCollegeId,
           collegeName: sunniCollegeName,
-          title: "PG Govt. College Bilaspur PPT",
-          description: "28-slide mobile-first career awareness & industrial training presentation for PG Govt. College Bilaspur featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+          title: "Atal Bihari Vajpayee Govt Degree College Sunni PPT",
+          description: "28-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
           theme: "dark",
           slides: SUNNI_COLLEGE_PPT_SLIDES,
           isActive: true,
         });
-        console.log("[Presentations] Auto-seeded flagship deck: PG Govt. College Bilaspur PPT");
+        console.log("[Presentations] Auto-seeded flagship deck: Sunni College PPT");
       } else {
         const existingJson = JSON.stringify(existingSunni.slides || []);
         const targetJson = JSON.stringify(SUNNI_COLLEGE_PPT_SLIDES);
 
-        if (existingJson !== targetJson || existingSunni.title !== "PG Govt. College Bilaspur PPT" || existingSunni.collegeName !== "PG Govt. College Bilaspur") {
+        if (existingJson !== targetJson) {
           await presentationsRepository.updatePresentation("pres_sunni_college_ppt", {
-            title: "PG Govt. College Bilaspur PPT",
-            collegeName: "PG Govt. College Bilaspur",
-            description: "28-slide mobile-first career awareness & industrial training presentation for PG Govt. College Bilaspur featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+            title: "Atal Bihari Vajpayee Govt Degree College Sunni PPT",
+            description: "37-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
             slides: SUNNI_COLLEGE_PPT_SLIDES,
           });
-          console.log(`[Presentations] Auto-synced PG Govt. College Bilaspur PPT to latest ${SUNNI_COLLEGE_PPT_SLIDES.length} master slides.`);
+          console.log(`[Presentations] Auto-synced Sunni College PPT to latest ${SUNNI_COLLEGE_PPT_SLIDES.length} master slides.`);
         }
       }
 
       const existingRoadshow = await presentationsRepository.getPresentationById("pres_ai_training_roadshow");
       if (!existingRoadshow) {
         let collegeId: string | null = null;
-        let collegeName = "PG Govt. College Bilaspur";
+        let collegeName = "Government Degree College";
         try {
           const collegesList = await collegesRepository.list();
-          let bilaspurCollege = collegesList.find(
-            (c) =>
-              c.slug?.includes("bilaspur") ||
-              c.name?.toLowerCase().includes("bilaspur")
-          );
-          if (bilaspurCollege) {
-            collegeId = bilaspurCollege.id;
-            collegeName = bilaspurCollege.name;
-          } else if (collegesList.length > 0) {
+          if (collegesList.length > 0) {
             collegeId = collegesList[0].id;
             collegeName = collegesList[0].name;
           }
@@ -186,25 +177,24 @@ export const presentationsService = {
           id: "pres_ai_training_roadshow",
           collegeId: collegeId,
           collegeName: collegeName,
-          title: "PG Govt. College Bilaspur",
-          description: "27-slide industrial training cum internship roadshow presentation for PG Govt. College Bilaspur featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+          title: "AI Training Program Roadshow",
+          description: "27-slide industrial training cum internship roadshow presentation featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
           theme: "dark",
           slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
           isActive: true,
         });
-        console.log("[Presentations] Auto-seeded flagship deck: PG Govt. College Bilaspur");
+        console.log("[Presentations] Auto-seeded flagship deck: AI Training Program Roadshow");
       } else {
         const existingJson = JSON.stringify(existingRoadshow.slides || []);
         const targetJson = JSON.stringify(AI_TRAINING_ROADSHOW_DECK_SLIDES);
 
-        if (existingJson !== targetJson || existingRoadshow.title !== "PG Govt. College Bilaspur" || existingRoadshow.collegeName !== "PG Govt. College Bilaspur") {
+        if (existingJson !== targetJson) {
           await presentationsRepository.updatePresentation("pres_ai_training_roadshow", {
-            title: "PG Govt. College Bilaspur",
-            collegeName: "PG Govt. College Bilaspur",
-            description: "27-slide industrial training cum internship roadshow presentation for PG Govt. College Bilaspur featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+            title: "AI Training Program Roadshow",
+            description: "27-slide industrial training cum internship roadshow presentation featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
             slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
           });
-          console.log(`[Presentations] Auto-synced PG Govt. College Bilaspur to latest ${AI_TRAINING_ROADSHOW_DECK_SLIDES.length} master slides.`);
+          console.log(`[Presentations] Auto-synced AI Training Program Roadshow to latest ${AI_TRAINING_ROADSHOW_DECK_SLIDES.length} master slides.`);
         }
       }
     } catch (err) {

@@ -7,10 +7,10 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     type: "COVER",
     badge: "INDUSTRIAL TRAINING CUM INTERNSHIP OPPORTUNITY PROGRAM",
     title: "UNISOLE AI CAMPUS PROGRAM",
-    subtitle: "Industrial Training cum Internship Opportunity Program · PG Govt. College Bilaspur",
+    subtitle: "Industrial Training cum Internship Opportunity Program · Atal Bihari Vajpayee Govt. Degree College, Sunni",
     org: "UNISOLE SKILL AI LABS",
     maxBuildSteps: 2,
-    notes: "Welcome everyone at PG Govt. College Bilaspur! In the next 50 minutes, we are tackling the single most urgent question on every student's mind: In an era where AI can write code, analyze data, and draft documents in seconds, what happens to your degree and how do you build an indispensable career?",
+    notes: "Welcome everyone at Atal Bihari Vajpayee Govt. Degree College Sunni! In the next 50 minutes, we are tackling the single most urgent question on every student's mind: In an era where AI can write code, analyze data, and draft documents in seconds, what happens to your degree and how do you build an indispensable career?",
   },
 
   // =========================================================================
@@ -245,7 +245,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
       "Haven't used it much",
     ],
     maxBuildSteps: 1,
-    notes: "Live Poll 03. Gauge personal hands-on experience with LLMs across the PG Govt. College Bilaspur audience.",
+    notes: "Live Poll 03. Gauge personal hands-on experience with LLMs across the Sunni audience.",
   },
 
   // =========================================================================
@@ -514,7 +514,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     type: "METRIC_CARD",
     badge: "THE HARD NUMBER",
     title: "1.1 Crore Annual Graduates in India",
-    subtitle: "Your competition is no longer just your college in Bilaspur — it is every ambitious student nationwide.",
+    subtitle: "Your competition is no longer just your college in Sunni — it is every ambitious student nationwide.",
     metrics: [
       {
         val: "1.1 Crore",
@@ -537,7 +537,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     ],
     punchline: "Your competition is nationwide. The only signal that breaks through the noise is verified, production-grade proof of work.",
     maxBuildSteps: 3,
-    notes: "1.1 Crore graduates every year. The competition is not just your classmate in Bilaspur—it is every hungry student in Bangalore, Pune, and Delhi. A plain marksheet won't save you.",
+    notes: "1.1 Crore graduates every year. The competition is not just your classmate in Sunni—it is every hungry student in Bangalore, Pune, and Delhi. A plain marksheet won't save you.",
   },
 
   // =========================================================================
@@ -1102,7 +1102,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
     type: "PROGRAM_OVERVIEW",
     badge: "YOUR GUIDED PATH",
     title: "Industrial Training Program",
-    subtitle: "3-MONTH INTENSIVE TRACK · PG GOVT. COLLEGE BILASPUR",
+    subtitle: "3-MONTH INTENSIVE TRACK · ATAL BIHARI VAJPAYEE GOVT. DEGREE COLLEGE SUNNI",
     pillars: [
       "3-Month Intensive Training — Focused on real industry skills, containerized microservices, and production capstone projects",
       "Unisole Talent Pool — Top-performing students get inducted into the vetted talent pool for direct industry recommendations",
@@ -1110,7 +1110,7 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
       "Dedicated Mentorship — Weekly hands-on labs guided by engineers and researchers from NIT Hamirpur, IIT Delhi & BlackRock",
     ],
     maxBuildSteps: 2,
-    notes: "This is our commitment to PG Govt. College Bilaspur. 3 months of hands-on training, 2 containerized capstone systems, direct induction into the UNISOLE Talent Pool, and dedicated practitioner mentorship.",
+    notes: "This is our commitment to ABV GDC Sunni. 3 months of hands-on training, 2 containerized capstone systems, direct induction into the UNISOLE Talent Pool, and dedicated practitioner mentorship.",
   },
 
   // =========================================================================
@@ -1153,8 +1153,8 @@ export const SUNNI_COLLEGE_PPT_SLIDES = [
       "Deploy it to a live cloud URL with automated tests and an architectural README",
       "Register for the UNISOLE Industrial Training Program today",
     ],
-    qrPrompt: "Scan QR Code to Register for the PG Govt. College Bilaspur Program",
-    qrUrl: "https://unisole.org/programs/bilaspur",
+    qrPrompt: "Scan QR Code to Register for the ABV GDC Sunni Program",
+    qrUrl: "https://unisole.org/programs/sunni",
     maxBuildSteps: 2,
     notes: "In the age of AI, the students who win will not be the ones who know the most. They will be the ones who can prove they can solve real problems and take responsibility. Scan the QR code, join the program, and let us build your career together.",
   },
