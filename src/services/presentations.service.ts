@@ -115,11 +115,22 @@ export const presentationsService = {
               title = 'Atal Bihari Vajpayee Govt Degree College Sunni PPT'
           WHERE id = 'pres_sunni_college_ppt' AND (college_name ILIKE '%Bilaspur%' OR title ILIKE '%Bilaspur%');
 
+          -- Ensure PG Govt College Bilaspur exists and is distinct from Hydro Engineering College Bandla
+          INSERT INTO colleges (name, short_name, slug, description, is_active)
+          VALUES ('PG Govt College Bilaspur', 'PG GDC Bilaspur', 'pg-govt-college-bilaspur', 'Post Graduate Government College Bilaspur, Himachal Pradesh.', TRUE)
+          ON CONFLICT (slug) DO UPDATE
+          SET name = 'PG Govt College Bilaspur', short_name = 'PG GDC Bilaspur', is_active = TRUE;
+
           UPDATE presentations
-          SET college_name = 'PG Govt Degree College Bilaspur',
-              college_id = (SELECT id FROM colleges WHERE slug = 'pg-gdc-bilaspur' OR name ILIKE '%Bilaspur%' LIMIT 1),
+          SET college_name = 'PG Govt College Bilaspur',
+              college_id = (SELECT id FROM colleges WHERE slug = 'pg-govt-college-bilaspur' LIMIT 1),
               title = 'AI Training Program Roadshow'
           WHERE id = 'pres_ai_training_roadshow';
+
+          UPDATE presentation_sessions
+          SET college_name = 'PG Govt College Bilaspur',
+              college_id = (SELECT id FROM colleges WHERE slug = 'pg-govt-college-bilaspur' LIMIT 1)
+          WHERE presentation_id = 'pres_ai_training_roadshow';
         `);
       } catch (cleanupErr) {
         // ignore
@@ -187,27 +198,64 @@ export const presentationsService = {
 
       const existingRoadshow = await presentationsRepository.getPresentationById("pres_ai_training_roadshow");
       let roadshowCollegeId: string | null = null;
-      let roadshowCollegeName = "PG Govt Degree College Bilaspur";
+      let roadshowCollegeName = "PG Govt College Bilaspur";
       try {
         const collegesList = await collegesRepository.list();
         let bilaspurCollege = collegesList.find(
           (c) =>
+            c.slug === "pg-govt-college-bilaspur" ||
             c.slug === "pg-gdc-bilaspur" ||
-            c.name?.toLowerCase().includes("pg govt degree college bilaspur") ||
-            c.name?.toLowerCase().includes("bilaspur")
+            (c.name?.toLowerCase().includes("pg govt") && c.name?.toLowerCase().includes("bilaspur") && !c.name?.toLowerCase().includes("hydro"))
         );
         if (!bilaspurCollege) {
           bilaspurCollege = await collegesRepository.create({
-            name: "PG Govt Degree College Bilaspur",
+            name: "PG Govt College Bilaspur",
             shortName: "PG GDC Bilaspur",
-            slug: "pg-gdc-bilaspur",
-            description: "Post Graduate Government Degree College Bilaspur, Himachal Pradesh.",
+            slug: "pg-govt-college-bilaspur",
+            description: "Post Graduate Government College Bilaspur, Himachal Pradesh.",
             isActive: true,
           });
+        } else if (bilaspurCollege.name !== "PG Govt College Bilaspur" || bilaspurCollege.slug !== "pg-govt-college-bilaspur") {
+          try {
+            await pool.query(
+              `UPDATE colleges
+               SET name = 'PG Govt College Bilaspur',
+                   short_name = 'PG GDC Bilaspur',
+                   slug = 'pg-govt-college-bilaspur'
+               WHERE id = $1`,
+              [bilaspurCollege.id]
+            );
+            bilaspurCollege.name = "PG Govt College Bilaspur";
+            bilaspurCollege.slug = "pg-govt-college-bilaspur";
+          } catch (upErr) {}
         }
+
         if (bilaspurCollege) {
           roadshowCollegeId = bilaspurCollege.id;
-          roadshowCollegeName = bilaspurCollege.name;
+          roadshowCollegeName = "PG Govt College Bilaspur";
+
+          // Ensure default degree branches exist for PG Govt College Bilaspur
+          try {
+            const defaultBranches = [
+              { name: "Bachelor of Computer Applications (BCA)", code: "BCA" },
+              { name: "B.Sc (Non-Medical)", code: "BSC_NM" },
+              { name: "B.Sc (Medical)", code: "BSC_MED" },
+              { name: "Bachelor of Commerce (B.Com)", code: "BCOM" },
+              { name: "Bachelor of Arts (B.A.)", code: "BA" },
+              { name: "Post Graduate Diploma in Computer Applications (PGDCA)", code: "PGDCA" },
+              { name: "Other", code: "OTHER" },
+            ];
+            for (const br of defaultBranches) {
+              await pool.query(
+                `INSERT INTO college_branches (college_id, name, code)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (college_id, code) DO NOTHING`,
+                [bilaspurCollege.id, br.name, br.code]
+              );
+            }
+          } catch (brErr) {
+            // ignore branch seed error
+          }
         }
       } catch (colErr) {
         // ignore

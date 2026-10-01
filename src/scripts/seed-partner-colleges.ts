@@ -333,6 +333,56 @@ const DUMMY_COLLEGES: DummyCollege[] = [
       },
     ],
   },
+  {
+    name: "PG Govt College Bilaspur",
+    shortName: "PG GDC Bilaspur",
+    slug: "pg-govt-college-bilaspur",
+    description: "Post Graduate Government College Bilaspur, Himachal Pradesh.",
+    branches: [
+      {
+        name: "Bachelor of Computer Applications (BCA)",
+        code: "BCA",
+        description: "Computer applications, software development, data structures, and web technologies.",
+        students: [],
+      },
+      {
+        name: "B.Sc (Non-Medical)",
+        code: "BSC_NM",
+        description: "Physics, Mathematics, and Chemistry/Computer Science.",
+        students: [],
+      },
+      {
+        name: "B.Sc (Medical)",
+        code: "BSC_MED",
+        description: "Botany, Zoology, and Chemistry.",
+        students: [],
+      },
+      {
+        name: "Bachelor of Commerce (B.Com)",
+        code: "BCOM",
+        description: "Financial accounting, corporate law, economics, and business management.",
+        students: [],
+      },
+      {
+        name: "Bachelor of Arts (B.A.)",
+        code: "BA",
+        description: "Humanities, languages, economics, and social sciences.",
+        students: [],
+      },
+      {
+        name: "Post Graduate Diploma in Computer Applications (PGDCA)",
+        code: "PGDCA",
+        description: "Advanced computing, database systems, and application programming.",
+        students: [],
+      },
+      {
+        name: "Other",
+        code: "OTHER",
+        description: "Other undergraduate and postgraduate programs.",
+        students: [],
+      },
+    ],
+  },
 ];
 
 export async function seedPartnerColleges() {
