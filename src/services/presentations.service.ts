@@ -15,6 +15,7 @@ import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck.js";
 import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
 import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck.js";
 import { SUNNI_COLLEGE_PPT_SLIDES } from "../data/sunniDeck.js";
+import { AI_TRAINING_ROADSHOW_DECK_SLIDES } from "../data/aiTrainingRoadshowDeck.js";
 import { broadcastSessionEnded } from "../socket/presentation.socket";
 
 function generateSessionCode(): string {
@@ -37,6 +38,10 @@ export const presentationsService = {
 
   getSunniTemplateSlides(): any[] {
     return SUNNI_COLLEGE_PPT_SLIDES;
+  },
+
+  getAiTrainingRoadshowTemplateSlides(): any[] {
+    return AI_TRAINING_ROADSHOW_DECK_SLIDES;
   },
 
   async ensureFlagshipDecks(): Promise<void> {
@@ -153,6 +158,45 @@ export const presentationsService = {
           console.log(`[Presentations] Auto-synced Sunni College PPT to latest ${SUNNI_COLLEGE_PPT_SLIDES.length} master slides.`);
         }
       }
+
+      const existingRoadshow = await presentationsRepository.getPresentationById("pres_ai_training_roadshow");
+      if (!existingRoadshow) {
+        let collegeId: string | null = null;
+        let collegeName = "Government Degree College";
+        try {
+          const collegesList = await collegesRepository.list();
+          if (collegesList.length > 0) {
+            collegeId = collegesList[0].id;
+            collegeName = collegesList[0].name;
+          }
+        } catch (colErr) {
+          // ignore
+        }
+
+        await presentationsRepository.createPresentation({
+          id: "pres_ai_training_roadshow",
+          collegeId: collegeId,
+          collegeName: collegeName,
+          title: "AI Training Program Roadshow",
+          description: "27-slide industrial training cum internship roadshow presentation featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+          theme: "dark",
+          slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
+          isActive: true,
+        });
+        console.log("[Presentations] Auto-seeded flagship deck: AI Training Program Roadshow");
+      } else {
+        const existingJson = JSON.stringify(existingRoadshow.slides || []);
+        const targetJson = JSON.stringify(AI_TRAINING_ROADSHOW_DECK_SLIDES);
+
+        if (existingJson !== targetJson) {
+          await presentationsRepository.updatePresentation("pres_ai_training_roadshow", {
+            title: "AI Training Program Roadshow",
+            description: "27-slide industrial training cum internship roadshow presentation featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+            slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
+          });
+          console.log(`[Presentations] Auto-synced AI Training Program Roadshow to latest ${AI_TRAINING_ROADSHOW_DECK_SLIDES.length} master slides.`);
+        }
+      }
     } catch (err) {
       console.warn("[Presentations] Could not auto-sync flagship decks:", err);
     }
@@ -164,7 +208,11 @@ export const presentationsService = {
   },
 
   async getById(id: string): Promise<Presentation> {
-    if (id === "pres_sanjauli_college_ppt" || id === "pres_sunni_college_ppt") {
+    if (
+      id === "pres_sanjauli_college_ppt" ||
+      id === "pres_sunni_college_ppt" ||
+      id === "pres_ai_training_roadshow"
+    ) {
       await this.ensureFlagshipDecks();
     }
     const presentation = await presentationsRepository.getPresentationById(id);
