@@ -7,10 +7,10 @@ export const AI_TRAINING_ROADSHOW_DECK_SLIDES = [
     type: "COVER",
     badge: "INDUSTRIAL TRAINING CUM INTERNSHIP PROGRAM",
     title: "Industrial Training cum Internship Program",
-    subtitle: "Learn AI Today or remain Behind Tomorrow",
+    subtitle: "PG Govt. College Bilaspur · Learn AI Today or remain Behind Tomorrow",
     org: "UNISOLE SKILL AI LABS",
     maxBuildSteps: 2,
-    notes: "Welcome students! Today we are announcing the Unisole Industrial Training cum Internship Opportunity Program. The simple truth of 2026: Learn AI Today or remain Behind Tomorrow.",
+    notes: "Welcome students of PG Govt. College Bilaspur! Today we are announcing the Unisole Industrial Training cum Internship Opportunity Program. The simple truth of 2026: Learn AI Today or remain Behind Tomorrow.",
   },
 
   // =========================================================================
@@ -549,11 +549,11 @@ export const AI_TRAINING_ROADSHOW_DECK_SLIDES = [
       },
       {
         title: "Campus Project Implementation",
-        desc: "If we get 20+ students from your college, we will do the project and implementation part here offline on weekends.",
+        desc: "If we get 20+ students from PG Govt. College Bilaspur, we will do the project and implementation part here offline on weekends.",
       },
     ],
     maxBuildSteps: 3,
-    notes: "Online classes. Batch starts Nov after exams. If 20+ students from your college, offline weekend project sessions at your campus.",
+    notes: "Online classes. Batch starts Nov after exams. If 20+ students from PG Govt. College Bilaspur, offline weekend project sessions at your campus.",
   },
 
   // =========================================================================

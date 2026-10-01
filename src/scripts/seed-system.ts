@@ -211,8 +211,8 @@ export async function seedSystemData() {
     );
     console.log(`[Seed:System] Synchronized flagship deck: Sanjauli College PPT (${SANJAULI_COLLEGE_PPT_SLIDES.length} slides)`);
 
-    // 2C. Seed / Sync Flagship Deck: Sunni College PPT
-    const sunniPresTitle = "Atal Bihari Vajpayee Govt Degree College Sunni PPT";
+    // 2C. Seed / Sync Flagship Deck: PG Govt. College Bilaspur PPT
+    const sunniPresTitle = "PG Govt. College Bilaspur PPT";
     await pool.query(
       `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
        VALUES ('pres_sunni_college_ppt', $1, $2, $3, $4, 'dark', $5, TRUE)
@@ -225,11 +225,11 @@ export async function seedSystemData() {
         sunniCollegeId,
         sunniCollegeName,
         sunniPresTitle,
-        "28-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+        "28-slide mobile-first career awareness & industrial training presentation for PG Govt. College Bilaspur featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
         JSON.stringify(SUNNI_COLLEGE_PPT_SLIDES),
       ]
     );
-    console.log(`[Seed:System] Synchronized flagship deck: Sunni College PPT (${SUNNI_COLLEGE_PPT_SLIDES.length} slides)`);
+    console.log(`[Seed:System] Synchronized flagship deck: PG Govt. College Bilaspur PPT (${SUNNI_COLLEGE_PPT_SLIDES.length} slides)`);
 
     // 3. Seed / Sync Flagship Deck: Unisole AI Campus Deck
     const aiDeckTitle = "UNISOLE AI Campus Program Presentation Deck";
