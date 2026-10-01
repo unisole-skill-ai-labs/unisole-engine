@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   presentations,
@@ -64,37 +64,76 @@ export const presentationsRepository = {
 
   // ==================== SESSIONS ====================
   async listSessions(presentationId?: string): Promise<PresentationSession[]> {
-    if (presentationId) {
-      return db
-        .select()
-        .from(presentationSessions)
-        .where(eq(presentationSessions.presentationId, presentationId))
-        .orderBy(desc(presentationSessions.createdAt));
-    }
-    return db
-      .select()
+    const baseQuery = db
+      .select({
+        session: presentationSessions,
+        totalAttendeesCount: sql<number>`coalesce(count(${presentationLeads.id}), 0)::int`,
+      })
       .from(presentationSessions)
-      .orderBy(desc(presentationSessions.createdAt));
+      .leftJoin(
+        presentationLeads,
+        eq(presentationSessions.id, presentationLeads.sessionId)
+      );
+
+    const rows = presentationId
+      ? await baseQuery
+          .where(eq(presentationSessions.presentationId, presentationId))
+          .groupBy(presentationSessions.id)
+          .orderBy(desc(presentationSessions.createdAt))
+      : await baseQuery
+          .groupBy(presentationSessions.id)
+          .orderBy(desc(presentationSessions.createdAt));
+
+    return rows.map((r) => ({
+      ...r.session,
+      totalAttendeesCount: Number(r.totalAttendeesCount || 0),
+    }));
   },
 
   async getSessionById(id: string): Promise<PresentationSession | null> {
     const rows = await db
-      .select()
+      .select({
+        session: presentationSessions,
+        totalAttendeesCount: sql<number>`coalesce(count(${presentationLeads.id}), 0)::int`,
+      })
       .from(presentationSessions)
+      .leftJoin(
+        presentationLeads,
+        eq(presentationSessions.id, presentationLeads.sessionId)
+      )
       .where(eq(presentationSessions.id, id))
+      .groupBy(presentationSessions.id)
       .limit(1);
-    return rows[0] ?? null;
+
+    if (!rows[0]) return null;
+    return {
+      ...rows[0].session,
+      totalAttendeesCount: Number(rows[0].totalAttendeesCount || 0),
+    };
   },
 
   async getSessionByCode(
     sessionCode: string
   ): Promise<PresentationSession | null> {
     const rows = await db
-      .select()
+      .select({
+        session: presentationSessions,
+        totalAttendeesCount: sql<number>`coalesce(count(${presentationLeads.id}), 0)::int`,
+      })
       .from(presentationSessions)
+      .leftJoin(
+        presentationLeads,
+        eq(presentationSessions.id, presentationLeads.sessionId)
+      )
       .where(eq(presentationSessions.sessionCode, sessionCode.toUpperCase()))
+      .groupBy(presentationSessions.id)
       .limit(1);
-    return rows[0] ?? null;
+
+    if (!rows[0]) return null;
+    return {
+      ...rows[0].session,
+      totalAttendeesCount: Number(rows[0].totalAttendeesCount || 0),
+    };
   },
 
   async createSession(
