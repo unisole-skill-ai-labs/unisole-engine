@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { pool } from "../db";
 import { ValidationError, NotFoundError } from "../errors";
 import { presentationsRepository } from "../repositories/presentations.repository";
 import { usersRepository } from "../repositories/users.repository";
@@ -106,40 +107,60 @@ export const presentationsService = {
         }
       }
 
-      const existingSunni = await presentationsRepository.getPresentationById("pres_sunni_college_ppt");
-      if (!existingSunni) {
-        let sunniCollegeId: string | null = null;
-        let sunniCollegeName = "Atal Bihari Vajpayee Govt Degree College, Sunni";
-        try {
-          const collegesList = await collegesRepository.list();
-          let sunniCollege = collegesList.find(
-            (c) =>
-              c.slug?.includes("sunni") ||
-              c.name?.toLowerCase().includes("sunni")
-          );
-          if (!sunniCollege) {
-            sunniCollege = await collegesRepository.create({
-              name: "Atal Bihari Vajpayee Govt Degree College, Sunni",
-              shortName: "ABV GDC Sunni",
-              slug: "gdc-sunni",
-              description: "Premier government degree college in Sunni, Shimla offering undergraduate programs across Arts, Commerce, Science, and Computer Applications affiliated with Himachal Pradesh University.",
-              isActive: true,
-            });
-          }
-          if (sunniCollege) {
-            sunniCollegeId = sunniCollege.id;
-            sunniCollegeName = sunniCollege.name;
-          }
-        } catch (colErr) {
-          // ignore
-        }
+      try {
+        await pool.query(`
+          UPDATE presentations
+          SET college_name = 'Atal Bihari Vajpayee Govt Degree College, Sunni',
+              college_id = (SELECT id FROM colleges WHERE slug = 'gdc-sunni' OR name ILIKE '%Sunni%' LIMIT 1),
+              title = 'Atal Bihari Vajpayee Govt Degree College Sunni PPT'
+          WHERE id = 'pres_sunni_college_ppt' AND (college_name ILIKE '%Bilaspur%' OR title ILIKE '%Bilaspur%');
 
+          UPDATE presentations
+          SET college_name = COALESCE((SELECT name FROM colleges WHERE slug = 'gdc-theog' LIMIT 1), 'Government Degree College Theog'),
+              college_id = (SELECT id FROM colleges WHERE slug = 'gdc-theog' LIMIT 1),
+              title = 'AI Training Program Roadshow'
+          WHERE id = 'pres_ai_training_roadshow' AND (college_name ILIKE '%Bilaspur%' OR title ILIKE '%Bilaspur%');
+
+          DELETE FROM colleges WHERE slug = 'pg-gdc-bilaspur';
+        `);
+      } catch (cleanupErr) {
+        // ignore
+      }
+
+      const existingSunni = await presentationsRepository.getPresentationById("pres_sunni_college_ppt");
+      let sunniCollegeId: string | null = null;
+      let sunniCollegeName = "Atal Bihari Vajpayee Govt Degree College, Sunni";
+      try {
+        const collegesList = await collegesRepository.list();
+        let sunniCollege = collegesList.find(
+          (c) =>
+            c.slug?.includes("sunni") ||
+            c.name?.toLowerCase().includes("sunni")
+        );
+        if (!sunniCollege) {
+          sunniCollege = await collegesRepository.create({
+            name: "Atal Bihari Vajpayee Govt Degree College, Sunni",
+            shortName: "ABV GDC Sunni",
+            slug: "gdc-sunni",
+            description: "Premier government degree college in Sunni, Shimla offering undergraduate programs across Arts, Commerce, Science, and Computer Applications affiliated with Himachal Pradesh University.",
+            isActive: true,
+          });
+        }
+        if (sunniCollege) {
+          sunniCollegeId = sunniCollege.id;
+          sunniCollegeName = sunniCollege.name;
+        }
+      } catch (colErr) {
+        // ignore
+      }
+
+      if (!existingSunni) {
         await presentationsRepository.createPresentation({
           id: "pres_sunni_college_ppt",
           collegeId: sunniCollegeId,
           collegeName: sunniCollegeName,
           title: "Atal Bihari Vajpayee Govt Degree College Sunni PPT",
-          description: "28-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
+          description: "37-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
           theme: "dark",
           slides: SUNNI_COLLEGE_PPT_SLIDES,
           isActive: true,
@@ -149,9 +170,16 @@ export const presentationsService = {
         const existingJson = JSON.stringify(existingSunni.slides || []);
         const targetJson = JSON.stringify(SUNNI_COLLEGE_PPT_SLIDES);
 
-        if (existingJson !== targetJson) {
+        if (
+          existingSunni.collegeName !== sunniCollegeName ||
+          existingSunni.collegeId !== sunniCollegeId ||
+          existingSunni.title !== "Atal Bihari Vajpayee Govt Degree College Sunni PPT" ||
+          existingJson !== targetJson
+        ) {
           await presentationsRepository.updatePresentation("pres_sunni_college_ppt", {
             title: "Atal Bihari Vajpayee Govt Degree College Sunni PPT",
+            collegeId: sunniCollegeId,
+            collegeName: sunniCollegeName,
             description: "37-slide mobile-first career awareness & industrial training presentation for ABV Govt Degree College Sunni featuring AI History, AlphaFold Protein Folding, Math Reinvention, Fresher Hiring Collapse (6L to 2.5L), Cheap vs Valuable Skills, Stream-Specific Roles, and the 5-Step Action Playbook.",
             slides: SUNNI_COLLEGE_PPT_SLIDES,
           });
@@ -160,23 +188,34 @@ export const presentationsService = {
       }
 
       const existingRoadshow = await presentationsRepository.getPresentationById("pres_ai_training_roadshow");
-      if (!existingRoadshow) {
-        let collegeId: string | null = null;
-        let collegeName = "Government Degree College";
-        try {
-          const collegesList = await collegesRepository.list();
-          if (collegesList.length > 0) {
-            collegeId = collegesList[0].id;
-            collegeName = collegesList[0].name;
+      let roadshowCollegeId: string | null = null;
+      let roadshowCollegeName = "Government Degree College Theog";
+      try {
+        const collegesList = await collegesRepository.list();
+        const theogCollege = collegesList.find(
+          (c) => c.slug === "gdc-theog" || c.name?.toLowerCase().includes("theog")
+        );
+        if (theogCollege) {
+          roadshowCollegeId = theogCollege.id;
+          roadshowCollegeName = theogCollege.name;
+        } else if (collegesList.length > 0) {
+          const nonBilaspur = collegesList.find(
+            (c) => !c.slug?.includes("bilaspur") && !c.name?.toLowerCase().includes("bilaspur")
+          );
+          if (nonBilaspur) {
+            roadshowCollegeId = nonBilaspur.id;
+            roadshowCollegeName = nonBilaspur.name;
           }
-        } catch (colErr) {
-          // ignore
         }
+      } catch (colErr) {
+        // ignore
+      }
 
+      if (!existingRoadshow) {
         await presentationsRepository.createPresentation({
           id: "pres_ai_training_roadshow",
-          collegeId: collegeId,
-          collegeName: collegeName,
+          collegeId: roadshowCollegeId,
+          collegeName: roadshowCollegeName,
           title: "AI Training Program Roadshow",
           description: "27-slide industrial training cum internship roadshow presentation featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
           theme: "dark",
@@ -188,9 +227,15 @@ export const presentationsService = {
         const existingJson = JSON.stringify(existingRoadshow.slides || []);
         const targetJson = JSON.stringify(AI_TRAINING_ROADSHOW_DECK_SLIDES);
 
-        if (existingJson !== targetJson) {
+        if (
+          existingRoadshow.collegeName?.includes("Bilaspur") ||
+          existingRoadshow.title !== "AI Training Program Roadshow" ||
+          existingJson !== targetJson
+        ) {
           await presentationsRepository.updatePresentation("pres_ai_training_roadshow", {
             title: "AI Training Program Roadshow",
+            collegeId: roadshowCollegeId,
+            collegeName: roadshowCollegeName,
             description: "27-slide industrial training cum internship roadshow presentation featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
             slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
           });
