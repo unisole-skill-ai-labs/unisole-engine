@@ -195,7 +195,8 @@ export const AI_TRAINING_ROADSHOW_DECK_SLIDES = [
     badge: "RETHINKING STABILITY",
     title: "Private Jobs Are Unstable??",
     subtitle: "Job switching is becoming part of the modern career",
-    steps: [
+    stagesLabel: "Career Path",
+    stages: [
       "College",
       "Job",
       "1–3 Years Exp",
@@ -203,8 +204,22 @@ export const AI_TRAINING_ROADSHOW_DECK_SLIDES = [
       "New Role / Company",
       "Leadership / Entrepreneurship",
     ],
+    stats: [
+      {
+        label: "Market Transformation till 2030",
+        value: "+78M Net Jobs",
+        color: "text-emerald-400",
+        desc: "Till 2030 market transformation could create 170 million jobs globally while displacing 92 million, resulting in net growth of 78 million jobs.",
+      },
+      {
+        label: "Startup India Annual Generation",
+        value: "25 Lakhs Jobs",
+        color: "text-cyan-400",
+        desc: "In each year Startup India registers ~2.5 lakh startups. If each startup needs 10 people, that generates 25 lakh new jobs.",
+      },
+    ],
     quote: "“The question is no longer simply: 'Will I get a stable job?' The better question is: 'Will I have skills that remain valuable when the job changes?'”",
-    note: "Till 2030 market transformation could create 170M jobs globally while displacing 92M (+78M net growth). Startup India registers ~2.5L startups/year (25L jobs).",
+    punchline: "Job switching is becoming part of the modern career. Career capital keeps you indispensable.",
     maxBuildSteps: 3,
     notes: "Career path: College -> Job -> 1-3 yrs -> Skill upgrade -> New role -> Leadership. 170M jobs created globally vs 92M displaced (+78M net). 2.5L startups = 25L jobs.",
   },
@@ -300,7 +315,8 @@ export const AI_TRAINING_ROADSHOW_DECK_SLIDES = [
     badge: "SYSTEMS THINKING",
     title: "What Industry Do",
     subtitle: "Product Development Cycle",
-    steps: [
+    stagesLabel: "7-Stage Development Lifecycle",
+    stages: [
       "Problem Discovery",
       "Define the Product",
       "Design the Solution",
