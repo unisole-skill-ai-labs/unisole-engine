@@ -139,23 +139,34 @@ export const AI_TRAINING_ROADSHOW_DECK_SLIDES = [
   // =========================================================================
   {
     id: "ai_train_slide_7",
-    type: "COMPARISON_STATS",
+    type: "COMPARISON",
     badge: "MARKET REALITY",
     title: "Job Landscape",
     subtitle: "Private Sector vs Government Sector in India",
-    stat1: {
-      value: "570 Million",
-      label: "Jobs in Private Sector",
-      desc: "Formal + informal + micro enterprises contain 570 million jobs — which is 40 times more than govt sector jobs.",
-    },
-    stat2: {
-      value: "1.4 Crore",
-      label: "Jobs in Govt. Sector",
-      desc: "Indian govt sector holds 1.4 crore jobs while 1.1 crore students pass out in one year. Scope narrows with paper leaks, outsourcing & delays.",
-    },
-    punchline: "Private sector has 40x more jobs. Skill capital determines who captures them.",
+    columns: [
+      {
+        label: "Job in Private Sector",
+        stat: "570 Million Jobs",
+        color: "text-cyan-400",
+        items: [
+          "Formal + informal + micro enterprises contain 570 million jobs",
+          "Which is 40 times more than govt sector job",
+        ],
+      },
+      {
+        label: "Job in Govt. Sector",
+        stat: "1.4 Crore Jobs",
+        color: "text-amber-400",
+        items: [
+          "Indian govt sector hold 1.4 crore jobs",
+          "1.1 crore students get pass out in one year",
+          "Then paper leak, outsourcing, direct approach scope get narrow down",
+        ],
+      },
+    ],
+    punchline: "Private sector contains 40x more opportunities than the entire government sector.",
     maxBuildSteps: 3,
-    notes: "Job in Private Sector: 570M jobs (40x more). Job in Govt: 1.4Cr total jobs vs 1.1Cr graduates every year.",
+    notes: "Job in Private Sector: Formal + informal + micro enterprises contain 570 million jobs (40 times more than govt sector job). Job in Govt. Sector: Indian govt sector hold 1.4 crore jobs vs 1.1 crore students get pass out in one year. Then paper leak, outsourcing, direct approach scope get narrow down.",
   },
 
   // =========================================================================
