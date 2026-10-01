@@ -77,6 +77,7 @@ const reactionLimits = new Map<
   { lastSent: number; penaltyUntil: number; strikes: number }
 >();
 const pollBroadcastTimers = new Map<string, NodeJS.Timeout>();
+const attendeeBroadcastTimers = new Map<string, NodeJS.Timeout>();
 const sessionDbCountTimers = new Map<string, NodeJS.Timeout>();
 const leadUpdateBatch = new Map<string, { totalScore: number; streak: number; responses: any }>();
 let leadBatchFlushTimer: NodeJS.Timeout | null = null;
@@ -325,18 +326,25 @@ export function setupPresentationSocket(io: SocketIOServer) {
           return;
         }
 
-        // Fetch lead details if existing
-        let currentScore = 0;
-        let currentStreak = 0;
-        let dbBranch = branch;
-        let dbYear = yearOfStudy;
+        // Fetch lead details: check in-memory attendee cache first (O(1) memory lookup, 0 DB overhead)
+        const existingAttendee = sessionState.attendees.get(leadId);
+        let currentScore = existingAttendee?.totalScore ?? 0;
+        let currentStreak = existingAttendee?.streak ?? 0;
+        let dbBranch = branch || existingAttendee?.branch;
+        let dbYear = yearOfStudy || existingAttendee?.yearOfStudy;
 
-        const dbLead = await presentationsRepository.getLeadById(leadId);
-        if (dbLead) {
-          currentScore = dbLead.totalScore ?? 0;
-          currentStreak = dbLead.streak ?? 0;
-          if (!dbBranch && dbLead.branch) dbBranch = dbLead.branch;
-          if (!dbYear && dbLead.yearOfStudy) dbYear = dbLead.yearOfStudy;
+        if (!existingAttendee && (!dbBranch || !dbYear)) {
+          try {
+            const dbLead = await presentationsRepository.getLeadById(leadId);
+            if (dbLead) {
+              currentScore = dbLead.totalScore ?? 0;
+              currentStreak = dbLead.streak ?? 0;
+              if (!dbBranch && dbLead.branch) dbBranch = dbLead.branch;
+              if (!dbYear && dbLead.yearOfStudy) dbYear = dbLead.yearOfStudy;
+            }
+          } catch {
+            // Non-blocking fallback: continue smoothly without DB pool starvation
+          }
         }
 
         const attendeeObj: Attendee = {
@@ -358,20 +366,26 @@ export function setupPresentationSocket(io: SocketIOServer) {
         scheduleAttendeeCountDbUpdate(sessionState.sessionId, sessionState.attendees.size);
 
         const branchStats = getBranchDistribution(sessionState);
-        const attendeesList = Array.from(sessionState.attendees.values());
 
-        // Broadcast updated attendee count to everyone
-        io.to(room).emit("attendee_count", {
-          count: sessionState.attendees.size,
-        });
-
-        // Broadcast live joined member notification & updated full attendee list ONLY to Presenter / Projector screen!
-        io.to(`${room}:admin`).emit("attendee_joined", {
-          attendee: attendeeObj,
-          attendees: attendeesList,
-          count: sessionState.attendees.size,
-          branchStats,
-        });
+        // Debounce attendee count and presenter updates (200ms) to prevent event loop choking during massive QR rushes
+        if (!attendeeBroadcastTimers.has(code)) {
+          const timer = setTimeout(() => {
+            attendeeBroadcastTimers.delete(code);
+            const currentState = activeSessions.get(code);
+            if (!currentState) return;
+            const currentBranchStats = getBranchDistribution(currentState);
+            io.to(room).emit("attendee_count", {
+              count: currentState.attendees.size,
+            });
+            io.to(`${room}:admin`).emit("attendee_joined", {
+              attendee: attendeeObj,
+              attendees: Array.from(currentState.attendees.values()),
+              count: currentState.attendees.size,
+              branchStats: currentBranchStats,
+            });
+          }, 200);
+          attendeeBroadcastTimers.set(code, timer);
+        }
 
         // Send current slide, isPresentationStarted & branch stats to joining audience (omit heavy full attendee array)
         const myAnswer = sessionState.quizState.quizAnswers.get(leadId);
