@@ -30,7 +30,7 @@ export async function initializeDatabase() {
     // 1. Ensure Base Enums Exist
     await execSqlSafe("base_enums", `
       DO $$ BEGIN
-        CREATE TYPE "public"."user_role" AS ENUM('STUDENT', 'MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES');
+        CREATE TYPE "public"."user_role" AS ENUM('STUDENT', 'MEMBER', 'MENTOR', 'PROGRAM_MANAGER', 'ADMIN', 'SUPER_ADMIN', 'SALES');
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
       DO $$ BEGIN
@@ -115,6 +115,8 @@ export async function initializeDatabase() {
     `);
 
     // 2. Safe standalone enum additions (outside PL/pgSQL transaction blocks)
+    await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
     await addEnumValueSafely("enrollment_source", "SURVEY");
     await addEnumValueSafely("lead_source", "SURVEY");
     await addEnumValueSafely("item_type", "PATHWAY");
