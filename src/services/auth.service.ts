@@ -36,11 +36,17 @@ function generateTokens(user: {
     }
   }
 
+  const roles = (user.metadata && Array.isArray((user.metadata as any).roles))
+    ? (user.metadata as any).roles
+    : [];
+
   const payload = {
     id: user.id,
     phone: user.phone,
     username: user.username || null,
     role: user.role,
+    roles,
+    metadata: user.metadata || null,
     name: user.name,
     collegeName: user.collegeName,
     branch: user.branch,

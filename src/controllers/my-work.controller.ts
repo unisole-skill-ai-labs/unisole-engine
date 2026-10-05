@@ -560,7 +560,7 @@ export const myWorkController = {
           OR t.sub_project_lead_id = u.id
         )
         LEFT JOIN leads l ON l.assigned_to_user_id = u.id
-        WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
+        WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'PROGRAM_MANAGER') AND u.is_active = TRUE
         GROUP BY u.id, d.name, d.color
         ORDER BY 
           CASE WHEN u.role = 'SUPER_ADMIN' THEN 1 WHEN u.role = 'ADMIN' THEN 2 ELSE 3 END,

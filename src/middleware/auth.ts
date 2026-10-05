@@ -35,6 +35,8 @@ export function authMiddleware(
       id: string;
       phone: string;
       role: string;
+      roles?: string[];
+      metadata?: any;
       name?: string;
       username?: string | null;
       designation?: string | null;
@@ -61,6 +63,8 @@ export function optionalAuthMiddleware(
         id: string;
         phone: string;
         role: string;
+        roles?: string[];
+        metadata?: any;
         name?: string;
         username?: string | null;
         designation?: string | null;
@@ -81,20 +85,24 @@ export function requireRole(roles: string[]) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    const userRole = req.user.role;
-    const additionalRoles = Array.isArray((req.user as any).metadata?.roles)
+
+    const userPrimaryRole = req.user.role;
+    const userSecondaryRoles: string[] = Array.isArray((req.user as any).roles)
+      ? (req.user as any).roles
+      : Array.isArray((req.user as any).metadata?.roles)
       ? (req.user as any).metadata.roles
       : [];
-    const allUserRoles = [userRole, ...additionalRoles];
+    const allUserRoles = [userPrimaryRole, ...userSecondaryRoles];
 
-    // SUPER_ADMIN and ADMIN always have global operational access
+    // SUPER_ADMIN and ADMIN always have global operational access across all features
     if (allUserRoles.includes("SUPER_ADMIN") || allUserRoles.includes("ADMIN")) {
       next();
       return;
     }
 
-    const hasPermission = roles.some((r) => allUserRoles.includes(r));
-    if (!hasPermission) {
+    const hasMatchingRole = roles.some((r) => allUserRoles.includes(r));
+
+    if (!hasMatchingRole) {
       res.status(403).json({ error: "Forbidden: Insufficient permissions" });
       return;
     }
