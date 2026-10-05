@@ -11,7 +11,9 @@ export const usersService = {
     signupSource?: string;
     signupSessionCode?: string;
     search?: string;
-  }): Promise<User[]> {
+    enrolledOnly?: boolean;
+    courseId?: string;
+  }): Promise<any[]> {
     return usersRepository.list(filters);
   },
 
