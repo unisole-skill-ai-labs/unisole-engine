@@ -26,6 +26,7 @@ import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { pathwaysService } from "./services/pathways.service";
 import { pricingService } from "./services/pricing.service";
+import { enrollmentsService } from "./services/enrollments.service";
 
 const app = express();
 app.set("trust proxy", true);
@@ -106,6 +107,13 @@ async function bootstrap() {
       console.log(`[BOOTSTRAP] Drizzle synced ${prcResult.total} canonical offerings pricing to database.`);
     } catch (syncErr: any) {
       console.warn("[BOOTSTRAP] Warning during canonical pathways sync:", syncErr);
+    }
+
+    // 4. Auto-sync any manual/grant enrollments that lack complimentary orders
+    try {
+      await enrollmentsService.syncOrphanedEnrollments();
+    } catch (syncErr: any) {
+      console.warn("[BOOTSTRAP] Warning during enrollments order sync:", syncErr);
     }
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);

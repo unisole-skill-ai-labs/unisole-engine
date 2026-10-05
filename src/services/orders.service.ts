@@ -6,6 +6,7 @@ import { authService } from "./auth.service";
 import { usersRepository } from "../repositories/users.repository";
 import { paymentsRepository } from "../repositories/payments.repository";
 import { enrollmentsRepository } from "../repositories/enrollments.repository";
+import { enrollmentsService } from "./enrollments.service";
 import { Order, OrderItem, ItemType, OrderStatus } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 import { normalizePhone } from "../helpers/formatters";
@@ -239,6 +240,11 @@ export const ordersService = {
     const queryFilters: ListOrdersFilter = { ...filters };
     if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       queryFilters.userId = user.id;
+    }
+
+    // Auto-sync any active enrollments lacking orders for this user so they immediately appear in their order history
+    if (queryFilters.userId) {
+      await enrollmentsService.syncOrphanedEnrollments(queryFilters.userId);
     }
 
     return ordersRepository.list(queryFilters);
