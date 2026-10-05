@@ -36,6 +36,16 @@ lmsRouter.get("/notes/:pathwayId", lmsController.getNotes);
 lmsRouter.get("/cohort", lmsController.getCohortData);
 lmsRouter.get("/cohort/:pathwayId", lmsController.getCohortData);
 
+// Mentorship System & Cockpit
+lmsRouter.get("/mentor/me", lmsController.getMyMentor);
+lmsRouter.get("/mentor/cockpit", lmsController.getMentorCockpit);
+
+// Course Assignments Studio (Practice vs Test)
+lmsRouter.get("/assignments", lmsController.getAssignments);
+lmsRouter.post("/assignments", validateBody({ required: ["title", "category", "type"] }), lmsController.createAssignment);
+lmsRouter.post("/assignments/submit", validateBody({ required: ["assignmentId"] }), lmsController.submitAssessmentTask);
+lmsRouter.post("/submissions/:id/grade", validateBody({ required: ["score"] }), lmsController.gradeSubmission);
+
 // Enrollments
 lmsRouter.get("/enrollments", enrollmentsController.list);
 
