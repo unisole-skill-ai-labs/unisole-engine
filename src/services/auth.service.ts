@@ -99,7 +99,16 @@ export const authService = {
       throw new UnauthorizedError("Account has been deactivated. Please contact Super Administrator.");
     }
 
-    if (!["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR"].includes(user.role)) {
+    const userRoles = [
+      user.role,
+      ...(Array.isArray((user.metadata as any)?.roles) ? (user.metadata as any).roles : []),
+    ];
+
+    const hasStaffPrivileges = userRoles.some((r) =>
+      ["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR", "PROGRAM_MANAGER"].includes(r)
+    );
+
+    if (!hasStaffPrivileges) {
       throw new UnauthorizedError("Access denied. Internal staff privileges required.");
     }
 
