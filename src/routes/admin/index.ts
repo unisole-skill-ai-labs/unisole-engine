@@ -23,11 +23,15 @@ import { adminOrdersRouter } from "./orders";
 import { adminPricingRouter } from "./pricing";
 import { adminCouponsRouter } from "./coupons";
 import { adminSurveysRouter } from "./surveys";
+import { adminDashboardRouter } from "./dashboard";
 
 export const adminRouter: Router = Router();
 
 // Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES, MENTOR, PROGRAM_MANAGER)
 adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR", "PROGRAM_MANAGER"]));
+
+// Dashboard Stats & Academic Metrics
+adminRouter.use("/dashboard", adminDashboardRouter);
 
 // My Work - Centralized Staff Task & Lead Workspace
 adminRouter.use("/my-work", adminMyWorkRouter);
