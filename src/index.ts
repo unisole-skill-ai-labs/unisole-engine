@@ -28,6 +28,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { courseModules, moduleLessons, lessons, modules } from "./db/schema";
 import { pathwaysService } from "./services/pathways.service";
 import { pricingService } from "./services/pricing.service";
+import { enrollmentsService } from "./services/enrollments.service";
 
 const app = express();
 app.set("trust proxy", true);
@@ -119,6 +120,13 @@ async function bootstrap() {
       console.log("[BOOTSTRAP] Successfully purged legacy dummy curriculum modules & lessons.");
     } catch (purgeErr: any) {
       console.warn("[BOOTSTRAP] Note on dummy curriculum cleanup:", purgeErr?.message || purgeErr);
+    }
+
+    // 5. Auto-sync any manual/grant enrollments that lack complimentary orders
+    try {
+      await enrollmentsService.syncOrphanedEnrollments();
+    } catch (syncErr: any) {
+      console.warn("[BOOTSTRAP] Warning during enrollments order sync:", syncErr);
     }
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);
