@@ -15,4 +15,5 @@ adminCoursesRouter.delete("/:id", coursesController.delete);
 // Modules
 adminCoursesRouter.post("/:id/modules", validateBody({ required: ["moduleId", "position"] }), coursesController.attachModule);
 adminCoursesRouter.delete("/:id/modules/:moduleId", coursesController.detachModule);
+adminCoursesRouter.delete("/:id/modules", coursesController.clearModules);
 adminCoursesRouter.get("/:id/modules", coursesController.getModules);

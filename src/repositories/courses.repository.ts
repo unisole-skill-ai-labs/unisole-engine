@@ -5,6 +5,8 @@ import {
   courseModules, NewCourseModule,
   pathwayCourses,
   modules,
+  moduleLessons,
+  lessons,
 } from "../db/schema";
 
 export const coursesRepository = {
@@ -103,6 +105,34 @@ export const coursesRepository = {
     await db.delete(courseModules).where(
       and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleId))
     );
+  },
+
+  async clearModules(courseId: string): Promise<void> {
+    const attached = await db
+      .select({ moduleId: courseModules.moduleId })
+      .from(courseModules)
+      .where(eq(courseModules.courseId, courseId));
+    const moduleIds = attached.map((a) => a.moduleId);
+
+    await db.delete(courseModules).where(eq(courseModules.courseId, courseId));
+
+    if (moduleIds.length > 0) {
+      for (const modId of moduleIds) {
+        const mLes = await db
+          .select({ lessonId: moduleLessons.lessonId })
+          .from(moduleLessons)
+          .where(eq(moduleLessons.moduleId, modId));
+        const lessonIds = mLes.map((l) => l.lessonId);
+
+        await db.delete(moduleLessons).where(eq(moduleLessons.moduleId, modId));
+        if (lessonIds.length > 0) {
+          for (const lId of lessonIds) {
+            await db.delete(lessons).where(eq(lessons.id, lId));
+          }
+        }
+        await db.delete(modules).where(eq(modules.id, modId));
+      }
+    }
   },
 
   async getModules(courseId: string): Promise<any[]> {

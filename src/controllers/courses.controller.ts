@@ -34,6 +34,10 @@ export const coursesController = {
     await coursesService.detachModule(req.params.id, req.params.moduleId);
     res.json({ ok: true });
   }),
+  clearModules: asyncHandler(async (req: Request, res: Response) => {
+    await coursesService.clearModules(req.params.id);
+    res.json({ ok: true, message: "Course modules cleared successfully" });
+  }),
   getModules: asyncHandler(async (req: Request, res: Response) => {
     res.json(await coursesService.getModules(req.params.id));
   }),

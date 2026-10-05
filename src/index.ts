@@ -23,7 +23,9 @@ import { setupPresentationSocket } from "./socket/presentation.socket";
 import { pool, db } from "./db";
 import { initializeDatabase } from "./db/init";
 import path from "path";
+import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { courseModules, moduleLessons, lessons, modules } from "./db/schema";
 import { pathwaysService } from "./services/pathways.service";
 import { pricingService } from "./services/pricing.service";
 
@@ -106,6 +108,17 @@ async function bootstrap() {
       console.log(`[BOOTSTRAP] Drizzle synced ${prcResult.total} canonical offerings pricing to database.`);
     } catch (syncErr: any) {
       console.warn("[BOOTSTRAP] Warning during canonical pathways sync:", syncErr);
+    }
+
+    // 4. Purge legacy dummy modules & lessons so users manually author their courses
+    try {
+      await db.delete(courseModules).where(sql`"module_id" LIKE 'mod_cs_%'`);
+      await db.delete(moduleLessons).where(sql`"module_id" LIKE 'mod_cs_%' OR "lesson_id" LIKE 'les_cs_%'`);
+      await db.delete(lessons).where(sql`"id" LIKE 'les_cs_%'`);
+      await db.delete(modules).where(sql`"id" LIKE 'mod_cs_%'`);
+      console.log("[BOOTSTRAP] Successfully purged legacy dummy curriculum modules & lessons.");
+    } catch (purgeErr: any) {
+      console.warn("[BOOTSTRAP] Note on dummy curriculum cleanup:", purgeErr?.message || purgeErr);
     }
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);
