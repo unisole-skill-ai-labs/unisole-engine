@@ -81,4 +81,43 @@ export const lmsController = {
     const result = await lmsService.updateUserProfile(userId, req.body);
     res.json(result);
   }),
+
+  // Mentorship
+  getMyMentor: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const mentor = await lmsService.getStudentMentor(userId);
+    res.json(mentor);
+  }),
+
+  getMentorCockpit: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const cockpit = await lmsService.getMentorCockpit(userId);
+    res.json(cockpit);
+  }),
+
+  // Course Assignments (Practice vs Test)
+  getAssignments: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const courseId = req.query.courseId as string;
+    const moduleId = req.query.moduleId as string;
+    const assignments = await lmsService.getCourseAssignments(courseId, moduleId);
+    res.json(assignments);
+  }),
+
+  createAssignment: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const result = await lmsService.createOrUpdateAssignment(req.body);
+    res.json(result);
+  }),
+
+  submitAssessmentTask: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const result = await lmsService.submitAssessmentTask(userId, req.body);
+    res.json(result);
+  }),
+
+  gradeSubmission: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const mentorUserId = req.user!.id;
+    const submissionId = req.params.id;
+    const result = await lmsService.gradeSubmission(submissionId, mentorUserId, req.body);
+    res.json(result);
+  }),
 };
