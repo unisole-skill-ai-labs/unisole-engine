@@ -1,9 +1,10 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
   modules, Module, NewModule,
   moduleLessons, NewModuleLesson,
   courseModules,
+  lessons,
 } from "../db/schema";
 
 export const modulesRepository = {
@@ -51,11 +52,20 @@ export const modulesRepository = {
     );
   },
 
-  async getLessons(moduleId: string): Promise<{ lessonId: string; position: number }[]> {
+  async getLessons(moduleId: string): Promise<any[]> {
     const rows = await db
-      .select({ lessonId: moduleLessons.lessonId, position: moduleLessons.position })
+      .select({
+        lessonId: moduleLessons.lessonId,
+        position: moduleLessons.position,
+        title: lessons.title,
+        slug: lessons.slug,
+        videoUrl: lessons.videoUrl,
+        durationMinutes: lessons.durationMinutes,
+      })
       .from(moduleLessons)
-      .where(eq(moduleLessons.moduleId, moduleId));
+      .leftJoin(lessons, eq(moduleLessons.lessonId, lessons.id))
+      .where(eq(moduleLessons.moduleId, moduleId))
+      .orderBy(asc(moduleLessons.position));
     return rows;
   },
 

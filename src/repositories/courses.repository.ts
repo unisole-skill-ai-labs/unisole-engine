@@ -1,9 +1,10 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
   courses, Course, NewCourse,
   courseModules, NewCourseModule,
   pathwayCourses,
+  modules,
 } from "../db/schema";
 
 export const coursesRepository = {
@@ -104,11 +105,19 @@ export const coursesRepository = {
     );
   },
 
-  async getModules(courseId: string): Promise<{ moduleId: string; position: number }[]> {
+  async getModules(courseId: string): Promise<any[]> {
     const rows = await db
-      .select({ moduleId: courseModules.moduleId, position: courseModules.position })
+      .select({
+        moduleId: courseModules.moduleId,
+        position: courseModules.position,
+        title: modules.title,
+        slug: modules.slug,
+        status: modules.status,
+      })
       .from(courseModules)
-      .where(eq(courseModules.courseId, courseId));
+      .leftJoin(modules, eq(courseModules.moduleId, modules.id))
+      .where(eq(courseModules.courseId, courseId))
+      .orderBy(asc(courseModules.position));
     return rows;
   },
 

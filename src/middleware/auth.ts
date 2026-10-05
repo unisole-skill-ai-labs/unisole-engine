@@ -81,7 +81,20 @@ export function requireRole(roles: string[]) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    if (!roles.includes(req.user.role)) {
+    const userRole = req.user.role;
+    const additionalRoles = Array.isArray((req.user as any).metadata?.roles)
+      ? (req.user as any).metadata.roles
+      : [];
+    const allUserRoles = [userRole, ...additionalRoles];
+
+    // SUPER_ADMIN and ADMIN always have global operational access
+    if (allUserRoles.includes("SUPER_ADMIN") || allUserRoles.includes("ADMIN")) {
+      next();
+      return;
+    }
+
+    const hasPermission = roles.some((r) => allUserRoles.includes(r));
+    if (!hasPermission) {
       res.status(403).json({ error: "Forbidden: Insufficient permissions" });
       return;
     }

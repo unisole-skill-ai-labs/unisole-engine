@@ -387,22 +387,92 @@ export const lmsService = {
         moduleList.push({
           ...mod,
           position: modPos,
-          lessons: linkedLessons.map(({ position: lesPos, lesson }) => ({
-            id: lesson.id,
-            title: lesson.title,
-            slug: lesson.slug,
-            description: lesson.description,
-            durationMinutes: lesson.durationMinutes,
-            videoUrl: lesson.videoUrl || "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
-            content: lesson.content,
-            contentType: lesson.id.includes("_quiz")
-              ? "QUIZ"
-              : lesson.id.includes("_lab") || lesson.id.includes("_cap")
-              ? "ASSIGNMENT"
-              : "VIDEO",
-            status: lesson.status,
-            position: lesPos,
-          })),
+          lessons: linkedLessons.map(({ position: lesPos, lesson }) => {
+            let parsedContent: any = null;
+            try {
+              if (lesson.content && lesson.content.startsWith("{")) {
+                parsedContent = JSON.parse(lesson.content);
+              }
+            } catch {}
+
+            const isCoding =
+              parsedContent?.testType === "CODING_TEST" ||
+              parsedContent?.type === "CODING_TEST" ||
+              lesson.slug?.includes("coding");
+            const isVideoTest =
+              parsedContent?.testType === "VIDEO_TEST" ||
+              parsedContent?.type === "VIDEO_TEST" ||
+              lesson.slug?.includes("viva");
+            const isSubjTest =
+              parsedContent?.testType === "SUBJECTIVE_TEST" ||
+              parsedContent?.type === "SUBJECTIVE_TEST";
+            const isQuizItem =
+              parsedContent?.type === "QUIZ" ||
+              parsedContent?.practiceType === "MCQ" ||
+              lesson.id.includes("_quiz") ||
+              lesson.slug?.includes("quiz");
+            const isAssignmentItem =
+              parsedContent?.type === "ASSIGNMENT" ||
+              parsedContent?.practiceType === "PROJECT" ||
+              parsedContent?.testType === "PROJECT" ||
+              lesson.id.includes("_lab") ||
+              lesson.id.includes("_cap");
+
+            let computedType = "video";
+            let computedCategory = "LECTURE";
+
+            if (isCoding) {
+              computedType = "coding_test";
+              computedCategory = "TEST";
+            } else if (isVideoTest) {
+              computedType = "video_test";
+              computedCategory = "TEST";
+            } else if (isSubjTest) {
+              computedType = "subjective_test";
+              computedCategory = "TEST";
+            } else if (isQuizItem) {
+              computedType = "quiz";
+              computedCategory = parsedContent?.category || "PRACTICE";
+            } else if (isAssignmentItem) {
+              computedType = "assignment";
+              computedCategory = parsedContent?.category || (parsedContent?.testType ? "TEST" : "PRACTICE");
+            }
+
+            return {
+              id: lesson.id,
+              title: lesson.title,
+              slug: lesson.slug,
+              description: lesson.description || parsedContent?.contentMarkdown,
+              durationMinutes: lesson.durationMinutes,
+              videoUrl:
+                lesson.videoUrl ||
+                parsedContent?.videoUrl ||
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
+              content: lesson.content,
+              contentType: computedType.toUpperCase(),
+              type: computedType,
+              category: computedCategory,
+              isTest: computedCategory === "TEST",
+              config:
+                parsedContent?.codingTest ||
+                parsedContent?.subjectiveTest ||
+                parsedContent?.videoTest ||
+                parsedContent?.assignment ||
+                parsedContent?.quiz,
+              questions: parsedContent?.quiz?.questions || parsedContent?.questions,
+              instructions:
+                parsedContent?.assignment?.instructions ||
+                parsedContent?.instructions ||
+                lesson.description,
+              maxScore:
+                parsedContent?.maxScore ||
+                parsedContent?.assignment?.maxPoints ||
+                parsedContent?.codingTest?.maxScore ||
+                100,
+              status: lesson.status,
+              position: lesPos,
+            };
+          }),
         });
       }
 
