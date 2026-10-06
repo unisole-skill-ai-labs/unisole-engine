@@ -24,6 +24,19 @@ export const modulesController = {
     await modulesService.detachLesson(req.params.id, req.params.lessonId);
     res.json({ ok: true });
   }),
+  reorderLessons: asyncHandler(async (req: Request, res: Response) => {
+    await modulesService.reorderLessons(req.params.id, req.body.lessonIds || []);
+    res.json({ ok: true, message: "Lessons reordered successfully" });
+  }),
+  moveLesson: asyncHandler(async (req: Request, res: Response) => {
+    await modulesService.moveLesson(
+      req.params.id,
+      req.body.targetModuleId,
+      req.body.lessonId,
+      req.body.targetPosition
+    );
+    res.json({ ok: true, message: "Lesson moved successfully" });
+  }),
   getLessons: asyncHandler(async (req: Request, res: Response) => {
     res.json(await modulesService.getLessons(req.params.id));
   }),

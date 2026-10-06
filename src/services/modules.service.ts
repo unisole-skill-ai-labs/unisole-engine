@@ -58,6 +58,14 @@ export const modulesService = {
     await modulesRepository.detachLesson(moduleId, lessonId);
   },
 
+  async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
+    await modulesRepository.reorderLessons(moduleId, lessonIds);
+  },
+
+  async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, targetPosition?: number): Promise<void> {
+    await modulesRepository.moveLesson(sourceModuleId, targetModuleId, lessonId, targetPosition);
+  },
+
   async getLessons(moduleId: string) {
     return modulesRepository.getLessons(moduleId);
   },

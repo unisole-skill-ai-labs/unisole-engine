@@ -6,6 +6,7 @@ export const adminCoursesRouter: Router = Router();
 
 adminCoursesRouter.get("/", coursesController.list);
 adminCoursesRouter.post("/sync-canonical", coursesController.syncCanonical);
+adminCoursesRouter.post("/purge-all-curriculum", coursesController.purgeAllCurriculum);
 adminCoursesRouter.get("/:id", coursesController.getById);
 adminCoursesRouter.post("/", validateBody({ required: ["title", "slug"] }), coursesController.create);
 adminCoursesRouter.put("/:id", coursesController.update);
@@ -14,5 +15,7 @@ adminCoursesRouter.delete("/:id", coursesController.delete);
 
 // Modules
 adminCoursesRouter.post("/:id/modules", validateBody({ required: ["moduleId", "position"] }), coursesController.attachModule);
+adminCoursesRouter.post("/:id/reorder-modules", validateBody({ required: ["moduleIds"] }), coursesController.reorderModules);
 adminCoursesRouter.delete("/:id/modules/:moduleId", coursesController.detachModule);
+adminCoursesRouter.delete("/:id/modules", coursesController.clearModules);
 adminCoursesRouter.get("/:id/modules", coursesController.getModules);

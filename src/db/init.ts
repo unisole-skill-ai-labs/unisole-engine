@@ -3,6 +3,7 @@ import path from "path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
 import { pricingService } from "../services/pricing.service";
+import { seedLmsDemoData } from "../scripts/seed-lms-demo";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -29,7 +30,7 @@ export async function initializeDatabase() {
     // 1. Ensure Base Enums Exist
     await execSqlSafe("base_enums", `
       DO $$ BEGIN
-        CREATE TYPE "public"."user_role" AS ENUM('STUDENT', 'MEMBER', 'ADMIN', 'SUPER_ADMIN', 'SALES');
+        CREATE TYPE "public"."user_role" AS ENUM('STUDENT', 'MEMBER', 'MENTOR', 'PROGRAM_MANAGER', 'ADMIN', 'SUPER_ADMIN', 'SALES');
       EXCEPTION WHEN OTHERS THEN null; END $$;
 
       DO $$ BEGIN
@@ -114,6 +115,8 @@ export async function initializeDatabase() {
     `);
 
     // 2. Safe standalone enum additions (outside PL/pgSQL transaction blocks)
+    await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
     await addEnumValueSafely("enrollment_source", "SURVEY");
     await addEnumValueSafely("lead_source", "SURVEY");
     await addEnumValueSafely("item_type", "PATHWAY");
@@ -146,6 +149,8 @@ export async function initializeDatabase() {
     await addEnumValueSafely("lead_status", "NOT_A_LEAD");
 
     await addEnumValueSafely("user_role", "SALES");
+    await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
 
     // 3. Sequences
     await execSqlSafe("sequences", `
@@ -174,6 +179,8 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_session_code" varchar(50);
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_college_id" varchar(50);
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "signup_college_name" varchar(200);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "email" varchar(255);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "avatar" text;
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
     `);
 
@@ -225,6 +232,84 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "price_paise" bigint DEFAULT 0 NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "mrp_paise" bigint DEFAULT 0 NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+    `);
+
+    await execSqlSafe("curriculum_tables_alterations", `
+      CREATE SEQUENCE IF NOT EXISTS "public"."modules_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE TABLE IF NOT EXISTS "public"."modules" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('mod_'::text || nextval('public.modules_id_seq'::regclass)) NOT NULL,
+        "title" varchar(250) NOT NULL,
+        "slug" varchar(280) NOT NULL,
+        "description" text,
+        "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "slug" varchar(280);
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+
+      CREATE SEQUENCE IF NOT EXISTS "public"."lessons_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE TABLE IF NOT EXISTS "public"."lessons" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('les_'::text || nextval('public.lessons_id_seq'::regclass)) NOT NULL,
+        "title" varchar(250) NOT NULL,
+        "slug" varchar(280) NOT NULL,
+        "description" text,
+        "content" text,
+        "video_url" text,
+        "duration_minutes" integer,
+        "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "slug" varchar(280);
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "content" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "video_url" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "duration_minutes" integer;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."modules" ALTER COLUMN "id" TYPE varchar(50) USING id::text;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      CREATE TABLE IF NOT EXISTS "public"."course_modules" (
+        "course_id" varchar(50) NOT NULL,
+        "module_id" varchar(50) NOT NULL,
+        "position" integer NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        PRIMARY KEY ("course_id", "module_id")
+      );
+      ALTER TABLE "public"."course_modules" ADD COLUMN IF NOT EXISTS "position" integer;
+      ALTER TABLE "public"."course_modules" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS "public"."module_lessons" (
+        "module_id" varchar(50) NOT NULL,
+        "lesson_id" varchar(50) NOT NULL,
+        "position" integer NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        PRIMARY KEY ("module_id", "lesson_id")
+      );
+      DO $$ BEGIN
+        ALTER TABLE "public"."module_lessons" ALTER COLUMN "module_id" TYPE varchar(50) USING module_id::text;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+      DO $$ BEGIN
+        ALTER TABLE "public"."module_lessons" ALTER COLUMN "module_item_id" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+      DO $$ BEGIN
+        ALTER TABLE "public"."module_lessons" ALTER COLUMN "order_index" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+      ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "lesson_id" varchar(50);
+      ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "position" integer;
+      ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
     `);
 
     // 5. Commercial Orders, Pricing Catalog & Coupons Tables
@@ -853,7 +938,123 @@ export async function initializeDatabase() {
       console.warn("[DB-INIT] Warning syncing canonical offerings:", e);
     }
 
-    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment and Survey tables verified successfully.");
+    // 18. LMS Tables (lesson_progress, submissions, notes)
+    await execSqlSafe("lms_tables", `
+      CREATE TABLE IF NOT EXISTS "public"."lesson_progress" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('prog_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "pathway_id" varchar(100) NOT NULL,
+        "lesson_id" varchar(100) NOT NULL,
+        "completed" boolean DEFAULT false NOT NULL,
+        "watched_duration_seconds" integer DEFAULT 0 NOT NULL,
+        "completed_at" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_user_lesson" UNIQUE("user_id", "lesson_id")
+      );
+
+      ALTER TABLE "public"."lesson_progress" ADD COLUMN IF NOT EXISTS "pathway_id" varchar(50);
+      ALTER TABLE "public"."lesson_progress" ADD COLUMN IF NOT EXISTS "is_completed" boolean DEFAULT true;
+      ALTER TABLE "public"."lesson_progress" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+      UPDATE "public"."lesson_progress" SET "is_completed" = "completed" WHERE "is_completed" IS NULL;
+
+      CREATE TABLE IF NOT EXISTS "public"."submissions" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('sub_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "lesson_id" varchar(50),
+        "assignment_id" varchar(50),
+        "pathway_id" varchar(50),
+        "mentor_id" varchar(50),
+        "type" varchar(50) DEFAULT 'assignment' NOT NULL,
+        "title" varchar(255),
+        "submission_url" text,
+        "submission_text" text,
+        "code_snippet" text,
+        "video_url" text,
+        "score" integer,
+        "max_score" integer DEFAULT 100,
+        "status" varchar(50) DEFAULT 'SUBMITTED' NOT NULL,
+        "mentor_feedback" text,
+        "evaluated_at" timestamp with time zone,
+        "metadata" jsonb DEFAULT '{}'::jsonb,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "lesson_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "assignment_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "pathway_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "mentor_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "title" varchar(255);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "submission_url" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "submission_text" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "code_snippet" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "video_url" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "mentor_feedback" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "evaluated_at" timestamp with time zone;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+
+      CREATE TABLE IF NOT EXISTS "public"."notes" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('note_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "pathway_id" varchar(100) NOT NULL,
+        "lesson_id" varchar(100),
+        "lesson_title" varchar(255),
+        "content" text NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS "idx_lesson_progress_user" ON "public"."lesson_progress" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_lesson_progress_pathway" ON "public"."lesson_progress" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_user" ON "public"."submissions" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_pathway" ON "public"."submissions" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_notes_user" ON "public"."notes" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_notes_pathway" ON "public"."notes" ("pathway_id");
+
+      -- Users email & avatar extension
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "email" varchar(255);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "avatar" text;
+
+      -- Mentorship and Cohort tables
+      CREATE TABLE IF NOT EXISTS "public"."mentors" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('mnt_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "specialization" varchar(255),
+        "bio" text,
+        "office_hours" varchar(255),
+        "is_active" boolean DEFAULT true NOT NULL,
+        "metadata" jsonb DEFAULT '{}'::jsonb,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS "public"."mentor_mentees" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('mm_'::text || gen_random_uuid()),
+        "mentor_id" varchar(50) NOT NULL,
+        "mentee_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "course_id" varchar(50),
+        "pathway_id" varchar(50),
+        "status" varchar(50) DEFAULT 'ACTIVE' NOT NULL,
+        "metadata" jsonb DEFAULT '{}'::jsonb,
+        "assigned_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS "idx_mentors_user" ON "public"."mentors" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentor" ON "public"."mentor_mentees" ("mentor_id");
+      CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentee" ON "public"."mentor_mentees" ("mentee_id");
+    `);
+
+    // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)
+    try {
+      await seedLmsDemoData();
+      console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
+    } catch (lmsSeedErr) {
+      console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
+    }
+
+    console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment, LMS, and Survey tables verified successfully.");
   } catch (err) {
     console.error("[DB-INIT] ❌ Database initialization error:", err);
   }

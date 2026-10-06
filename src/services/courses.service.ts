@@ -86,6 +86,18 @@ export const coursesService = {
     await coursesRepository.detachModule(courseId, moduleId);
   },
 
+  async clearModules(courseId: string): Promise<void> {
+    await coursesRepository.clearModules(courseId);
+  },
+
+  async purgeAllCurriculum(): Promise<{ modulesDeleted: number; lessonsDeleted: number }> {
+    return coursesRepository.purgeAllCurriculum();
+  },
+
+  async reorderModules(courseId: string, moduleIds: string[]): Promise<void> {
+    await coursesRepository.reorderModules(courseId, moduleIds);
+  },
+
   async getModules(courseId: string) {
     return coursesRepository.getModules(courseId);
   },
