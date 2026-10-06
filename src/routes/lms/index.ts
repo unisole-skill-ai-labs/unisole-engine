@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../../middleware/auth";
 import { authController } from "../../controllers/auth.controller";
 import { lmsController } from "../../controllers/lms.controller";
+import { mentorshipController } from "../../controllers/mentorship.controller";
 import { enrollmentsController } from "../../controllers/enrollments.controller";
 import { paymentsController } from "../../controllers/payments.controller";
 import { validateBody } from "../../middleware/validate";
@@ -38,6 +39,7 @@ lmsRouter.get("/cohort", lmsController.getCohortData);
 lmsRouter.get("/cohort/:pathwayId", lmsController.getCohortData);
 
 // Mentorship System & Cockpit
+lmsRouter.get("/mentors", mentorshipController.listMentors);
 lmsRouter.get("/mentor/me", lmsController.getMyMentor);
 lmsRouter.get("/mentor/cockpit", lmsController.getMentorCockpit);
 

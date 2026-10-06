@@ -90,12 +90,19 @@ export const lmsController = {
   }),
 
   getMentorCockpit: asyncHandler(async (req: CustomRequest, res: Response) => {
-    const userId = req.user!.id;
+    const callerUserId = req.user!.id;
+    const callerRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean);
     const { mentorId, mentorUserId } = req.query as any;
-    const isStaff = ["ADMIN", "SUPER_ADMIN", "PROGRAM_MANAGER"].includes(req.user?.role || "");
-    const targetId = isStaff && mentorId ? String(mentorId) : undefined;
-    const targetUser = isStaff && mentorUserId ? String(mentorUserId) : userId;
-    const cockpit = await lmsService.getMentorCockpit(targetUser, targetId);
+    const targetMentorId = mentorId || mentorUserId ? String(mentorId || mentorUserId) : undefined;
+    const cockpit = await lmsService.getMentorCockpit({
+      callerUserId,
+      callerRoles,
+      targetMentorId,
+    });
     res.json(cockpit);
   }),
 

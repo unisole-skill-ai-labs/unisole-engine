@@ -1283,35 +1283,168 @@ export const lmsService = {
     };
   },
 
-  async getMentorCockpit(mentorUserId: string, targetMentorId?: string) {
+  async getMentorCockpit(
+    firstArg: string | { callerUserId: string; callerRoles?: string[]; targetMentorId?: string },
+    secondArg?: string
+  ) {
+    let callerUserId: string;
+    let callerRoles: string[] = [];
+    let targetMentorId: string | undefined = undefined;
+
+    if (typeof firstArg === "object" && firstArg !== null) {
+      callerUserId = firstArg.callerUserId;
+      callerRoles = firstArg.callerRoles || [];
+      targetMentorId = firstArg.targetMentorId;
+    } else {
+      callerUserId = firstArg;
+      targetMentorId = secondArg;
+    }
+
+    const isAdmin = callerRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r.toUpperCase()));
+    const isProgramManager = callerRoles.some((r) => r.toUpperCase() === "PROGRAM_MANAGER");
+    const isMentor = callerRoles.some((r) => r.toUpperCase() === "MENTOR");
+
+    // 1. Auto-sync users having role = 'MENTOR' into mentors table if not already present
+    try {
+      const mentorRoleUsers = await db
+        .select()
+        .from(users)
+        .where(sql`role::text = 'MENTOR' OR metadata->'roles' ? 'MENTOR'`);
+
+      for (const u of mentorRoleUsers) {
+        const existing = await db
+          .select()
+          .from(mentors)
+          .where(eq(mentors.userId, u.id))
+          .limit(1);
+
+        if (existing.length === 0) {
+          await db.insert(mentors).values({
+            id: `mnt_${u.id}`,
+            userId: u.id,
+            specialization: u.designation || "Technical Mentor & Evaluator",
+            bio: "Technical mentor guiding student capstone projects and assessments.",
+            isActive: u.isActive,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("[LMSService] Auto-sync mentors warning:", err);
+    }
+
     let menteesList: any[] = [];
     let mentorRecord: any = null;
 
     try {
-      if (targetMentorId) {
+      let specificMentorId: string | undefined = undefined;
+
+      if (targetMentorId && targetMentorId !== "ALL") {
         const records = await db
           .select()
           .from(mentors)
-          .where(eq(mentors.id, targetMentorId))
+          .where(or(eq(mentors.id, targetMentorId), eq(mentors.userId, targetMentorId)))
           .limit(1);
-        mentorRecord = records[0];
-      } else {
+        if (records.length > 0) {
+          mentorRecord = records[0];
+          specificMentorId = mentorRecord.id;
+        }
+      } else if (isMentor && !isAdmin && !isProgramManager) {
         const records = await db
           .select()
           .from(mentors)
-          .where(eq(mentors.userId, mentorUserId))
+          .where(eq(mentors.userId, callerUserId))
           .limit(1);
-        mentorRecord = records[0];
+        if (records.length > 0) {
+          mentorRecord = records[0];
+          specificMentorId = mentorRecord.id;
+        }
       }
 
-      if (mentorRecord) {
+      if (specificMentorId && mentorRecord) {
+        // Fetch mentor's user details if available
+        const mentorUser = (await db.select().from(users).where(eq(users.id, mentorRecord.userId)).limit(1))[0];
+        if (mentorUser) {
+          mentorRecord = {
+            ...mentorRecord,
+            name: mentorUser.name,
+            email: mentorUser.email,
+            phone: mentorUser.phone,
+            avatar: mentorUser.avatar,
+          };
+        }
+
         const menteeRows = await db
           .select()
           .from(mentorMentees)
-          .where(and(eq(mentorMentees.mentorId, mentorRecord.id), eq(mentorMentees.status, "ACTIVE")));
+          .where(and(eq(mentorMentees.mentorId, specificMentorId), eq(mentorMentees.status, "ACTIVE")));
 
         if (menteeRows.length > 0) {
           const studentIds = menteeRows.map((r) => r.menteeId);
+          const studentUsers = await db
+            .select()
+            .from(users)
+            .where(inArray(users.id, studentIds));
+
+          const allSubs = await db
+            .select()
+            .from(submissions)
+            .where(inArray(submissions.userId, studentIds));
+
+          menteesList = studentUsers.map((u) => {
+            const userSubs = allSubs.filter((s) => s.userId === u.id);
+            const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
+            const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
+            const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const latestSub = sortedSubs[0];
+
+            return {
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              phone: u.phone,
+              avatar: u.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=128&q=80`,
+              college: u.collegeName || "Govt Degree College",
+              progressPercent: Math.min(100, Math.max(15, gradedSubs.length * 20)),
+              submittedCount: userSubs.length,
+              pendingReviews: pendingSubs.length,
+              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : userSubs.length === 0 ? "AT_RISK" : "ON_TRACK",
+              lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
+              latestSubmission: latestSub ? {
+                id: latestSub.id,
+                title: latestSub.title,
+                type: latestSub.type,
+                submissionUrl: latestSub.submissionUrl,
+                submissionText: latestSub.submissionText,
+                codeSnippet: latestSub.codeSnippet,
+                videoUrl: latestSub.videoUrl,
+                score: latestSub.score,
+                status: latestSub.status,
+                mentorFeedback: latestSub.mentorFeedback,
+                createdAt: latestSub.createdAt,
+              } : null,
+            };
+          });
+        }
+      } else {
+        // Admin or Program Manager viewing aggregate / all mentors cohort
+        mentorRecord = {
+          id: "ALL",
+          userId: "ALL",
+          name: "All Mentors Cohort",
+          specialization: "Full Cohort Oversight",
+          bio: "Aggregated mentorship cockpit across all active mentors.",
+        };
+
+        const menteeRows = await db
+          .select({
+            menteeId: mentorMentees.menteeId,
+            mentorId: mentorMentees.mentorId,
+          })
+          .from(mentorMentees)
+          .where(eq(mentorMentees.status, "ACTIVE"));
+
+        if (menteeRows.length > 0) {
+          const studentIds = Array.from(new Set(menteeRows.map((r) => r.menteeId)));
           const studentUsers = await db
             .select()
             .from(users)
@@ -1371,7 +1504,11 @@ export const lmsService = {
       mentor: mentorRecord ? {
         id: mentorRecord.id,
         userId: mentorRecord.userId,
-        specialization: mentorRecord.specialization,
+        name: mentorRecord.name || "Assigned Mentor",
+        email: mentorRecord.email,
+        phone: mentorRecord.phone,
+        avatar: mentorRecord.avatar,
+        specialization: mentorRecord.specialization || "Technical Mentor",
         bio: mentorRecord.bio,
       } : null,
       milestones: {
