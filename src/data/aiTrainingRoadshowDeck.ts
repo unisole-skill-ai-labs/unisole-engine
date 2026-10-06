@@ -90,22 +90,22 @@ export const AI_TRAINING_ROADSHOW_DECK_SLIDES = [
   },
 
   // =========================================================================
-  // SLIDE 5 — POLL: HOW MUCH DOES A DEGREE MATTER?
+  // SLIDE 5 — POLL: WHAT ARE YOUR CURRENT CAREER GOALS?
   // =========================================================================
   {
     id: "ai_train_slide_5",
     type: "POLL",
     badge: "LIVE POLL 01",
-    title: "Poll: How Much Does a Degree Matter?",
-    question: "How much degree matter for job?",
+    title: "Poll: What Are Your Current Career Goals?",
+    question: "What are your current career goals?",
     options: [
-      "100% — Degree is everything for a job",
-      "50% — Degree opens the door, skills do the rest",
-      "20–30% — Degree is just a basic eligibility filter",
-      "<10% — Skills & practical proof matter almost completely",
+      "Want to make strong portfolio for job",
+      "Want internship",
+      "Want to learn skill for now",
+      "Not decided yet",
     ],
     maxBuildSteps: 1,
-    notes: "Live Poll 01: 4 options. Show live votes on screen.",
+    notes: "Live Poll 01: 4 career goal options. Show live votes on screen.",
   },
 
   // =========================================================================
