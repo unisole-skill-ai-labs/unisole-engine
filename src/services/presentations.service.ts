@@ -293,6 +293,95 @@ export const presentationsService = {
           console.log(`[Presentations] Auto-synced AI Training Program Roadshow (collegeName: ${roadshowCollegeName})`);
         }
       }
+
+      // -------------------------------------------------------------
+      // 4. M.L.S.M. College Sundernagar — AI Training Program Roadshow Deck
+      // -------------------------------------------------------------
+      const existingMlsmRoadshow = await presentationsRepository.getPresentationById("pres_mlsm_sundernagar_roadshow");
+      let mlsmCollegeId: string | null = null;
+      let mlsmCollegeName = "M.L.S.M. College Sundernagar";
+      try {
+        const collegesList = await collegesRepository.list();
+        let mlsmCollege = collegesList.find(
+          (c) =>
+            c.slug === "mlsm-college-sundernagar" ||
+            c.slug === "mlsm-sundernagar" ||
+            (c.name?.toLowerCase().includes("mlsm") || c.name?.toLowerCase().includes("m.l.s.m") || c.name?.toLowerCase().includes("sundernagar"))
+        );
+        if (!mlsmCollege) {
+          mlsmCollege = await collegesRepository.create({
+            name: "M.L.S.M. College Sundernagar",
+            shortName: "MLSM College Sundernagar",
+            slug: "mlsm-college-sundernagar",
+            description: "Maharaja Laxman Sen Memorial (M.L.S.M.) College, Sundernagar, District Mandi, Himachal Pradesh.",
+            isActive: true,
+          });
+        }
+
+        if (mlsmCollege) {
+          mlsmCollegeId = mlsmCollege.id;
+          mlsmCollegeName = mlsmCollege.name;
+
+          // Ensure default branches exist
+          try {
+            const defaultBranches = [
+              { name: "Bachelor of Computer Applications (BCA)", code: "BCA" },
+              { name: "B.Sc (Computer Science / Non-Medical)", code: "BSC_NM" },
+              { name: "B.Sc (Medical)", code: "BSC_MED" },
+              { name: "Bachelor of Commerce (B.Com)", code: "BCOM" },
+              { name: "Bachelor of Arts (B.A.)", code: "BA" },
+              { name: "Bachelor of Business Administration (BBA)", code: "BBA" },
+              { name: "Post Graduate Diploma in Computer Applications (PGDCA)", code: "PGDCA" },
+              { name: "Other", code: "OTHER" },
+            ];
+            for (const br of defaultBranches) {
+              await pool.query(
+                `INSERT INTO college_branches (college_id, name, code)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (college_id, code) DO NOTHING`,
+                [mlsmCollege.id, br.name, br.code]
+              );
+            }
+          } catch (brErr) {
+            // ignore
+          }
+        }
+      } catch (colErr) {
+        // ignore
+      }
+
+      if (!existingMlsmRoadshow) {
+        await presentationsRepository.createPresentation({
+          id: "pres_mlsm_sundernagar_roadshow",
+          collegeId: mlsmCollegeId,
+          collegeName: mlsmCollegeName,
+          title: "AI Training Program Roadshow",
+          description: "27-slide industrial training cum internship roadshow presentation for M.L.S.M. College Sundernagar featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+          theme: "dark",
+          slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
+          isActive: true,
+        });
+        console.log("[Presentations] Auto-seeded flagship deck: AI Training Program Roadshow (MLSM College Sundernagar)");
+      } else {
+        const existingJson = JSON.stringify(existingMlsmRoadshow.slides || []);
+        const targetJson = JSON.stringify(AI_TRAINING_ROADSHOW_DECK_SLIDES);
+
+        if (
+          existingMlsmRoadshow.collegeName !== mlsmCollegeName ||
+          existingMlsmRoadshow.collegeId !== mlsmCollegeId ||
+          existingMlsmRoadshow.title !== "AI Training Program Roadshow" ||
+          existingJson !== targetJson
+        ) {
+          await presentationsRepository.updatePresentation("pres_mlsm_sundernagar_roadshow", {
+            title: "AI Training Program Roadshow",
+            collegeId: mlsmCollegeId,
+            collegeName: mlsmCollegeName,
+            description: "27-slide industrial training cum internship roadshow presentation for M.L.S.M. College Sundernagar featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+            slides: AI_TRAINING_ROADSHOW_DECK_SLIDES,
+          });
+          console.log(`[Presentations] Auto-synced AI Training Program Roadshow (MLSM College Sundernagar)`);
+        }
+      }
     } catch (err) {
       console.warn("[Presentations] Could not auto-sync flagship decks:", err);
     }
@@ -307,7 +396,8 @@ export const presentationsService = {
     if (
       id === "pres_sanjauli_college_ppt" ||
       id === "pres_sunni_college_ppt" ||
-      id === "pres_ai_training_roadshow"
+      id === "pres_ai_training_roadshow" ||
+      id === "pres_mlsm_sundernagar_roadshow"
     ) {
       await this.ensureFlagshipDecks();
     }
