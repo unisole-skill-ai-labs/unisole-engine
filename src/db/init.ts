@@ -234,6 +234,84 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
     `);
 
+    await execSqlSafe("curriculum_tables_alterations", `
+      CREATE SEQUENCE IF NOT EXISTS "public"."modules_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE TABLE IF NOT EXISTS "public"."modules" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('mod_'::text || nextval('public.modules_id_seq'::regclass)) NOT NULL,
+        "title" varchar(250) NOT NULL,
+        "slug" varchar(280) NOT NULL,
+        "description" text,
+        "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "slug" varchar(280);
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+
+      CREATE SEQUENCE IF NOT EXISTS "public"."lessons_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE TABLE IF NOT EXISTS "public"."lessons" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('les_'::text || nextval('public.lessons_id_seq'::regclass)) NOT NULL,
+        "title" varchar(250) NOT NULL,
+        "slug" varchar(280) NOT NULL,
+        "description" text,
+        "content" text,
+        "video_url" text,
+        "duration_minutes" integer,
+        "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "slug" varchar(280);
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "content" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "video_url" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "duration_minutes" integer;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+
+      DO $$ BEGIN
+        ALTER TABLE "public"."modules" ALTER COLUMN "id" TYPE varchar(50) USING id::text;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+
+      CREATE TABLE IF NOT EXISTS "public"."course_modules" (
+        "course_id" varchar(50) NOT NULL,
+        "module_id" varchar(50) NOT NULL,
+        "position" integer NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        PRIMARY KEY ("course_id", "module_id")
+      );
+      ALTER TABLE "public"."course_modules" ADD COLUMN IF NOT EXISTS "position" integer;
+      ALTER TABLE "public"."course_modules" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS "public"."module_lessons" (
+        "module_id" varchar(50) NOT NULL,
+        "lesson_id" varchar(50) NOT NULL,
+        "position" integer NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        PRIMARY KEY ("module_id", "lesson_id")
+      );
+      DO $$ BEGIN
+        ALTER TABLE "public"."module_lessons" ALTER COLUMN "module_id" TYPE varchar(50) USING module_id::text;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+      DO $$ BEGIN
+        ALTER TABLE "public"."module_lessons" ALTER COLUMN "module_item_id" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+      DO $$ BEGIN
+        ALTER TABLE "public"."module_lessons" ALTER COLUMN "order_index" DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN null; END $$;
+      ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "lesson_id" varchar(50);
+      ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "position" integer;
+      ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+    `);
+
     // 5. Commercial Orders, Pricing Catalog & Coupons Tables
     await execSqlSafe("orders_tables", `
       CREATE TABLE IF NOT EXISTS "public"."orders" (
