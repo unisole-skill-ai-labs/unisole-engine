@@ -52,6 +52,12 @@ lmsRouter.post("/submissions/:id/grade", validateBody({ required: ["score"] }), 
 // Enrollments
 lmsRouter.get("/enrollments", enrollmentsController.list);
 
+// Calendar & Scheduling
+lmsRouter.get("/calendar/events", lmsController.getCalendarEvents);
+lmsRouter.post("/calendar/events", validateBody({ required: ["title", "startTime", "endTime"] }), lmsController.createCalendarEvent);
+lmsRouter.put("/calendar/events/:id", lmsController.updateCalendarEvent);
+lmsRouter.delete("/calendar/events/:id", lmsController.deleteCalendarEvent);
+
 // Payments
 lmsRouter.post(
   "/payments/create-order",

@@ -2126,11 +2126,44 @@ export const notes = pgTable(
   ]
 );
 
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    eventType: varchar("event_type", { length: 50 }).notNull().default("GENERAL"), // 'MILESTONE', 'LIVE_CLASS', 'DEADLINE', 'VIVA_1ON1', 'GENERAL'
+    startTime: timestamp("start_time", { withTimezone: true, mode: "string" }).notNull(),
+    endTime: timestamp("end_time", { withTimezone: true, mode: "string" }).notNull(),
+    scope: varchar("scope", { length: 50 }).notNull().default("GLOBAL"), // 'GLOBAL', 'COURSE', 'COHORT', 'STUDENT'
+    courseId: varchar("course_id", { length: 255 }),
+    lessonId: varchar("lesson_id", { length: 255 }),
+    mentorId: varchar("mentor_id", { length: 255 }),
+    studentId: varchar("student_id", { length: 255 }),
+    meetUrl: varchar("meet_url", { length: 500 }),
+    colorScheme: varchar("color_scheme", { length: 50 }).default("blue"), // 'blue', 'purple', 'green', 'amber', 'rose', 'slate'
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_calendar_events_start").on(table.startTime),
+    index("idx_calendar_events_scope").on(table.scope),
+    index("idx_calendar_events_course").on(table.courseId),
+    index("idx_calendar_events_student").on(table.studentId),
+  ]
+);
+
 // ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
 export type User = InferSelectModel<typeof users>;
+export type CalendarEvent = InferSelectModel<typeof calendarEvents>;
 export type OtpVerification = InferSelectModel<typeof otpVerifications>;
 export type College = InferSelectModel<typeof colleges>;
 export type Branch = InferSelectModel<typeof branches>;
@@ -2196,6 +2229,7 @@ export type NewEnrollment = InferInsertModel<typeof enrollments>;
 export type NewLessonProgress = InferInsertModel<typeof lessonProgress>;
 export type NewSubmission = InferInsertModel<typeof submissions>;
 export type NewNote = InferInsertModel<typeof notes>;
+export type NewCalendarEvent = InferInsertModel<typeof calendarEvents>;
 export type NewProgramManager = InferInsertModel<typeof programManagers>;
 export type NewMentor = InferInsertModel<typeof mentors>;
 export type NewMentorMentee = InferInsertModel<typeof mentorMentees>;

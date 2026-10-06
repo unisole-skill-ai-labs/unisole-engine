@@ -150,4 +150,58 @@ export const lmsController = {
     const result = await lmsService.gradeSubmission(submissionId, mentorUserId, req.body);
     res.json(result);
   }),
+
+  // Calendar
+  getCalendarEvents: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const callerUserId = req.user!.id;
+    const callerRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean);
+    const { startDate, endDate, eventType, courseId, mentorId, studentId, search } = req.query as any;
+
+    const events = await lmsService.getCalendarEvents({
+      callerUserId,
+      callerRoles,
+      startDate: startDate ? String(startDate) : undefined,
+      endDate: endDate ? String(endDate) : undefined,
+      eventType: eventType ? String(eventType) : undefined,
+      courseId: courseId ? String(courseId) : undefined,
+      mentorId: mentorId ? String(mentorId) : undefined,
+      studentId: studentId ? String(studentId) : undefined,
+      search: search ? String(search) : undefined,
+    });
+    res.json(events);
+  }),
+
+  createCalendarEvent: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const callerUserId = req.user!.id;
+    const result = await lmsService.createCalendarEvent(callerUserId, req.body);
+    res.json(result);
+  }),
+
+  updateCalendarEvent: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const callerUserId = req.user!.id;
+    const callerRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean);
+    const id = req.params.id;
+    const result = await lmsService.updateCalendarEvent(id, callerUserId, callerRoles, req.body);
+    res.json(result);
+  }),
+
+  deleteCalendarEvent: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const callerUserId = req.user!.id;
+    const callerRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean);
+    const id = req.params.id;
+    const result = await lmsService.deleteCalendarEvent(id, callerUserId, callerRoles);
+    res.json(result);
+  }),
 };
