@@ -24,6 +24,7 @@ lmsRouter.get("/lessons/:id", lmsController.getLessonContent);
 lmsRouter.post("/progress", validateBody({ required: ["lessonId"] }), lmsController.markProgress);
 lmsRouter.get("/progress", lmsController.getProgress);
 lmsRouter.get("/progress/:pathwayId", lmsController.getProgress);
+lmsRouter.get("/submissions/audit", lmsController.getSubmissionsAudit);
 lmsRouter.post("/submissions", validateBody({ required: ["lessonId"] }), lmsController.submitAssignment);
 lmsRouter.get("/submissions", lmsController.getSubmissions);
 lmsRouter.get("/submissions/:pathwayId", lmsController.getSubmissions);

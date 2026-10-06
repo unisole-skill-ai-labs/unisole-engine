@@ -878,19 +878,38 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS "public"."submissions" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('sub_'::text || gen_random_uuid()),
         "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
-        "pathway_id" varchar(100) NOT NULL,
-        "lesson_id" varchar(100) NOT NULL,
-        "type" varchar(20) NOT NULL,
-        "content" text,
-        "repo_url" text,
+        "lesson_id" varchar(50),
+        "assignment_id" varchar(50),
+        "pathway_id" varchar(50),
+        "mentor_id" varchar(50),
+        "type" varchar(50) DEFAULT 'assignment' NOT NULL,
+        "title" varchar(255),
+        "submission_url" text,
+        "submission_text" text,
+        "code_snippet" text,
+        "video_url" text,
         "score" integer,
-        "max_score" integer,
-        "feedback" text,
-        "status" varchar(30) DEFAULT 'SUBMITTED' NOT NULL,
-        "submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "max_score" integer DEFAULT 100,
+        "status" varchar(50) DEFAULT 'SUBMITTED' NOT NULL,
+        "mentor_feedback" text,
+        "evaluated_at" timestamp with time zone,
+        "metadata" jsonb DEFAULT '{}'::jsonb,
         "created_at" timestamp with time zone DEFAULT now() NOT NULL,
         "updated_at" timestamp with time zone DEFAULT now() NOT NULL
       );
+
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "lesson_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "assignment_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "pathway_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "mentor_id" varchar(50);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "title" varchar(255);
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "submission_url" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "submission_text" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "code_snippet" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "video_url" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "mentor_feedback" text;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "evaluated_at" timestamp with time zone;
+      ALTER TABLE "public"."submissions" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
 
       CREATE TABLE IF NOT EXISTS "public"."notes" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('note_'::text || gen_random_uuid()),

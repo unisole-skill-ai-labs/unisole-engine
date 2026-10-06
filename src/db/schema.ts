@@ -1972,7 +1972,7 @@ export const submissions = pgTable(
     codeSnippet: text("code_snippet"),
     videoUrl: text("video_url"),
     score: integer(),
-    maxScore: integer().default(100),
+    maxScore: integer("max_score").default(100),
     status: varchar({ length: 50 }).default("SUBMITTED").notNull(), // "DRAFT" | "SUBMITTED" | "UNDER_REVIEW" | "GRADED" | "RESUBMIT_REQUESTED"
     mentorFeedback: text("mentor_feedback"),
     evaluatedAt: timestamp("evaluated_at", { withTimezone: true, mode: "string" }),

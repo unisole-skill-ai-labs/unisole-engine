@@ -1,4 +1,4 @@
-import { eq, and, or, inArray, asc } from "drizzle-orm";
+import { eq, and, or, inArray, asc, desc, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   users,
@@ -1283,98 +1283,235 @@ export const lmsService = {
     };
   },
 
-  async getMentorCockpit(mentorUserId: string) {
+  async getMentorCockpit(mentorUserId: string, targetMentorId?: string) {
     let menteesList: any[] = [];
+    let mentorRecord: any = null;
+
     try {
-      // Look up mentor record by userId
-      const mentorRecords = await db
-        .select()
-        .from(mentors)
-        .where(eq(mentors.userId, mentorUserId))
-        .limit(1);
-
-      const mentorId = mentorRecords[0]?.id || "mnt_dr_vikram";
-
-      const menteeRows = await db
-        .select()
-        .from(mentorMentees)
-        .where(eq(mentorMentees.mentorId, mentorId));
-
-      if (menteeRows.length > 0) {
-        const studentIds = menteeRows.map((r) => r.menteeId);
-        const studentUsers = await db
+      if (targetMentorId) {
+        const records = await db
           .select()
-          .from(users)
-          .where(inArray(users.id, studentIds));
+          .from(mentors)
+          .where(eq(mentors.id, targetMentorId))
+          .limit(1);
+        mentorRecord = records[0];
+      } else {
+        const records = await db
+          .select()
+          .from(mentors)
+          .where(eq(mentors.userId, mentorUserId))
+          .limit(1);
+        mentorRecord = records[0];
+      }
 
-        menteesList = studentUsers.map((u, idx) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          avatar: u.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=128&q=80`,
-          college: u.collegeName || "Govt Degree College",
-          progressPercent: Math.max(10, 85 - idx * 15),
-          submittedCount: 3 + idx,
-          pendingReviews: idx === 0 ? 2 : 1,
-          status: idx === 0 ? "NEEDS_REVIEW" : idx === 2 ? "AT_RISK" : "ON_TRACK",
-          lastActive: "2 hours ago",
-        }));
+      if (mentorRecord) {
+        const menteeRows = await db
+          .select()
+          .from(mentorMentees)
+          .where(and(eq(mentorMentees.mentorId, mentorRecord.id), eq(mentorMentees.status, "ACTIVE")));
+
+        if (menteeRows.length > 0) {
+          const studentIds = menteeRows.map((r) => r.menteeId);
+          const studentUsers = await db
+            .select()
+            .from(users)
+            .where(inArray(users.id, studentIds));
+
+          const allSubs = await db
+            .select()
+            .from(submissions)
+            .where(inArray(submissions.userId, studentIds));
+
+          menteesList = studentUsers.map((u) => {
+            const userSubs = allSubs.filter((s) => s.userId === u.id);
+            const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
+            const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
+            const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const latestSub = sortedSubs[0];
+
+            return {
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              phone: u.phone,
+              avatar: u.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=128&q=80`,
+              college: u.collegeName || "Govt Degree College",
+              progressPercent: Math.min(100, Math.max(15, gradedSubs.length * 20)),
+              submittedCount: userSubs.length,
+              pendingReviews: pendingSubs.length,
+              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : userSubs.length === 0 ? "AT_RISK" : "ON_TRACK",
+              lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
+              latestSubmission: latestSub ? {
+                id: latestSub.id,
+                title: latestSub.title,
+                type: latestSub.type,
+                submissionUrl: latestSub.submissionUrl,
+                submissionText: latestSub.submissionText,
+                codeSnippet: latestSub.codeSnippet,
+                videoUrl: latestSub.videoUrl,
+                score: latestSub.score,
+                status: latestSub.status,
+                mentorFeedback: latestSub.mentorFeedback,
+                createdAt: latestSub.createdAt,
+              } : null,
+            };
+          });
+        }
       }
     } catch (err) {
-      console.warn("[LMSService] DB getMentorCockpit fallback notice:", err);
+      console.warn("[LMSService] DB getMentorCockpit notice:", err);
     }
 
-    if (menteesList.length === 0) {
-      menteesList = [
-        {
-          id: "mentee_1",
-          name: "Aarav Sharma",
-          email: "aarav.sharma@unisole.org",
-          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=128&q=80",
-          college: "IIIT Una (Sanjauli Campus)",
-          progressPercent: 65,
-          submittedCount: 7,
-          pendingReviews: 2,
-          status: "NEEDS_REVIEW",
-          lastActive: "10 mins ago",
-        },
-        {
-          id: "mentee_2",
-          name: "Priya Chauhan",
-          email: "priya.c@unisole.org",
-          avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=128&q=80",
-          college: "Govt College Sunni",
-          progressPercent: 88,
-          submittedCount: 9,
-          pendingReviews: 0,
-          status: "ON_TRACK",
-          lastActive: "1 hour ago",
-        },
-        {
-          id: "mentee_3",
-          name: "Rohan Verma",
-          email: "rohan.v@unisole.org",
-          avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=128&q=80",
-          college: "Govt College Theog",
-          progressPercent: 32,
-          submittedCount: 3,
-          pendingReviews: 1,
-          status: "AT_RISK",
-          lastActive: "3 days ago",
-        },
-      ];
-    }
+    const totalSubmissions = menteesList.reduce((acc, m) => acc + m.submittedCount, 0);
+    const totalPending = menteesList.reduce((acc, m) => acc + m.pendingReviews, 0);
+    const totalEvaluated = totalSubmissions - totalPending;
+    const atRiskCount = menteesList.filter((m) => m.status === "AT_RISK").length;
 
-    // Diamond milestone counters: 7 submitted, 6 evaluated, 4 pending review, 5 at risk
     return {
+      mentor: mentorRecord ? {
+        id: mentorRecord.id,
+        userId: mentorRecord.userId,
+        specialization: mentorRecord.specialization,
+        bio: mentorRecord.bio,
+      } : null,
       milestones: {
-        submitted: 7,
-        evaluated: 6,
-        pendingReview: 4,
-        atRisk: 5,
+        submitted: totalSubmissions,
+        evaluated: totalEvaluated,
+        pendingReview: totalPending,
+        atRisk: atRiskCount,
       },
       mentees: menteesList,
     };
+  },
+
+  async getSubmissionsAudit(options: {
+    callerUserId: string;
+    callerRoles: string[];
+    status?: string;
+    search?: string;
+    mentorId?: string;
+    courseId?: string;
+  }) {
+    const { callerUserId, callerRoles, status, search, mentorId, courseId } = options;
+    const isAdmin = callerRoles.includes("SUPER_ADMIN") || callerRoles.includes("ADMIN");
+    const isMentor = callerRoles.includes("MENTOR") && !isAdmin;
+    const isProgramManager = callerRoles.includes("PROGRAM_MANAGER") && !isAdmin;
+
+    const whereClauses: any[] = [];
+
+    if (isMentor) {
+      // Mentors strictly ONLY see submissions from students assigned to them
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        JOIN mentors m ON m.id = mm.mentor_id
+        WHERE mm.mentee_id = s.user_id 
+          AND m.user_id = ${callerUserId} 
+          AND mm.status = 'ACTIVE'
+      )`);
+    } else if (isProgramManager) {
+      // Program Managers can see all submissions from students assigned to ANY mentor (or filtered by specific mentorId)
+      if (mentorId) {
+        whereClauses.push(sql`EXISTS (
+          SELECT 1 FROM mentor_mentees mm
+          WHERE mm.mentee_id = s.user_id 
+            AND mm.mentor_id = ${mentorId} 
+            AND mm.status = 'ACTIVE'
+        )`);
+      } else {
+        whereClauses.push(sql`EXISTS (
+          SELECT 1 FROM mentor_mentees mm
+          WHERE mm.mentee_id = s.user_id 
+            AND mm.status = 'ACTIVE'
+        )`);
+      }
+    } else if (isAdmin && mentorId) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        WHERE mm.mentee_id = s.user_id 
+          AND mm.mentor_id = ${mentorId} 
+          AND mm.status = 'ACTIVE'
+      )`);
+    }
+
+    if (courseId) {
+      whereClauses.push(sql`(s.pathway_id = ${courseId} OR s.lesson_id = ${courseId})`);
+    }
+
+    if (status && status !== "ALL") {
+      if (status === "PENDING") {
+        whereClauses.push(sql`s.status::text IN ('SUBMITTED', 'UNDER_REVIEW', 'PENDING')`);
+      } else if (status === "APPROVED" || status === "GRADED") {
+        whereClauses.push(sql`s.status::text IN ('GRADED', 'APPROVED')`);
+      } else if (status === "CHANGES_REQUESTED") {
+        whereClauses.push(sql`s.status::text = 'CHANGES_REQUESTED'`);
+      } else {
+        whereClauses.push(sql`s.status::text = ${status}`);
+      }
+    }
+
+    if (search && search.trim()) {
+      const q = `%${search.trim()}%`;
+      whereClauses.push(sql`(
+        u.name ILIKE ${q} OR 
+        u.email ILIKE ${q} OR 
+        s.title ILIKE ${q} OR 
+        c.title ILIKE ${q} OR
+        p.title ILIKE ${q}
+      )`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? sql`WHERE ${sql.join(whereClauses, sql` AND `)}` : sql``;
+
+    const query = sql`
+      SELECT 
+        s.id,
+        s.user_id as "studentId",
+        u.name as "studentName",
+        u.email as "studentEmail",
+        u.phone as "studentPhone",
+        s.pathway_id as "courseId",
+        COALESCE(c.title, p.title, s.pathway_id, 'Course Assignment') as "courseTitle",
+        s.lesson_id as "lessonId",
+        s.assignment_id as "assignmentId",
+        s.title as "lessonTitle",
+        s.title as "title",
+        s.type,
+        s.submission_url as "submissionUrl",
+        s.submission_text as "submissionText",
+        s.code_snippet as "codeSnippet",
+        s.video_url as "videoUrl",
+        s.score,
+        s.max_score as "maxScore",
+        s.status,
+        s.mentor_feedback as "mentorFeedback",
+        s.evaluated_at as "reviewedAt",
+        s.created_at as "createdAt",
+        s.updated_at as "updatedAt",
+        m.id as "mentorId",
+        u_m.name as "mentorName",
+        u_m.name as "reviewedBy"
+      FROM submissions s
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN courses c ON (c.id = s.pathway_id OR c.slug = s.pathway_id)
+      LEFT JOIN pathways p ON (p.id = s.pathway_id OR p.slug = s.pathway_id)
+      LEFT JOIN mentor_mentees mm ON (mm.mentee_id = s.user_id AND mm.status = 'ACTIVE')
+      LEFT JOIN mentors m ON m.id = mm.mentor_id
+      LEFT JOIN users u_m ON u_m.id = m.user_id
+      ${whereSql}
+      ORDER BY s.created_at DESC;
+    `;
+
+    const result = await db.execute<any>(query);
+    return (result.rows || result).map((row: any) => ({
+      ...row,
+      status: ["GRADED", "APPROVED"].includes(row.status)
+        ? "APPROVED"
+        : row.status === "CHANGES_REQUESTED"
+        ? "CHANGES_REQUESTED"
+        : "PENDING",
+      score: row.score ?? (row.status === "GRADED" || row.status === "APPROVED" ? 85 : null),
+      maxScore: row.maxScore ?? 100,
+    }));
   },
 
   // -------------------------------------------------------------
