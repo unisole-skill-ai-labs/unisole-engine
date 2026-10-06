@@ -13,20 +13,39 @@ export const usersController = {
       userRole,
       ...(Array.isArray((customReq.user as any)?.roles) ? (customReq.user as any).roles : []),
       ...(Array.isArray((customReq.user as any)?.metadata?.roles) ? (customReq.user as any).metadata.roles : []),
-    ];
+    ].filter(Boolean);
 
-    // Program Managers are strictly scoped to students who have active course enrollments
-    const isProgramManager = userRoles.includes("PROGRAM_MANAGER") && !userRoles.includes("SUPER_ADMIN") && !userRoles.includes("ADMIN");
-    const shouldFilterEnrolledOnly = isProgramManager || enrolledOnly === "true" || enrolledOnly === true;
+    const isAdmin = userRoles.includes("SUPER_ADMIN") || userRoles.includes("ADMIN");
+    const isMentor = userRoles.includes("MENTOR") && !isAdmin;
+    const isProgramManager = userRoles.includes("PROGRAM_MANAGER") && !isAdmin;
+
+    let mentorUserIdFilter: string | undefined = undefined;
+    let onlyAssignedMentorshipFilter: boolean | undefined = undefined;
+    let roleFilter = role ? String(role) : undefined;
+    let shouldFilterEnrolledOnly = enrolledOnly === "true" || enrolledOnly === true;
+
+    if (isMentor) {
+      // Mentors strictly ONLY see the students assigned to them
+      mentorUserIdFilter = customReq.user?.id;
+      roleFilter = "STUDENT";
+      shouldFilterEnrolledOnly = true;
+    } else if (isProgramManager) {
+      // Program Managers strictly see students assigned to ANY mentor
+      onlyAssignedMentorshipFilter = true;
+      roleFilter = "STUDENT";
+      shouldFilterEnrolledOnly = true;
+    }
 
     res.json(
       await usersService.list({
         collegeId: collegeId ? String(collegeId) : undefined,
         branch: branch ? String(branch) : undefined,
-        role: role ? String(role) : undefined,
+        role: roleFilter,
         search: search ? String(search) : undefined,
         courseId: courseId ? String(courseId) : undefined,
         enrolledOnly: shouldFilterEnrolledOnly,
+        mentorUserId: mentorUserIdFilter,
+        onlyAssignedMentorship: onlyAssignedMentorshipFilter,
       })
     );
   }),

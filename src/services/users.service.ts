@@ -13,6 +13,8 @@ export const usersService = {
     search?: string;
     enrolledOnly?: boolean;
     courseId?: string;
+    mentorUserId?: string;
+    onlyAssignedMentorship?: boolean;
   }): Promise<any[]> {
     return usersRepository.list(filters);
   },

@@ -12,6 +12,8 @@ export const usersRepository = {
     search?: string;
     enrolledOnly?: boolean;
     courseId?: string;
+    mentorUserId?: string;
+    onlyAssignedMentorship?: boolean;
   }): Promise<any[]> {
     const whereClauses: any[] = [];
 
@@ -55,6 +57,23 @@ export const usersRepository = {
         SELECT 1 FROM enrollments e 
         WHERE e.user_id = u.id 
           AND (e.item_id = ${filters.courseId} OR e.pathway_id = ${filters.courseId})
+      )`);
+    }
+
+    if (filters?.mentorUserId) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        JOIN mentors m ON m.id = mm.mentor_id
+        WHERE mm.mentee_id = u.id 
+          AND m.user_id = ${filters.mentorUserId}
+          AND mm.status = 'ACTIVE'
+      )`);
+    }
+
+    if (filters?.onlyAssignedMentorship) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
       )`);
     }
 
