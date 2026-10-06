@@ -418,10 +418,18 @@ export const lmsService = {
               lesson.id.includes("_lab") ||
               lesson.id.includes("_cap");
 
+            const isFolder =
+              parsedContent?.type === "FOLDER" ||
+              parsedContent?.curriculumMode === "FOLDER" ||
+              lesson.slug?.includes("folder");
+
             let computedType = "video";
             let computedCategory = "LECTURE";
 
-            if (isCoding) {
+            if (isFolder) {
+              computedType = "folder";
+              computedCategory = "FOLDER";
+            } else if (isCoding) {
               computedType = "coding_test";
               computedCategory = "TEST";
             } else if (isVideoTest) {
@@ -453,6 +461,8 @@ export const lmsService = {
               type: computedType,
               category: computedCategory,
               isTest: computedCategory === "TEST",
+              folderId: parsedContent?.folderId || null,
+              attachments: parsedContent?.attachments || [],
               config:
                 parsedContent?.codingTest ||
                 parsedContent?.subjectiveTest ||
