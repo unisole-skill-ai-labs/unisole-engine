@@ -12,15 +12,15 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 # Load environment configuration if available (handling CRLF safely)
-if [ -f .env.production ]; then
+if [ -f .env ]; then
+  # shellcheck disable=SC1090
+  eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '\r')" 2>/dev/null || true
+elif [ -f .env.production ]; then
   # shellcheck disable=SC1090
   eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env.production | tr -d '\r')" 2>/dev/null || true
 elif [ -f .env.staging ]; then
   # shellcheck disable=SC1090
   eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env.staging | tr -d '\r')" 2>/dev/null || true
-elif [ -f .env ]; then
-  # shellcheck disable=SC1090
-  eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '\r')" 2>/dev/null || true
 fi
 
 # Detect environment based on current directory and local compose files
@@ -178,6 +178,9 @@ R2_TOKEN="${CLOUDFLARE_R2_TOKEN:-$R2_TOKEN}"
 if [ -n "$R2_TOKEN" ] && [ -n "$R2_ACCOUNT_ID" ]; then
   echo "☁️ Triggering Cloudflare R2 off-site upload ($R2_BUCKET)..."
   FILE_BASENAME=$(basename "$BACKUP_FILE")
+  export CLOUDFLARE_ACCOUNT_ID="$R2_ACCOUNT_ID"
+  export CLOUDFLARE_R2_TOKEN="$R2_TOKEN"
+  export CLOUDFLARE_R2_BUCKET="$R2_BUCKET"
   
   if command -v "$NODE_CMD" >/dev/null 2>&1 && [ -f "scripts/upload-r2.js" ]; then
     $NODE_CMD "scripts/upload-r2.js" "$BACKUP_FILE" || true
