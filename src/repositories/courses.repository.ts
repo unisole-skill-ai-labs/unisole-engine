@@ -98,7 +98,20 @@ export const coursesRepository = {
 
   // --- Module relationships ---
   async attachModule(data: NewCourseModule): Promise<void> {
-    await db.insert(courseModules).values(data);
+    const existing = await db
+      .select({ position: courseModules.position })
+      .from(courseModules)
+      .where(eq(courseModules.courseId, data.courseId));
+    const maxPos = existing.reduce((max, r) => Math.max(max, r.position), 0);
+    const pos =
+      data.position && !existing.some((e) => e.position === data.position)
+        ? data.position
+        : maxPos + 1;
+
+    await db.insert(courseModules).values({
+      ...data,
+      position: pos,
+    });
   },
 
   async detachModule(courseId: string, moduleId: string): Promise<void> {
