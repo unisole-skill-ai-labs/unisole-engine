@@ -483,95 +483,6 @@ export const lmsService = {
       });
     }
 
-    // Resilient fallback: If no linked courses or modules in relational table yet, synthesize from canonical catalog
-    if (courseList.length === 0 || courseList.every((c) => !c.modules || c.modules.length === 0)) {
-      const canon = getCanonicalPathway(pathway.id) || getCanonicalPathway(pathway.slug);
-      if (canon?.modules && canon.modules.length > 0) {
-        const syntheticModules = canon.modules.map((mod, mIdx) => ({
-          id: `mod_${pathway.id}_${mod.num}`,
-          title: mod.title,
-          slug: `${pathway.slug}-w${mod.num}`,
-          description: mod.practical || mod.title,
-          status: "PUBLISHED",
-          isActive: true,
-          position: mIdx + 1,
-          lessons: [
-            ...(mod.topics || []).map((topic, tIdx) => ({
-              id: `les_${pathway.id}_${mod.num}_${tIdx + 1}`,
-              title: topic,
-              slug: `${pathway.slug}-w${mod.num}-t${tIdx + 1}`,
-              description: topic,
-              durationMinutes: 45,
-              videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
-              contentType: "VIDEO",
-              status: "PUBLISHED",
-              position: tIdx + 1,
-            })),
-            {
-              id: `les_${pathway.id}_${mod.num}_quiz`,
-              title: `Quiz: ${mod.title}`,
-              slug: `${pathway.slug}-w${mod.num}-quiz`,
-              description: `Weekly Graded Quiz & Concept Check for ${mod.title}`,
-              durationMinutes: 20,
-              videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
-              contentType: "QUIZ",
-              status: "PUBLISHED",
-              position: (mod.topics?.length || 0) + 1,
-            },
-            ...(mod.practical
-              ? [
-                  {
-                    id: `les_${pathway.id}_${mod.num}_lab`,
-                    title: `Hands-on Lab: ${mod.title}`,
-                    slug: `${pathway.slug}-w${mod.num}-lab`,
-                    description: mod.practical,
-                    durationMinutes: 60,
-                    videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
-                    contentType: "ASSIGNMENT",
-                    status: "PUBLISHED",
-                    position: (mod.topics?.length || 0) + 2,
-                  },
-                ]
-              : []),
-          ],
-        }));
-
-        if (canon.capstone) {
-          syntheticModules.push({
-            id: `mod_${pathway.id}_cap`,
-            title: `Capstone: ${canon.capstone.title}`,
-            slug: `${pathway.slug}-capstone`,
-            description: `Capstone Project Flow: ${canon.capstone.flow?.join(" ➔ ")}`,
-            status: "PUBLISHED",
-            isActive: true,
-            position: canon.modules.length + 1,
-            lessons: (canon.capstone.outputs || []).map((out, oIdx) => ({
-              id: `les_${pathway.id}_cap_${oIdx + 1}`,
-              title: `Deliverable ${oIdx + 1}: ${out}`,
-              slug: `${pathway.slug}-cap-out-${oIdx + 1}`,
-              description: out,
-              durationMinutes: 90,
-              videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
-              contentType: "ASSIGNMENT",
-              status: "PUBLISHED",
-              position: oIdx + 1,
-            })),
-          });
-        }
-
-        courseList.push({
-          id: `crs_${pathway.id}`,
-          title: pathway.title,
-          slug: `course-${pathway.slug}`,
-          shortDescription: pathway.shortDescription,
-          description: pathway.description,
-          status: "PUBLISHED",
-          position: 1,
-          modules: syntheticModules,
-        });
-      }
-    }
-
     return {
       pathway,
       courses: courseList,
@@ -627,43 +538,6 @@ export const lmsService = {
       }
 
       return lesson;
-    }
-
-    // Fallback: search canonical catalog for lesson
-    for (const group of CANONICAL_GROUPS) {
-      for (const p of group.pathways) {
-        if (!lessonId.includes(p.id)) continue;
-        for (const mod of p.modules || []) {
-          if (lessonId.includes(`_${mod.num}_lab`)) {
-            return {
-              id: lessonId,
-              title: `Lab: ${mod.title}`,
-              slug: `${p.id}-w${mod.num}-lab`,
-              description: mod.practical,
-              content: `Hands-on Practical Lab Exercise:\n\n${mod.practical}\n\nDeliverable: Commit and push your code to your designated repository branch.`,
-              durationMinutes: 60,
-              status: "PUBLISHED",
-              isActive: true,
-            };
-          }
-          if (mod.topics) {
-            for (let i = 0; i < mod.topics.length; i++) {
-              if (lessonId.endsWith(`_${mod.num}_${i + 1}`)) {
-                return {
-                  id: lessonId,
-                  title: mod.topics[i],
-                  slug: `${p.id}-w${mod.num}-t${i + 1}`,
-                  description: mod.topics[i],
-                  content: `Curriculum Module ${mod.num}: ${mod.title}\n\nCore Topic: ${mod.topics[i]}\n\nReview the guided lecture notes and execute the lab walkthrough.`,
-                  durationMinutes: 45,
-                  status: "PUBLISHED",
-                  isActive: true,
-                };
-              }
-            }
-          }
-        }
-      }
     }
 
     throw new NotFoundError("Lesson not found");
