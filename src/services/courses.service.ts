@@ -90,6 +90,10 @@ export const coursesService = {
     await coursesRepository.clearModules(courseId);
   },
 
+  async purgeAllCurriculum(): Promise<{ modulesDeleted: number; lessonsDeleted: number }> {
+    return coursesRepository.purgeAllCurriculum();
+  },
+
   async getModules(courseId: string) {
     return coursesRepository.getModules(courseId);
   },

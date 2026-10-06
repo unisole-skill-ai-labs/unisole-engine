@@ -135,6 +135,17 @@ export const coursesRepository = {
     }
   },
 
+  async purgeAllCurriculum(): Promise<{ modulesDeleted: number; lessonsDeleted: number }> {
+    await db.delete(moduleLessons);
+    await db.delete(courseModules);
+    const lRes = await db.delete(lessons);
+    const mRes = await db.delete(modules);
+    return {
+      modulesDeleted: mRes?.rowCount || 0,
+      lessonsDeleted: lRes?.rowCount || 0,
+    };
+  },
+
   async getModules(courseId: string): Promise<any[]> {
     const rows = await db
       .select({

@@ -38,6 +38,14 @@ export const coursesController = {
     await coursesService.clearModules(req.params.id);
     res.json({ ok: true, message: "Course modules cleared successfully" });
   }),
+  purgeAllCurriculum: asyncHandler(async (_req: Request, res: Response) => {
+    const result = await coursesService.purgeAllCurriculum();
+    res.json({
+      success: true,
+      message: "All curriculum modules and lessons purged from database.",
+      result,
+    });
+  }),
   getModules: asyncHandler(async (req: Request, res: Response) => {
     res.json(await coursesService.getModules(req.params.id));
   }),
