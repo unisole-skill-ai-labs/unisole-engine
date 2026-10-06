@@ -23,61 +23,44 @@ elif [ -f .env ]; then
   eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '\r')" 2>/dev/null || true
 fi
 
-# Detect docker compose file and database service
-COMPOSE_FILE=""
-DB_SERVICE=""
-
-# 1. Check running docker containers first
-if command -v docker >/dev/null 2>&1; then
-  RUNNING_CONTAINERS=$(docker ps --format '{{.Names}}' 2>/dev/null || true)
-  if echo "$RUNNING_CONTAINERS" | grep -q "db-staging"; then
+# Detect environment based on current directory and local compose files
+if [[ "$PWD" == *"staging"* ]] || [ "$NODE_ENV" = "staging" ]; then
+  if [ -f "docker-compose.staging.yml" ]; then
     COMPOSE_FILE="docker-compose.staging.yml"
     DB_SERVICE="db-staging"
-    DB_NAME="${DB_NAME:-unisole_staging}"
-  elif echo "$RUNNING_CONTAINERS" | grep -E "(_db_1|-db-1|^db$)"; then
-    COMPOSE_FILE="docker-compose.prod.yml"
-    DB_SERVICE="db"
-    DB_NAME="${DB_NAME:-unisole}"
-  fi
-fi
-
-# 2. Check current directory name or environment
-if [ -z "$COMPOSE_FILE" ]; then
-  if [[ "$PWD" == *"staging"* ]] && [ -f "docker-compose.staging.yml" ]; then
-    COMPOSE_FILE="docker-compose.staging.yml"
-    DB_SERVICE="db-staging"
-    DB_NAME="${DB_NAME:-unisole_staging}"
-  elif [ -f "docker-compose.prod.yml" ]; then
-    COMPOSE_FILE="docker-compose.prod.yml"
-    DB_SERVICE="db"
-    DB_NAME="${DB_NAME:-unisole}"
-  elif [ -f "docker-compose.staging.yml" ]; then
-    COMPOSE_FILE="docker-compose.staging.yml"
-    DB_SERVICE="db-staging"
-    DB_NAME="${DB_NAME:-unisole_staging}"
   else
     COMPOSE_FILE="docker-compose.yml"
     DB_SERVICE="db"
-    DB_NAME="${DB_NAME:-unisole}"
   fi
+  DB_NAME="${DB_NAME:-unisole_staging}"
+elif [ -f "docker-compose.prod.yml" ]; then
+  COMPOSE_FILE="docker-compose.prod.yml"
+  DB_SERVICE="db"
+  DB_NAME="${DB_NAME:-unisole}"
+elif [ -f "docker-compose.yml" ]; then
+  COMPOSE_FILE="docker-compose.yml"
+  DB_SERVICE="db"
+  DB_NAME="${DB_NAME:-unisole}"
 fi
 
-# Fallback defaults
+# Fallback defaults & Environment tag
 DB_SERVICE="${DB_SERVICE:-db}"
-if [ "$DB_SERVICE" = "db-staging" ]; then
-  # In staging, the database is unisole_staging
+if [ "$DB_SERVICE" = "db-staging" ] || [[ "$PWD" == *"staging"* ]] || [ "$NODE_ENV" = "staging" ]; then
+  ENV_TAG="staging"
   if [ -z "$DB_NAME" ] || [ "$DB_NAME" = "unisole" ]; then
     DB_NAME="unisole_staging"
   fi
 else
+  ENV_TAG="prod"
   DB_NAME="${DB_NAME:-unisole}"
 fi
 
 # Configuration & Defaults
 DB_USER="${DB_USER:-postgres}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
+BACKUP_PREFIX="unisole_${ENV_TAG}_backup"
 DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-BACKUP_FILE="$BACKUP_DIR/unisole_backup_$DATE.sql.gz"
+BACKUP_FILE="$BACKUP_DIR/${BACKUP_PREFIX}_$DATE.sql.gz"
 HASH_FILE="$BACKUP_DIR/latest.sha256"
 TEMP_DUMP="/tmp/unisole_dump_$$.sql"
 
@@ -102,15 +85,23 @@ else
   ENV_FILE_FLAG=""
   if [ -f ".env" ]; then
     ENV_FILE_FLAG="--env-file .env"
+  elif [ -f ".env.production" ]; then
+    ENV_FILE_FLAG="--env-file .env.production"
   elif [ -f ".env.staging" ]; then
     ENV_FILE_FLAG="--env-file .env.staging"
   fi
 
-  # Dump database excluding header comments so identical data produces identical byte stream
-  $DOCKER_COMPOSE_CMD $ENV_FILE_FLAG -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" pg_dump \
+  # Dump database: try docker compose first, then fallback to direct docker exec
+  if ! $DOCKER_COMPOSE_CMD $ENV_FILE_FLAG -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" pg_dump \
     -U "$DB_USER" \
     -d "$DB_NAME" \
-    --no-comments > "$TEMP_DUMP"
+    --no-comments > "$TEMP_DUMP" 2>/dev/null; then
+    
+    CONTAINER_CANDIDATE=$(docker ps --format '{{.Names}}' | grep -E "(unisole.*${DB_SERVICE}|${DB_SERVICE})" | head -n 1 || true)
+    if [ -n "$CONTAINER_CANDIDATE" ]; then
+      docker exec -i "$CONTAINER_CANDIDATE" pg_dump -U "$DB_USER" -d "$DB_NAME" --no-comments > "$TEMP_DUMP"
+    fi
+  fi
 fi
 
 # Check if dump is non-empty
@@ -149,11 +140,11 @@ echo "✅ Backup created successfully: $BACKUP_FILE ($FILE_SIZE)"
 echo "🧹 Cleaning old local backups (keeping only 1 single latest snapshot on EC2)..."
 cd "$BACKUP_DIR"
 # shellcheck disable=SC2012
-ls -t unisole_backup_*.sql.gz 2>/dev/null | tail -n +2 | xargs rm -f 2>/dev/null || true
+ls -t *backup_*.sql.gz 2>/dev/null | tail -n +2 | xargs rm -f 2>/dev/null || true
 
 echo "📋 Local server backup (single file retained):"
 # shellcheck disable=SC2012
-ls -lh unisole_backup_*.sql.gz 2>/dev/null
+ls -lh *backup_*.sql.gz 2>/dev/null
 cd "$PROJECT_ROOT"
 
 # Detect node executable (supports Linux node and Windows node.exe)
