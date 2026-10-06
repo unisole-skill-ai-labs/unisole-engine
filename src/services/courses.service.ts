@@ -94,6 +94,10 @@ export const coursesService = {
     return coursesRepository.purgeAllCurriculum();
   },
 
+  async reorderModules(courseId: string, moduleIds: string[]): Promise<void> {
+    await coursesRepository.reorderModules(courseId, moduleIds);
+  },
+
   async getModules(courseId: string) {
     return coursesRepository.getModules(courseId);
   },

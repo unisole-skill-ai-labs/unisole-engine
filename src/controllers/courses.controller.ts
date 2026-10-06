@@ -46,6 +46,10 @@ export const coursesController = {
       result,
     });
   }),
+  reorderModules: asyncHandler(async (req: Request, res: Response) => {
+    await coursesService.reorderModules(req.params.id, req.body.moduleIds || []);
+    res.json({ ok: true, message: "Modules reordered successfully" });
+  }),
   getModules: asyncHandler(async (req: Request, res: Response) => {
     res.json(await coursesService.getModules(req.params.id));
   }),

@@ -146,6 +146,21 @@ export const coursesRepository = {
     };
   },
 
+  async reorderModules(courseId: string, moduleIds: string[]): Promise<void> {
+    for (let i = 0; i < moduleIds.length; i++) {
+      await db
+        .update(courseModules)
+        .set({ position: i + 1000 })
+        .where(and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleIds[i])));
+    }
+    for (let i = 0; i < moduleIds.length; i++) {
+      await db
+        .update(courseModules)
+        .set({ position: i + 1 })
+        .where(and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleIds[i])));
+    }
+  },
+
   async getModules(courseId: string): Promise<any[]> {
     const rows = await db
       .select({

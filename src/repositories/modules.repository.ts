@@ -52,6 +52,41 @@ export const modulesRepository = {
     );
   },
 
+  async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
+    for (let i = 0; i < lessonIds.length; i++) {
+      await db
+        .update(moduleLessons)
+        .set({ position: i + 1000 })
+        .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
+    }
+    for (let i = 0; i < lessonIds.length; i++) {
+      await db
+        .update(moduleLessons)
+        .set({ position: i + 1 })
+        .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
+    }
+  },
+
+  async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, targetPosition?: number): Promise<void> {
+    await db.delete(moduleLessons).where(
+      and(eq(moduleLessons.moduleId, sourceModuleId), eq(moduleLessons.lessonId, lessonId))
+    );
+    
+    const existing = await db
+      .select({ position: moduleLessons.position })
+      .from(moduleLessons)
+      .where(eq(moduleLessons.moduleId, targetModuleId))
+      .orderBy(asc(moduleLessons.position));
+    
+    const nextPos = targetPosition || (existing.length + 1);
+
+    await db.insert(moduleLessons).values({
+      moduleId: targetModuleId,
+      lessonId,
+      position: nextPos,
+    });
+  },
+
   async getLessons(moduleId: string): Promise<any[]> {
     const rows = await db
       .select({
