@@ -98,7 +98,46 @@ export const usersRepository = {
             WHERE e.user_id = u.id
           ),
           '[]'::json
-        ) as "enrolledCourses"
+        ) as "enrolledCourses",
+        (
+          SELECT JSON_BUILD_OBJECT(
+            'id', mm.id,
+            'mentorId', m.id,
+            'mentorUserId', u_m.id,
+            'mentorName', u_m.name,
+            'mentorEmail', u_m.email,
+            'specialization', m.specialization,
+            'courseId', mm.course_id,
+            'assignedAt', mm.assigned_at
+          )
+          FROM mentor_mentees mm
+          JOIN mentors m ON m.id = mm.mentor_id
+          JOIN users u_m ON u_m.id = m.user_id
+          WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
+          ORDER BY mm.assigned_at DESC NULLS LAST
+          LIMIT 1
+        ) as "assignedMentor",
+        COALESCE(
+          (
+            SELECT JSON_AGG(
+              JSON_BUILD_OBJECT(
+                'id', mm.id,
+                'mentorId', m.id,
+                'mentorUserId', u_m.id,
+                'mentorName', u_m.name,
+                'mentorEmail', u_m.email,
+                'specialization', m.specialization,
+                'courseId', mm.course_id,
+                'assignedAt', mm.assigned_at
+              ) ORDER BY mm.assigned_at DESC NULLS LAST
+            )
+            FROM mentor_mentees mm
+            JOIN mentors m ON m.id = mm.mentor_id
+            JOIN users u_m ON u_m.id = m.user_id
+            WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
+          ),
+          '[]'::json
+        ) as "assignedMentors"
       FROM users u
       ${whereSql}
       ORDER BY u.created_at DESC;
@@ -107,6 +146,7 @@ export const usersRepository = {
     return (result.rows || result).map((r: any) => ({
       ...r,
       enrolledCourses: Array.isArray(r.enrolledCourses) ? r.enrolledCourses : [],
+      assignedMentors: Array.isArray(r.assignedMentors) ? r.assignedMentors : [],
     }));
   },
 

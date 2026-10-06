@@ -149,6 +149,8 @@ export async function initializeDatabase() {
     await addEnumValueSafely("lead_status", "NOT_A_LEAD");
 
     await addEnumValueSafely("user_role", "SALES");
+    await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
 
     // 3. Sequences
     await execSqlSafe("sequences", `
@@ -907,6 +909,39 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_submissions_pathway" ON "public"."submissions" ("pathway_id");
       CREATE INDEX IF NOT EXISTS "idx_notes_user" ON "public"."notes" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_notes_pathway" ON "public"."notes" ("pathway_id");
+
+      -- Users email & avatar extension
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "email" varchar(255);
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "avatar" text;
+
+      -- Mentorship and Cohort tables
+      CREATE TABLE IF NOT EXISTS "public"."mentors" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('mnt_'::text || gen_random_uuid()),
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "specialization" varchar(255),
+        "bio" text,
+        "office_hours" varchar(255),
+        "is_active" boolean DEFAULT true NOT NULL,
+        "metadata" jsonb DEFAULT '{}'::jsonb,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS "public"."mentor_mentees" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('mm_'::text || gen_random_uuid()),
+        "mentor_id" varchar(50) NOT NULL,
+        "mentee_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "course_id" varchar(50),
+        "pathway_id" varchar(50),
+        "status" varchar(50) DEFAULT 'ACTIVE' NOT NULL,
+        "metadata" jsonb DEFAULT '{}'::jsonb,
+        "assigned_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS "idx_mentors_user" ON "public"."mentors" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentor" ON "public"."mentor_mentees" ("mentor_id");
+      CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentee" ON "public"."mentor_mentees" ("mentee_id");
     `);
 
     // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)

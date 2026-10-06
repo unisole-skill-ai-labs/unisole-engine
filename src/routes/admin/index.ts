@@ -24,6 +24,7 @@ import { adminPricingRouter } from "./pricing";
 import { adminCouponsRouter } from "./coupons";
 import { adminSurveysRouter } from "./surveys";
 import { adminDashboardRouter } from "./dashboard";
+import { adminMentorshipRouter } from "./mentorship";
 
 export const adminRouter: Router = Router();
 
@@ -62,6 +63,7 @@ adminRouter.use("/lessons", adminLessonsRouter);
 adminRouter.use("/enrollments", adminEnrollmentsRouter);
 adminRouter.use("/presentations", adminPresentationsRouter);
 adminRouter.use("/surveys", adminSurveysRouter);
+adminRouter.use("/mentorship", adminMentorshipRouter);
 
 // Financial Management & Pricing Suite (Super Admin & Admin)
 adminRouter.use("/orders", requireRole(["SUPER_ADMIN", "ADMIN"]), adminOrdersRouter);
