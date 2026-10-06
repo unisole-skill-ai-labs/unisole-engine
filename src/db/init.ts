@@ -875,6 +875,11 @@ export async function initializeDatabase() {
         CONSTRAINT "uq_user_lesson" UNIQUE("user_id", "lesson_id")
       );
 
+      ALTER TABLE "public"."lesson_progress" ADD COLUMN IF NOT EXISTS "pathway_id" varchar(50);
+      ALTER TABLE "public"."lesson_progress" ADD COLUMN IF NOT EXISTS "is_completed" boolean DEFAULT true;
+      ALTER TABLE "public"."lesson_progress" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
+      UPDATE "public"."lesson_progress" SET "is_completed" = "completed" WHERE "is_completed" IS NULL;
+
       CREATE TABLE IF NOT EXISTS "public"."submissions" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('sub_'::text || gen_random_uuid()),
         "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,

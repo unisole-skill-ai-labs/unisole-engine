@@ -1390,12 +1390,25 @@ export const lmsService = {
             .from(submissions)
             .where(inArray(submissions.userId, studentIds));
 
+          const allProgress = await db
+            .select()
+            .from(lessonProgress)
+            .where(and(inArray(lessonProgress.userId, studentIds), eq(lessonProgress.isCompleted, true)));
+
+          const totalLessonsCountRes = await db
+            .select({ count: sql`COUNT(*)::int` })
+            .from(lessons);
+          const catalogLessonCount = Math.max(1, Number(totalLessonsCountRes[0]?.count || 10));
+
           menteesList = studentUsers.map((u) => {
             const userSubs = allSubs.filter((s) => s.userId === u.id);
             const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
             const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
             const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             const latestSub = sortedSubs[0];
+
+            const userProgressCount = allProgress.filter((p) => p.userId === u.id).length;
+            const progressPercent = Math.min(100, Math.round((userProgressCount / catalogLessonCount) * 100));
 
             return {
               id: u.id,
@@ -1404,10 +1417,10 @@ export const lmsService = {
               phone: u.phone,
               avatar: u.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=128&q=80`,
               college: u.collegeName || "Govt Degree College",
-              progressPercent: Math.min(100, Math.max(15, gradedSubs.length * 20)),
+              progressPercent,
               submittedCount: userSubs.length,
               pendingReviews: pendingSubs.length,
-              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : userSubs.length === 0 ? "AT_RISK" : "ON_TRACK",
+              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : (progressPercent < 20 && userSubs.length === 0) ? "AT_RISK" : "ON_TRACK",
               lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
               latestSubmission: latestSub ? {
                 id: latestSub.id,
@@ -1432,7 +1445,7 @@ export const lmsService = {
           userId: "ALL",
           name: "All Mentors Cohort",
           specialization: "Full Cohort Oversight",
-          bio: "Aggregated mentorship cockpit across all active mentors.",
+          bio: "Aggregated mentorship overview across all active mentors.",
         };
 
         const menteeRows = await db
@@ -1455,12 +1468,25 @@ export const lmsService = {
             .from(submissions)
             .where(inArray(submissions.userId, studentIds));
 
+          const allProgress = await db
+            .select()
+            .from(lessonProgress)
+            .where(and(inArray(lessonProgress.userId, studentIds), eq(lessonProgress.isCompleted, true)));
+
+          const totalLessonsCountRes = await db
+            .select({ count: sql`COUNT(*)::int` })
+            .from(lessons);
+          const catalogLessonCount = Math.max(1, Number(totalLessonsCountRes[0]?.count || 10));
+
           menteesList = studentUsers.map((u) => {
             const userSubs = allSubs.filter((s) => s.userId === u.id);
             const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
             const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
             const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             const latestSub = sortedSubs[0];
+
+            const userProgressCount = allProgress.filter((p) => p.userId === u.id).length;
+            const progressPercent = Math.min(100, Math.round((userProgressCount / catalogLessonCount) * 100));
 
             return {
               id: u.id,
@@ -1469,10 +1495,10 @@ export const lmsService = {
               phone: u.phone,
               avatar: u.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=128&q=80`,
               college: u.collegeName || "Govt Degree College",
-              progressPercent: Math.min(100, Math.max(15, gradedSubs.length * 20)),
+              progressPercent,
               submittedCount: userSubs.length,
               pendingReviews: pendingSubs.length,
-              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : userSubs.length === 0 ? "AT_RISK" : "ON_TRACK",
+              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : (progressPercent < 20 && userSubs.length === 0) ? "AT_RISK" : "ON_TRACK",
               lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
               latestSubmission: latestSub ? {
                 id: latestSub.id,
