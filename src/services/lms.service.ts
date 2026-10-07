@@ -2015,128 +2015,235 @@ export const lmsService = {
       }
     }
 
-    // Default canonical calendar schedule for the active week
-    const now = new Date();
-    const monday = new Date(now);
-    const day = monday.getDay();
-    const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
-    monday.setDate(diff);
+    // 3. Build dynamic live schedule from DB (Enrolled courses, upcoming lectures, pending MCQs, lab deliverables, and mentor live sessions)
+    try {
+      const now = new Date();
+      const monday = new Date(now);
+      const day = monday.getDay();
+      const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+      monday.setDate(diff);
 
-    const makeDate = (dayOffset: number, hours: number, minutes = 0) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + dayOffset);
-      d.setHours(hours, minutes, 0, 0);
-      return d.toISOString();
-    };
+      const makeDate = (dayOffset: number, hours: number, minutes = 0) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + dayOffset);
+        d.setHours(hours, minutes, 0, 0);
+        return d.toISOString();
+      };
 
-    return [
-      {
-        id: "ev_standup_mon",
-        title: "Monday standup",
-        description: "Weekly cohort sync & sprint roadmap kickoff.",
+      // Query active enrollments for user
+      const userEnrollments = await db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.userId, callerUserId), eq(enrollments.status, "ACTIVE")));
+
+      const pathwayId = userEnrollments[0]?.pathwayId || userEnrollments[0]?.itemId || "cs-p1";
+      const canon = getCanonicalPathway(pathwayId) || CANONICAL_GROUPS[0].pathways[0];
+
+      // Query completed lessons for student
+      const userProgress = await db
+        .select()
+        .from(lessonProgress)
+        .where(and(eq(lessonProgress.userId, callerUserId), eq(lessonProgress.isCompleted, true)));
+      const completedLessonIds = new Set(userProgress.map((p) => p.lessonId));
+
+      // Query user submissions
+      const userSubs = await db
+        .select()
+        .from(submissions)
+        .where(eq(submissions.userId, callerUserId));
+      const submittedLessonIds = new Set(userSubs.map((s) => s.lessonId || s.assignmentId));
+
+      // Query assigned mentor
+      const mentorAssigned = await db
+        .select({
+          mentorId: mentorMentees.mentorId,
+          mentorUserId: mentors.userId,
+          specialization: mentors.specialization,
+          officeHours: mentors.officeHours,
+          name: users.name,
+        })
+        .from(mentorMentees)
+        .leftJoin(mentors, eq(mentors.id, mentorMentees.mentorId))
+        .leftJoin(users, eq(users.id, mentors.userId))
+        .where(and(eq(mentorMentees.menteeId, callerUserId), eq(mentorMentees.status, "ACTIVE")))
+        .limit(1);
+
+      const mentorInfo = mentorAssigned[0] || {
+        name: "Dr. Vikram Sethi",
+        specialization: "Principal AI Scientist & GenAI Systems",
+        officeHours: "Tuesday & Thursday 6:00 PM - 7:30 PM IST",
+      };
+
+      // Collect pending items from modules
+      const pendingLectures: any[] = [];
+      const pendingQuizzes: any[] = [];
+      const pendingAssignments: any[] = [];
+
+      (canon?.modules || []).forEach((mod: any, mIdx: number) => {
+        (mod.topics || []).forEach((topic: string, tIdx: number) => {
+          const lId = `les_${canon.id}_${mod.num}_${tIdx + 1}`;
+          if (!completedLessonIds.has(lId)) {
+            pendingLectures.push({
+              id: lId,
+              title: topic,
+              moduleTitle: mod.title,
+              pathwayId: canon.id,
+            });
+          }
+        });
+
+        // Check for lab / assignment
+        if (mod.practical) {
+          const labId = `les_${canon.id}_${mod.num}_lab`;
+          if (!submittedLessonIds.has(labId) && !completedLessonIds.has(labId)) {
+            pendingAssignments.push({
+              id: labId,
+              title: `Lab: ${mod.title}`,
+              description: mod.practical,
+              moduleTitle: mod.title,
+              pathwayId: canon.id,
+            });
+          }
+        }
+      });
+
+      // Also check capstone
+      const cap = canon?.capstone;
+      if (cap) {
+        (cap.outputs || []).forEach((out: string, oIdx: number) => {
+          const capId = `les_${canon.id}_cap_${oIdx + 1}`;
+          if (!submittedLessonIds.has(capId) && !completedLessonIds.has(capId)) {
+            pendingAssignments.push({
+              id: capId,
+              title: `Capstone Deliverable: ${out}`,
+              description: out,
+              moduleTitle: `Capstone: ${cap.title}`,
+              pathwayId: canon.id,
+            });
+          }
+        });
+      }
+
+      const generatedEvents: any[] = [];
+
+      // 1. Monday: Next Upcoming Lecture
+      const nextLecture1 = pendingLectures[0] || { title: "Introduction to Neural Architectures", id: `les_${canon.id}_1_1`, moduleTitle: "Module 1" };
+      generatedEvents.push({
+        id: `ev_lec_mon_${nextLecture1.id}`,
+        title: `Lecture: ${nextLecture1.title}`,
+        description: `Enrolled: ${canon.title} · ${nextLecture1.moduleTitle || "Core Curriculum"}`,
         eventType: "LIVE_CLASS",
-        startTime: makeDate(0, 9, 0),
-        endTime: makeDate(0, 10, 0),
-        scope: "GLOBAL",
-        meetUrl: "https://meet.google.com/uni-standup",
-        colorScheme: "slate",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_content_plan",
-        title: "Content planning",
-        description: "Lecture & milestone roadmap alignment.",
-        eventType: "GENERAL",
-        startTime: makeDate(0, 11, 0),
-        endTime: makeDate(0, 12, 0),
-        scope: "GLOBAL",
+        startTime: makeDate(0, 10, 0),
+        endTime: makeDate(0, 11, 0),
+        scope: "COURSE",
+        courseId: canon.id,
+        lessonId: nextLecture1.id,
         colorScheme: "blue",
         createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_viva_eva",
-        title: "One-on-one with Eva",
-        description: "Personal Viva session and code milestone evaluation.",
+      });
+
+      // 2. Tuesday: Mentor Live Office Hours & Doubt Session
+      generatedEvents.push({
+        id: `ev_mentor_tue`,
+        title: `Live Office Hours: ${mentorInfo.name || "Assigned Mentor"}`,
+        description: `${mentorInfo.specialization || "Technical Mentorship"} — 1-on-1 doubt clearing & project review.`,
         eventType: "VIVA_1ON1",
-        startTime: makeDate(1, 10, 0),
-        endTime: makeDate(1, 11, 0),
+        startTime: makeDate(1, 18, 0),
+        endTime: makeDate(1, 19, 30),
         scope: "STUDENT",
         studentId: callerUserId,
-        studentName: "Eva",
-        meetUrl: "https://meet.google.com/uni-viva-eva",
+        mentorName: mentorInfo.name,
+        meetUrl: "https://meet.google.com/uni-mentor-office-hours",
         colorScheme: "rose",
         createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_deep_work",
-        title: "Deep work",
-        description: "Dedicated coding & lab hands-on focus block.",
-        eventType: "MILESTONE",
-        startTime: makeDate(2, 9, 0),
-        endTime: makeDate(2, 10, 30),
-        scope: "GLOBAL",
-        colorScheme: "blue",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_design_sync",
-        title: "Design sync",
-        description: "Curriculum architecture & pipeline optimization.",
+      });
+
+      // 3. Wednesday: Second Upcoming Lecture / Concept Review
+      const nextLecture2 = pendingLectures[1] || { title: "Hands-on PyTorch Model Optimization", id: `les_${canon.id}_1_2`, moduleTitle: "Module 1" };
+      generatedEvents.push({
+        id: `ev_lec_wed_${nextLecture2.id}`,
+        title: `Lecture: ${nextLecture2.title}`,
+        description: `Enrolled: ${canon.title} · ${nextLecture2.moduleTitle || "Core Curriculum"}`,
         eventType: "LIVE_CLASS",
-        startTime: makeDate(2, 10, 30),
-        endTime: makeDate(2, 11, 30),
+        startTime: makeDate(2, 10, 0),
+        endTime: makeDate(2, 11, 0),
         scope: "COURSE",
-        courseId: "cs-p1",
-        meetUrl: "https://meet.google.com/uni-design-sync",
+        courseId: canon.id,
+        lessonId: nextLecture2.id,
         colorScheme: "blue",
         createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_lunch_olivia",
-        title: "Lunch with Olivia",
-        description: "Casual cohort catchup & open mentorship.",
-        eventType: "GENERAL",
-        startTime: makeDate(3, 12, 0),
-        endTime: makeDate(3, 13, 0),
-        scope: "GLOBAL",
+      });
+
+      // 4. Wednesday Afternoon: Pending MCQ / Practice Quiz Assessment
+      generatedEvents.push({
+        id: `ev_mcq_wed`,
+        title: `MCQ Assessment: ${nextLecture1.title}`,
+        description: `Knowledge check & practice quiz for ${nextLecture1.title}.`,
+        eventType: "MILESTONE",
+        startTime: makeDate(2, 14, 0),
+        endTime: makeDate(2, 15, 0),
+        scope: "COURSE",
+        courseId: canon.id,
+        lessonId: nextLecture1.id,
         colorScheme: "green",
         createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_fri_standup",
-        title: "Friday standup",
-        description: "Weekly wrapup & milestone retrospectives.",
-        eventType: "LIVE_CLASS",
-        startTime: makeDate(4, 9, 0),
-        endTime: makeDate(4, 10, 0),
-        scope: "GLOBAL",
-        colorScheme: "slate",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_olivia_riley",
-        title: "Olivia x Riley",
-        description: "Pair programming & capstone code review.",
+      });
+
+      // 5. Thursday: Second Mentor Office Hours
+      generatedEvents.push({
+        id: `ev_mentor_thu`,
+        title: `Mentorship Huddle: ${mentorInfo.name || "Assigned Mentor"}`,
+        description: `${mentorInfo.specialization || "Technical Mentorship"} — Weekly milestone check-in.`,
         eventType: "VIVA_1ON1",
-        startTime: makeDate(4, 10, 0),
-        endTime: makeDate(4, 11, 0),
+        startTime: makeDate(3, 18, 0),
+        endTime: makeDate(3, 19, 30),
         scope: "STUDENT",
         studentId: callerUserId,
+        mentorName: mentorInfo.name,
+        meetUrl: "https://meet.google.com/uni-mentor-office-hours",
+        colorScheme: "rose",
+        createdAt: new Date().toISOString(),
+      });
+
+      // 6. Friday: Pending Lab / Assignment Deliverable Due
+      const nextAssignment = pendingAssignments[0] || {
+        title: "Hands-on Practical Lab Deliverable",
+        description: "Complete and commit code to your designated repository branch.",
+        id: "lab_1",
+      };
+      generatedEvents.push({
+        id: `ev_lab_fri_${nextAssignment.id}`,
+        title: `Deliverable Due: ${nextAssignment.title}`,
+        description: `${nextAssignment.description} · Due by end of week.`,
+        eventType: "DEADLINE",
+        startTime: makeDate(4, 16, 0),
+        endTime: makeDate(4, 17, 30),
+        scope: "COURSE",
+        courseId: canon.id,
+        lessonId: nextAssignment.id,
         colorScheme: "purple",
         createdAt: new Date().toISOString(),
-      },
-      {
-        id: "ev_house_inspect",
-        title: "House inspection",
-        description: "Batch architecture milestone check.",
-        eventType: "DEADLINE",
+      });
+
+      // 7. Saturday: Weekend Live Online Class / Capstone Masterclass
+      generatedEvents.push({
+        id: `ev_weekend_masterclass`,
+        title: `Weekend Live Class: Applied AI Systems`,
+        description: `Interactive live coding session & industry architecture walkthrough.`,
+        eventType: "LIVE_CLASS",
         startTime: makeDate(5, 11, 0),
-        endTime: makeDate(5, 12, 0),
-        scope: "COURSE",
+        endTime: makeDate(5, 12, 30),
+        scope: "GLOBAL",
+        meetUrl: "https://meet.google.com/uni-ai-masterclass",
         colorScheme: "amber",
         createdAt: new Date().toISOString(),
-      },
-    ];
+      });
+
+      return generatedEvents;
+    } catch (dbErr) {
+      console.warn("[LMSService] Dynamic DB calendar generation notice:", dbErr);
+      return [];
+    }
   },
 
   async createCalendarEvent(callerUserId: string, data: {
