@@ -2239,7 +2239,19 @@ export const lmsService = {
         createdAt: new Date().toISOString(),
       });
 
-      return generatedEvents;
+      let finalEvents = generatedEvents;
+      if (eventType && eventType !== "ALL") {
+        finalEvents = finalEvents.filter((e) => e.eventType === eventType);
+      }
+      if (search && search.trim()) {
+        const q = String(search).toLowerCase();
+        finalEvents = finalEvents.filter((e) =>
+          (e.title && e.title.toLowerCase().includes(q)) ||
+          (e.description && e.description.toLowerCase().includes(q))
+        );
+      }
+
+      return finalEvents;
     } catch (dbErr) {
       console.warn("[LMSService] Dynamic DB calendar generation notice:", dbErr);
       return [];
