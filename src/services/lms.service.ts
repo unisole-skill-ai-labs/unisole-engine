@@ -1143,16 +1143,37 @@ export const lmsService = {
             .where(eq(users.id, mRecord[0].userId))
             .limit(1);
 
+          const u = userRecord[0];
           return {
             id: mRecord[0].id,
-            name: userRecord[0]?.name || "Assigned Mentor",
-            email: userRecord[0]?.email || "",
-            specialization: mRecord[0].specialization || "AI & Full Stack Systems",
-            officeHours: mRecord[0].officeHours || "Tuesday & Thursday 6:00 PM - 7:30 PM IST",
-            bio: mRecord[0].bio || "Senior technical mentor guiding your architecture and project reviews.",
-            avatar: userRecord[0]?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
+            name: u?.name || "Assigned Mentor",
+            email: u?.email || "",
+            specialization: u?.designation || mRecord[0].specialization || "Technical Mentor & Project Evaluator",
+            officeHours: mRecord[0].officeHours || "",
+            bio: mRecord[0].bio || (u?.metadata as any)?.bio || "Senior technical mentor guiding student capstone projects and assessments.",
+            avatar: u?.avatar || (u?.metadata as any)?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
           };
         }
+      }
+
+      // Check if any mentor user exists in system
+      const anyMentorUser = await db
+        .select()
+        .from(users)
+        .where(sql`role::text = 'MENTOR' OR metadata->'roles' ? 'MENTOR'`)
+        .limit(1);
+
+      if (anyMentorUser.length > 0) {
+        const u = anyMentorUser[0];
+        return {
+          id: `mnt_${u.id}`,
+          name: u.name || "Assigned Mentor",
+          email: u.email || "",
+          specialization: u.designation || "Technical Mentor & Project Evaluator",
+          officeHours: "",
+          bio: (u.metadata as any)?.bio || "Senior technical mentor guiding student capstone projects and assessments.",
+          avatar: u.avatar || (u.metadata as any)?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
+        };
       }
     } catch (err) {
       console.warn("[LMSService] DB getStudentMentor fallback notice:", err);
@@ -1161,12 +1182,12 @@ export const lmsService = {
     // Default canonical mentor profile
     return {
       id: "mnt_dr_vikram",
-      name: "Dr. Vikram Sethi",
-      email: "vikram.sethi@unisole.org",
-      specialization: "Principal AI Scientist & GenAI Systems",
-      officeHours: "Tuesday & Thursday 6:00 PM - 7:30 PM IST",
-      bio: "12+ years in ML engineering, PyTorch core contributor, guiding Unisole student capstones.",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&q=80",
+      name: "Assigned Mentor",
+      email: "mentor@unisole.org",
+      specialization: "Technical Mentor & Project Evaluator",
+      officeHours: "",
+      bio: "Senior technical mentor guiding student capstone projects and assessments.",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
     };
   },
 
