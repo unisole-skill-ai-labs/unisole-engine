@@ -4,6 +4,7 @@ import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck";
 import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck";
 import { SUNNI_COLLEGE_PPT_SLIDES } from "../data/sunniDeck";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck";
+import { SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES } from "../data/seemaRoadshowDeck";
 
 /**
  * System Seeder — Sets up foundational, non-mock system data:
@@ -171,6 +172,50 @@ export async function seedSystemData() {
       console.log(`[Seed:System] Synchronized ABV GDC Sunni branches.`);
     }
 
+    // 1D. Sync Govt College Seema (Rohru) (govt-college-seema-rohru)
+    const seemaClgRes = await pool.query(
+      `INSERT INTO colleges (name, short_name, slug, description, is_active)
+       VALUES ('Govt College Seema (Rohru)', 'GC Seema (Rohru)', 'govt-college-seema-rohru', 'Government College Seema (Rohru), Shimla District, Himachal Pradesh.', TRUE)
+       ON CONFLICT (slug) DO UPDATE 
+       SET name = EXCLUDED.name, short_name = EXCLUDED.short_name, description = EXCLUDED.description, is_active = TRUE
+       RETURNING id, name`
+    );
+
+    const seemaCollegeId = seemaClgRes.rows[0]?.id;
+    const seemaCollegeName = seemaClgRes.rows[0]?.name ?? "Govt College Seema (Rohru)";
+
+    if (seemaCollegeId) {
+      const seemaBranches = [
+        { name: "BCA", code: "BCA", desc: "Bachelor of Computer Applications." },
+        { name: "BSC Non-Med", code: "BSC_NM", desc: "Bachelor of Science (Non-Medical)." },
+        { name: "BSC Med", code: "BSC_MED", desc: "Bachelor of Science (Medical)." },
+        { name: "BCOM", code: "BCOM", desc: "Bachelor of Commerce." },
+        { name: "BA", code: "BA", desc: "Bachelor of Arts." },
+        { name: "BBA", code: "BBA", desc: "Bachelor of Business Administration." },
+        { name: "PGDCA", code: "PGDCA", desc: "Post Graduate Diploma in Computer Applications." },
+        { name: "Others", code: "OTHERS", desc: "Other / Multidisciplinary streams." },
+      ];
+
+      for (const br of seemaBranches) {
+        const brCheck = await pool.query(
+          "SELECT id FROM branches WHERE college_id = $1 AND (name = $2 OR code = $3) LIMIT 1",
+          [seemaCollegeId, br.name, br.code]
+        );
+        if (brCheck.rows && brCheck.rows[0]) {
+          await pool.query(
+            "UPDATE branches SET name = $1, code = $2, description = $3, is_active = TRUE WHERE id = $4",
+            [br.name, br.code, br.desc, brCheck.rows[0].id]
+          );
+        } else {
+          await pool.query(
+            "INSERT INTO branches (college_id, name, code, description, is_active) VALUES ($1, $2, $3, $4, TRUE)",
+            [seemaCollegeId, br.name, br.code, br.desc]
+          );
+        }
+      }
+      console.log(`[Seed:System] Synchronized Govt College Seema (Rohru) branches.`);
+    }
+
     // 2. Seed / Sync Flagship Deck: Theog College PPT
     const theogPresTitle = "Theog College PPT";
     await pool.query(
@@ -230,6 +275,26 @@ export async function seedSystemData() {
       ]
     );
     console.log(`[Seed:System] Synchronized flagship deck: Sunni College PPT (${SUNNI_COLLEGE_PPT_SLIDES.length} slides)`);
+
+    // 2D. Seed / Sync Flagship Deck: Govt College Seema (Rohru) Roadshow Deck
+    const seemaPresTitle = "AI Training Program Roadshow";
+    await pool.query(
+      `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+       VALUES ('pres_seema_rohru_roadshow', $1, $2, $3, $4, 'dark', $5, TRUE)
+       ON CONFLICT (id) DO UPDATE 
+       SET slides = EXCLUDED.slides, 
+           title = EXCLUDED.title, 
+           college_id = COALESCE(EXCLUDED.college_id, presentations.college_id), 
+           college_name = COALESCE(EXCLUDED.college_name, presentations.college_name)`,
+      [
+        seemaCollegeId,
+        seemaCollegeName,
+        seemaPresTitle,
+        "27-slide industrial training cum internship roadshow presentation for Govt College Seema (Rohru) featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+        JSON.stringify(SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES),
+      ]
+    );
+    console.log(`[Seed:System] Synchronized flagship deck: AI Training Program Roadshow (Govt College Seema (Rohru)) (${SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES.length} slides)`);
 
     // 3. Seed / Sync Flagship Deck: Unisole AI Campus Deck
     const aiDeckTitle = "UNISOLE AI Campus Program Presentation Deck";
