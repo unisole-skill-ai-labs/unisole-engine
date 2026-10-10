@@ -69,11 +69,18 @@ export const teamService = {
         OR t.sub_project_lead_id = u.id
       )
       LEFT JOIN leads l ON l.assigned_to_user_id = u.id
-      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES')
+      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'PROGRAM_MANAGER')
         ${searchFilter}
       GROUP BY u.id, d.name, d.color
       ORDER BY 
-        CASE WHEN u.role = 'SUPER_ADMIN' THEN 1 WHEN u.role = 'ADMIN' THEN 2 WHEN u.role = 'SALES' THEN 3 ELSE 4 END,
+        CASE 
+          WHEN u.role::text = 'SUPER_ADMIN' THEN 1 
+          WHEN u.role::text = 'ADMIN' THEN 2 
+          WHEN u.role::text = 'PROGRAM_MANAGER' THEN 3 
+          WHEN u.role::text = 'MENTOR' THEN 4 
+          WHEN u.role::text = 'SALES' THEN 5 
+          ELSE 6 
+        END,
         u.name ASC
     `);
 
@@ -81,6 +88,7 @@ export const teamService = {
     return rows.map((row) => ({
       ...row,
       permissions: (row.metadata && Array.isArray(row.metadata.permissions)) ? row.metadata.permissions : [],
+      roles: (row.metadata && Array.isArray(row.metadata.roles)) ? row.metadata.roles : [],
     }));
   },
 
@@ -89,7 +97,8 @@ export const teamService = {
     username: string;
     password?: string;
     phone?: string;
-    role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES";
+    role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES" | "MENTOR" | "PROGRAM_MANAGER";
+    roles?: string[];
     departmentId?: string;
     designation?: string;
     permissions?: string[];
@@ -126,6 +135,7 @@ export const teamService = {
 
     const metadataObj = {
       permissions: Array.isArray(data.permissions) ? data.permissions : [],
+      roles: Array.isArray(data.roles) ? data.roles : [],
     };
 
     const newId = `usr_staff_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -153,7 +163,8 @@ export const teamService = {
       username?: string;
       password?: string;
       phone?: string;
-      role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES";
+      role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES" | "MENTOR" | "PROGRAM_MANAGER";
+      roles?: string[];
       departmentId?: string;
       designation?: string;
       permissions?: string[];
@@ -192,11 +203,12 @@ export const teamService = {
     if (data.designation !== undefined) updatePayload.designation = data.designation;
     if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
-    if (data.permissions !== undefined) {
+    if (data.permissions !== undefined || data.roles !== undefined) {
       const currentMeta = (existing.metadata as Record<string, any>) || {};
       updatePayload.metadata = {
         ...currentMeta,
-        permissions: data.permissions,
+        ...(data.permissions !== undefined ? { permissions: data.permissions } : {}),
+        ...(data.roles !== undefined ? { roles: data.roles } : {}),
       };
     }
 
@@ -839,7 +851,7 @@ export const teamService = {
       LEFT JOIN team_departments d ON u.department_id = d.id
       LEFT JOIN tasks t ON t.assignee_id = u.id
       LEFT JOIN daily_eod_logs e ON e.user_id = u.id AND e.log_date >= CURRENT_DATE - INTERVAL '30 days'
-      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
+      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'PROGRAM_MANAGER') AND u.is_active = TRUE
       GROUP BY u.id, d.name, d.color
       ORDER BY u.name ASC;
     `);
@@ -914,7 +926,7 @@ export const teamService = {
         d.color as "departmentColor"
       FROM users u
       LEFT JOIN team_departments d ON u.department_id = d.id
-      WHERE u.role IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES') AND u.is_active = TRUE
+      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'PROGRAM_MANAGER') AND u.is_active = TRUE
       ORDER BY u.name ASC
     `);
     const allStaff = (staffRes.rows || staffRes) as any[];

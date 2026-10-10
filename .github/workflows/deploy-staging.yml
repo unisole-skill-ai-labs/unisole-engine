@@ -36,6 +36,7 @@ jobs:
                       git clone -b staging https://github.com/unisole-skill-ai-labs/unisole-engine.git .
                     else
                       git fetch origin staging
+                      git reset --hard HEAD
                       git checkout -B staging origin/staging
                       git reset --hard origin/staging
                     fi

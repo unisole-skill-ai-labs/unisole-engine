@@ -25,9 +25,29 @@ import { sql, InferSelectModel, InferInsertModel } from "drizzle-orm";
 export const userRole = pgEnum("user_role", [
   "STUDENT",
   "MEMBER",
+  "MENTOR",
+  "PROGRAM_MANAGER",
   "ADMIN",
   "SUPER_ADMIN",
   "SALES",
+]);
+export const assignmentCategory = pgEnum("assignment_category", [
+  "PRACTICE",
+  "TEST",
+]);
+export const assignmentType = pgEnum("assignment_type", [
+  "MCQ",
+  "CODING_TEST",
+  "SUBJECTIVE_TEST",
+  "VIDEO_TEST",
+  "PROJECT",
+]);
+export const submissionStatus = pgEnum("submission_status", [
+  "DRAFT",
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "GRADED",
+  "RESUBMIT_REQUESTED",
 ]);
 export const pathwayStatus = pgEnum("pathway_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export const contentStatus = pgEnum("content_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
@@ -423,6 +443,8 @@ export const users = pgTable(
     username: varchar({ length: 100 }),
     password: varchar({ length: 255 }),
     name: varchar({ length: 150 }),
+    email: varchar({ length: 255 }),
+    avatar: text(),
     collegeId: varchar("college_id", { length: 50 }),
     collegeName: varchar("college_name", { length: 200 }),
     branch: varchar({ length: 100 }),
@@ -1901,10 +1923,247 @@ export const surveyResponses = pgTable(
 );
 
 // ============================================================
+// LMS PROGRESS & SUBMISSIONS
+// ============================================================
+
+export const lessonProgress = pgTable(
+  "lesson_progress",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    lessonId: varchar("lesson_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }),
+    isCompleted: boolean("is_completed").default(true).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_lesson_progress_user").on(table.userId),
+    index("idx_lesson_progress_lesson").on(table.lessonId),
+    index("idx_lesson_progress_pathway").on(table.pathwayId),
+    unique("uq_lesson_progress_user_lesson").on(table.userId, table.lessonId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_lesson_progress_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const submissions = pgTable(
+  "submissions",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    lessonId: varchar("lesson_id", { length: 50 }).notNull(),
+    assignmentId: varchar("assignment_id", { length: 50 }),
+    pathwayId: varchar("pathway_id", { length: 50 }),
+    mentorId: varchar("mentor_id", { length: 50 }),
+    type: varchar({ length: 50 }).default("assignment").notNull(), // "assignment" | "quiz" | "coding_test" | "subjective_test" | "video_test" | "project"
+    title: varchar({ length: 255 }),
+    submissionUrl: text("submission_url"),
+    submissionText: text("submission_text"),
+    codeSnippet: text("code_snippet"),
+    videoUrl: text("video_url"),
+    score: integer(),
+    maxScore: integer("max_score").default(100),
+    status: varchar({ length: 50 }).default("SUBMITTED").notNull(), // "DRAFT" | "SUBMITTED" | "UNDER_REVIEW" | "GRADED" | "RESUBMIT_REQUESTED"
+    mentorFeedback: text("mentor_feedback"),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true, mode: "string" }),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_submissions_user").on(table.userId),
+    index("idx_submissions_lesson").on(table.lessonId),
+    index("idx_submissions_assignment").on(table.assignmentId),
+    index("idx_submissions_mentor").on(table.mentorId),
+    index("idx_submissions_pathway").on(table.pathwayId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_submissions_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+// ============================================================
+// PROGRAM MANAGERS & MENTORS
+// ============================================================
+
+export const programManagers = pgTable(
+  "program_managers",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    collegeId: varchar("college_id", { length: 50 }),
+    department: varchar({ length: 150 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_pm_user").on(table.userId),
+    index("idx_pm_college").on(table.collegeId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_pm_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const mentors = pgTable(
+  "mentors",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    specialization: varchar({ length: 255 }),
+    bio: text(),
+    officeHours: varchar("office_hours", { length: 255 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_mentors_user").on(table.userId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_mentors_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const mentorMentees = pgTable(
+  "mentor_mentees",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    mentorId: varchar("mentor_id", { length: 50 }).notNull(),
+    menteeId: varchar("mentee_id", { length: 50 }).notNull(),
+    courseId: varchar("course_id", { length: 50 }),
+    pathwayId: varchar("pathway_id", { length: 50 }),
+    status: varchar({ length: 50 }).default("ACTIVE").notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    assignedAt: timestamp("assigned_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_mentor_mentees_mentor").on(table.mentorId),
+    index("idx_mentor_mentees_mentee").on(table.menteeId),
+  ]
+);
+
+// ============================================================
+// COURSE ASSIGNMENTS & TESTS (PRACTICE VS TEST)
+// ============================================================
+
+export const courseAssignments = pgTable(
+  "course_assignments",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    courseId: varchar("course_id", { length: 50 }),
+    moduleId: varchar("module_id", { length: 50 }),
+    title: varchar({ length: 250 }).notNull(),
+    slug: varchar({ length: 280 }).notNull(),
+    description: text(),
+    category: assignmentCategory().default("PRACTICE").notNull(), // PRACTICE | TEST
+    type: assignmentType().default("MCQ").notNull(), // MCQ | CODING_TEST | SUBJECTIVE_TEST | VIDEO_TEST | PROJECT
+    config: jsonb("config").default(sql`'{}'::jsonb`), // testCases, starterCode, mcqOptions, rubrics, videoDurationLimitSec
+    maxScore: integer("max_score").default(100).notNull(),
+    position: integer().default(1).notNull(),
+    status: contentStatus().default("PUBLISHED").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_course_assignments_course").on(table.courseId),
+    index("idx_course_assignments_module").on(table.moduleId),
+    index("idx_course_assignments_category").on(table.category),
+  ]
+);
+
+export const notes = pgTable(
+  "notes",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    lessonId: varchar("lesson_id", { length: 50 }).notNull(),
+    pathwayId: varchar("pathway_id", { length: 50 }),
+    lessonTitle: varchar("lesson_title", { length: 255 }),
+    content: text().notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_notes_user").on(table.userId),
+    index("idx_notes_lesson").on(table.lessonId),
+    index("idx_notes_pathway").on(table.pathwayId),
+    unique("uq_notes_user_lesson").on(table.userId, table.lessonId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_notes_user",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    eventType: varchar("event_type", { length: 50 }).notNull().default("GENERAL"), // 'MILESTONE', 'LIVE_CLASS', 'DEADLINE', 'VIVA_1ON1', 'GENERAL'
+    startTime: timestamp("start_time", { withTimezone: true, mode: "string" }).notNull(),
+    endTime: timestamp("end_time", { withTimezone: true, mode: "string" }).notNull(),
+    scope: varchar("scope", { length: 50 }).notNull().default("GLOBAL"), // 'GLOBAL', 'COURSE', 'COHORT', 'STUDENT'
+    courseId: varchar("course_id", { length: 255 }),
+    lessonId: varchar("lesson_id", { length: 255 }),
+    mentorId: varchar("mentor_id", { length: 255 }),
+    studentId: varchar("student_id", { length: 255 }),
+    meetUrl: varchar("meet_url", { length: 500 }),
+    colorScheme: varchar("color_scheme", { length: 50 }).default("blue"), // 'blue', 'purple', 'green', 'amber', 'rose', 'slate'
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_calendar_events_start").on(table.startTime),
+    index("idx_calendar_events_scope").on(table.scope),
+    index("idx_calendar_events_course").on(table.courseId),
+    index("idx_calendar_events_student").on(table.studentId),
+  ]
+);
+
+// ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
 export type User = InferSelectModel<typeof users>;
+export type CalendarEvent = InferSelectModel<typeof calendarEvents>;
 export type OtpVerification = InferSelectModel<typeof otpVerifications>;
 export type College = InferSelectModel<typeof colleges>;
 export type Branch = InferSelectModel<typeof branches>;
@@ -1919,6 +2178,13 @@ export type CourseModule = InferSelectModel<typeof courseModules>;
 export type Lesson = InferSelectModel<typeof lessons>;
 export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Enrollment = InferSelectModel<typeof enrollments>;
+export type LessonProgress = InferSelectModel<typeof lessonProgress>;
+export type Submission = InferSelectModel<typeof submissions>;
+export type Note = InferSelectModel<typeof notes>;
+export type ProgramManager = InferSelectModel<typeof programManagers>;
+export type Mentor = InferSelectModel<typeof mentors>;
+export type MentorMentee = InferSelectModel<typeof mentorMentees>;
+export type CourseAssignment = InferSelectModel<typeof courseAssignments>;
 export type Payment = InferSelectModel<typeof payments>;
 export type Order = InferSelectModel<typeof orders>;
 export type OrderItem = InferSelectModel<typeof orderItems>;
@@ -1960,6 +2226,14 @@ export type NewCourseModule = InferInsertModel<typeof courseModules>;
 export type NewLesson = InferInsertModel<typeof lessons>;
 export type NewModuleLesson = InferInsertModel<typeof moduleLessons>;
 export type NewEnrollment = InferInsertModel<typeof enrollments>;
+export type NewLessonProgress = InferInsertModel<typeof lessonProgress>;
+export type NewSubmission = InferInsertModel<typeof submissions>;
+export type NewNote = InferInsertModel<typeof notes>;
+export type NewCalendarEvent = InferInsertModel<typeof calendarEvents>;
+export type NewProgramManager = InferInsertModel<typeof programManagers>;
+export type NewMentor = InferInsertModel<typeof mentors>;
+export type NewMentorMentee = InferInsertModel<typeof mentorMentees>;
+export type NewCourseAssignment = InferInsertModel<typeof courseAssignments>;
 export type NewPayment = InferInsertModel<typeof payments>;
 export type NewOrder = InferInsertModel<typeof orders>;
 export type NewOrderItem = InferInsertModel<typeof orderItems>;

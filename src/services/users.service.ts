@@ -11,7 +11,11 @@ export const usersService = {
     signupSource?: string;
     signupSessionCode?: string;
     search?: string;
-  }): Promise<User[]> {
+    enrolledOnly?: boolean;
+    courseId?: string;
+    mentorUserId?: string;
+    onlyAssignedMentorship?: boolean;
+  }): Promise<any[]> {
     return usersRepository.list(filters);
   },
 

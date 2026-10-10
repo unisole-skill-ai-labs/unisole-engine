@@ -10,52 +10,163 @@ export const usersRepository = {
     signupSource?: string;
     signupSessionCode?: string;
     search?: string;
-  }): Promise<User[]> {
-    const conditions = [];
+    enrolledOnly?: boolean;
+    courseId?: string;
+    mentorUserId?: string;
+    onlyAssignedMentorship?: boolean;
+  }): Promise<any[]> {
+    const whereClauses: any[] = [];
 
     if (filters?.collegeId) {
-      conditions.push(eq(users.collegeId, filters.collegeId));
+      whereClauses.push(sql`u.college_id = ${filters.collegeId}`);
     }
     if (filters?.branch) {
-      conditions.push(
-        or(
-          eq(users.branch, filters.branch),
-          ilike(users.branch, `%${filters.branch}%`)
-        )
-      );
+      whereClauses.push(sql`(u.branch = ${filters.branch} OR u.branch ILIKE ${`%${filters.branch}%`})`);
     }
     if (filters?.role) {
-      conditions.push(eq(users.role, filters.role as any));
+      whereClauses.push(sql`u.role::text = ${filters.role}`);
     }
     if (filters?.signupSource) {
-      conditions.push(eq(users.signupSource, filters.signupSource));
+      whereClauses.push(sql`u.signup_source = ${filters.signupSource}`);
     }
     if (filters?.signupSessionCode) {
-      conditions.push(eq(users.signupSessionCode, filters.signupSessionCode));
+      whereClauses.push(sql`u.signup_session_code = ${filters.signupSessionCode}`);
     }
     if (filters?.search) {
       const q = `%${filters.search}%`;
-      conditions.push(
-        or(
-          ilike(users.name, q),
-          ilike(users.phone, q),
-          ilike(users.branch, q),
-          ilike(users.collegeName, q),
-          ilike(users.signupSource, q),
-          ilike(users.signupSessionCode, q)
-        )
-      );
+      whereClauses.push(sql`(
+        u.name ILIKE ${q} OR 
+        u.phone ILIKE ${q} OR 
+        u.email ILIKE ${q} OR 
+        u.branch ILIKE ${q} OR 
+        u.college_name ILIKE ${q} OR
+        u.signup_source ILIKE ${q} OR
+        u.signup_session_code ILIKE ${q}
+      )`);
     }
 
-    if (conditions.length > 0) {
-      return db
-        .select()
-        .from(users)
-        .where(and(...conditions))
-        .orderBy(desc(users.createdAt));
+    if (filters?.enrolledOnly) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM enrollments e 
+        WHERE e.user_id = u.id AND e.status::text IN ('ACTIVE', 'PENDING', 'COMPLETED')
+      )`);
     }
 
-    return db.select().from(users).orderBy(desc(users.createdAt));
+    if (filters?.courseId) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM enrollments e 
+        WHERE e.user_id = u.id 
+          AND (e.item_id = ${filters.courseId} OR e.pathway_id = ${filters.courseId})
+      )`);
+    }
+
+    if (filters?.mentorUserId) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        JOIN mentors m ON m.id = mm.mentor_id
+        WHERE mm.mentee_id = u.id 
+          AND m.user_id = ${filters.mentorUserId}
+          AND mm.status = 'ACTIVE'
+      )`);
+    }
+
+    if (filters?.onlyAssignedMentorship) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
+      )`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? sql`WHERE ${sql.join(whereClauses, sql` AND `)}` : sql``;
+
+    const result = await db.execute<any>(sql`
+      SELECT 
+        u.id,
+        u.name,
+        u.username,
+        u.phone,
+        u.email,
+        u.role,
+        u.college_id as "collegeId",
+        u.college_name as "collegeName",
+        u.branch,
+        u.department_id as "departmentId",
+        u.designation,
+        u.is_active as "isActive",
+        u.signup_source as "signupSource",
+        u.signup_session_code as "signupSessionCode",
+        u.metadata,
+        u.created_at as "createdAt",
+        u.updated_at as "updatedAt",
+        COALESCE(
+          (
+            SELECT JSON_AGG(
+              JSON_BUILD_OBJECT(
+                'id', COALESCE(c.id, p.id, e.item_id),
+                'title', COALESCE(c.title, p.title, e.item_id, 'Enrolled Course'),
+                'slug', COALESCE(c.slug, p.slug, ''),
+                'status', e.status,
+                'source', e.source,
+                'enrolledAt', e.enrolled_at,
+                'orderId', e.order_id
+              ) ORDER BY e.enrolled_at DESC NULLS LAST
+            )
+            FROM enrollments e
+            LEFT JOIN courses c ON (e.item_id = c.id OR e.pathway_id = c.id OR e.item_id = c.slug OR e.pathway_id = c.slug)
+            LEFT JOIN pathways p ON (e.pathway_id = p.id OR e.item_id = p.id OR e.pathway_id = p.slug OR e.item_id = p.slug)
+            WHERE e.user_id = u.id
+          ),
+          '[]'::json
+        ) as "enrolledCourses",
+        (
+          SELECT JSON_BUILD_OBJECT(
+            'id', mm.id,
+            'mentorId', m.id,
+            'mentorUserId', u_m.id,
+            'mentorName', u_m.name,
+            'mentorEmail', u_m.email,
+            'specialization', m.specialization,
+            'courseId', mm.course_id,
+            'assignedAt', mm.assigned_at
+          )
+          FROM mentor_mentees mm
+          JOIN mentors m ON m.id = mm.mentor_id
+          JOIN users u_m ON u_m.id = m.user_id
+          WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
+          ORDER BY mm.assigned_at DESC NULLS LAST
+          LIMIT 1
+        ) as "assignedMentor",
+        COALESCE(
+          (
+            SELECT JSON_AGG(
+              JSON_BUILD_OBJECT(
+                'id', mm.id,
+                'mentorId', m.id,
+                'mentorUserId', u_m.id,
+                'mentorName', u_m.name,
+                'mentorEmail', u_m.email,
+                'specialization', m.specialization,
+                'courseId', mm.course_id,
+                'assignedAt', mm.assigned_at
+              ) ORDER BY mm.assigned_at DESC NULLS LAST
+            )
+            FROM mentor_mentees mm
+            JOIN mentors m ON m.id = mm.mentor_id
+            JOIN users u_m ON u_m.id = m.user_id
+            WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
+          ),
+          '[]'::json
+        ) as "assignedMentors"
+      FROM users u
+      ${whereSql}
+      ORDER BY u.created_at DESC;
+    `);
+
+    return (result.rows || result).map((r: any) => ({
+      ...r,
+      enrolledCourses: Array.isArray(r.enrolledCourses) ? r.enrolledCourses : [],
+      assignedMentors: Array.isArray(r.assignedMentors) ? r.assignedMentors : [],
+    }));
   },
 
   async getById(id: string): Promise<User | null> {

@@ -17,6 +17,7 @@ import { THEOG_COLLEGE_PPT_SLIDES } from "../data/theogDeck.js";
 import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck.js";
 import { SUNNI_COLLEGE_PPT_SLIDES } from "../data/sunniDeck.js";
 import { AI_TRAINING_ROADSHOW_DECK_SLIDES } from "../data/aiTrainingRoadshowDeck.js";
+import { SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES } from "../data/seemaRoadshowDeck.js";
 import { broadcastSessionEnded } from "../socket/presentation.socket";
 
 function generateSessionCode(): string {
@@ -43,6 +44,10 @@ export const presentationsService = {
 
   getAiTrainingRoadshowTemplateSlides(): any[] {
     return AI_TRAINING_ROADSHOW_DECK_SLIDES;
+  },
+
+  getSeemaTemplateSlides(): any[] {
+    return SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES;
   },
 
   async ensureFlagshipDecks(): Promise<void> {
@@ -382,6 +387,95 @@ export const presentationsService = {
           console.log(`[Presentations] Auto-synced AI Training Program Roadshow (MLSM College Sundernagar)`);
         }
       }
+
+      // -------------------------------------------------------------
+      // 5. Govt College Seema (Rohru) — AI Training Program Roadshow Deck
+      // -------------------------------------------------------------
+      const existingSeemaRoadshow = await presentationsRepository.getPresentationById("pres_seema_rohru_roadshow");
+      let seemaCollegeId: string | null = null;
+      let seemaCollegeName = "Govt College Seema (Rohru)";
+      try {
+        const collegesList = await collegesRepository.list();
+        let seemaCollege = collegesList.find(
+          (c) =>
+            c.slug === "govt-college-seema-rohru" ||
+            c.slug === "gc-seema-rohru" ||
+            (c.name?.toLowerCase().includes("seema") || c.name?.toLowerCase().includes("rohru"))
+        );
+        if (!seemaCollege) {
+          seemaCollege = await collegesRepository.create({
+            name: "Govt College Seema (Rohru)",
+            shortName: "GC Seema (Rohru)",
+            slug: "govt-college-seema-rohru",
+            description: "Government College Seema (Rohru), Shimla District, Himachal Pradesh.",
+            isActive: true,
+          });
+        }
+
+        if (seemaCollege) {
+          seemaCollegeId = seemaCollege.id;
+          seemaCollegeName = seemaCollege.name;
+
+          // Ensure default branches exist
+          try {
+            const defaultBranches = [
+              { name: "Bachelor of Computer Applications (BCA)", code: "BCA" },
+              { name: "B.Sc (Computer Science / Non-Medical)", code: "BSC_NM" },
+              { name: "B.Sc (Medical)", code: "BSC_MED" },
+              { name: "Bachelor of Commerce (B.Com)", code: "BCOM" },
+              { name: "Bachelor of Arts (B.A.)", code: "BA" },
+              { name: "Bachelor of Business Administration (BBA)", code: "BBA" },
+              { name: "Post Graduate Diploma in Computer Applications (PGDCA)", code: "PGDCA" },
+              { name: "Other", code: "OTHER" },
+            ];
+            for (const br of defaultBranches) {
+              await pool.query(
+                `INSERT INTO college_branches (college_id, name, code)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (college_id, code) DO NOTHING`,
+                [seemaCollege.id, br.name, br.code]
+              );
+            }
+          } catch (brErr) {
+            // ignore
+          }
+        }
+      } catch (colErr) {
+        // ignore
+      }
+
+      if (!existingSeemaRoadshow) {
+        await presentationsRepository.createPresentation({
+          id: "pres_seema_rohru_roadshow",
+          collegeId: seemaCollegeId,
+          collegeName: seemaCollegeName,
+          title: "AI Training Program Roadshow",
+          description: "27-slide industrial training cum internship roadshow presentation for Govt College Seema (Rohru) featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+          theme: "dark",
+          slides: SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES,
+          isActive: true,
+        });
+        console.log("[Presentations] Auto-seeded flagship deck: AI Training Program Roadshow (Govt College Seema (Rohru))");
+      } else {
+        const existingJson = JSON.stringify(existingSeemaRoadshow.slides || []);
+        const targetJson = JSON.stringify(SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES);
+
+        if (
+          existingSeemaRoadshow.collegeName !== seemaCollegeName ||
+          existingSeemaRoadshow.collegeId !== seemaCollegeId ||
+          existingSeemaRoadshow.title !== "AI Training Program Roadshow" ||
+          existingJson !== targetJson
+        ) {
+          await presentationsRepository.updatePresentation("pres_seema_rohru_roadshow", {
+            title: "AI Training Program Roadshow",
+            collegeId: seemaCollegeId,
+            collegeName: seemaCollegeName,
+            description: "27-slide industrial training cum internship roadshow presentation for Govt College Seema (Rohru) featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+            slides: SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES,
+          });
+          console.log(`[Presentations] Auto-synced AI Training Program Roadshow (Govt College Seema (Rohru))`);
+        }
+      }
     } catch (err) {
       console.warn("[Presentations] Could not auto-sync flagship decks:", err);
     }
@@ -397,7 +491,8 @@ export const presentationsService = {
       id === "pres_sanjauli_college_ppt" ||
       id === "pres_sunni_college_ppt" ||
       id === "pres_ai_training_roadshow" ||
-      id === "pres_mlsm_sundernagar_roadshow"
+      id === "pres_mlsm_sundernagar_roadshow" ||
+      id === "pres_seema_rohru_roadshow"
     ) {
       await this.ensureFlagshipDecks();
     }
@@ -438,13 +533,30 @@ export const presentationsService = {
       college.name.toLowerCase().includes("theog") ||
       college.slug.toLowerCase().includes("theog");
 
+    const isSunni =
+      data.title.toLowerCase().includes("sunni") ||
+      college.name.toLowerCase().includes("sunni") ||
+      college.slug.toLowerCase().includes("sunni");
+
+    const isSeema =
+      data.title.toLowerCase().includes("seema") ||
+      data.title.toLowerCase().includes("rohru") ||
+      college.name.toLowerCase().includes("seema") ||
+      college.name.toLowerCase().includes("rohru") ||
+      college.slug.toLowerCase().includes("seema") ||
+      college.slug.toLowerCase().includes("rohru");
+
     const defaultSlides =
       data.slides && data.slides.length > 0
         ? data.slides
+        : isSeema
+        ? SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES
         : isSanjauli
         ? SANJAULI_COLLEGE_PPT_SLIDES
         : isTheog
         ? THEOG_COLLEGE_PPT_SLIDES
+        : isSunni
+        ? SUNNI_COLLEGE_PPT_SLIDES
         : UNISOLE_AI_CAMPUS_DECK_SLIDES;
 
     return presentationsRepository.createPresentation({

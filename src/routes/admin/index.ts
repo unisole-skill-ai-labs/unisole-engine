@@ -23,11 +23,16 @@ import { adminOrdersRouter } from "./orders";
 import { adminPricingRouter } from "./pricing";
 import { adminCouponsRouter } from "./coupons";
 import { adminSurveysRouter } from "./surveys";
+import { adminDashboardRouter } from "./dashboard";
+import { adminMentorshipRouter } from "./mentorship";
 
 export const adminRouter: Router = Router();
 
-// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES)
-adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES"]));
+// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES, MENTOR, PROGRAM_MANAGER)
+adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR", "PROGRAM_MANAGER"]));
+
+// Dashboard Stats & Academic Metrics
+adminRouter.use("/dashboard", adminDashboardRouter);
 
 // My Work - Centralized Staff Task & Lead Workspace
 adminRouter.use("/my-work", adminMyWorkRouter);
@@ -58,6 +63,7 @@ adminRouter.use("/lessons", adminLessonsRouter);
 adminRouter.use("/enrollments", adminEnrollmentsRouter);
 adminRouter.use("/presentations", adminPresentationsRouter);
 adminRouter.use("/surveys", adminSurveysRouter);
+adminRouter.use("/mentorship", adminMentorshipRouter);
 
 // Financial Management & Pricing Suite (Super Admin & Admin)
 adminRouter.use("/orders", requireRole(["SUPER_ADMIN", "ADMIN"]), adminOrdersRouter);
