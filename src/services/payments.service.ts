@@ -135,8 +135,51 @@ export const paymentsService = {
       }) as Payment;
     }
 
-    // 3. Mark Order as PAID
-    if (order && order.status !== "PAID") {
+    // 3. Guarantee Order exists and is marked PAID
+    if (!order) {
+      try {
+        const user = await usersRepository.getById(targetUserId);
+        const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+        const itemType = payment?.itemType || "WORKSHOP";
+        const itemId = payment?.itemId || "AI_MASTERCLASS_2026";
+        const amountPaise = payment?.amountPaise || 3900;
+        const userMeta = (typeof user?.metadata === "object" && user?.metadata !== null) ? (user.metadata as any) : {};
+
+        order = await ordersRepository.create(
+          {
+            orderNumber,
+            userId: targetUserId,
+            customerName: user?.name || "Student",
+            customerEmail: userMeta?.email || (user as any)?.email || "student@unisole.org",
+            customerPhone: user?.phone || body.phone || null,
+            subtotalPaise: amountPaise,
+            discountPaise: 0,
+            totalPaise: amountPaise,
+            currency: "INR",
+            status: "PAID",
+            paidAt: new Date().toISOString(),
+            razorpayOrderId: providerOrderId,
+            notes: `Auto-created on gateway verification (${providerPaymentId})`,
+          },
+          [
+            {
+              itemType: itemType as any,
+              itemId,
+              itemTitle: itemType === "WORKSHOP" ? "AI Masterclass Registration Token" : "Course Offering",
+              unitPricePaise: amountPaise,
+              quantity: 1,
+              totalPricePaise: amountPaise,
+            },
+          ]
+        );
+
+        if (payment && !payment.orderId) {
+          await paymentsRepository.update(payment.id, { orderId: order.id });
+        }
+      } catch (orderCreateErr) {
+        console.warn("[PaymentsService] Failed to auto-create missing order during verify:", orderCreateErr);
+      }
+    } else if (order.status !== "PAID") {
       await ordersRepository.updateStatus(order.id, "PAID");
       order.status = "PAID";
     }

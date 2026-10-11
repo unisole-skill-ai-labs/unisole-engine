@@ -4,6 +4,7 @@ import { ordersController } from "../../controllers/orders.controller";
 export const adminOrdersRouter: Router = Router();
 
 adminOrdersRouter.get("/", ordersController.adminList);
+adminOrdersRouter.post("/reconcile", ordersController.adminReconcile);
 adminOrdersRouter.get("/:id", ordersController.getById);
 adminOrdersRouter.post("/:id/confirm-manual", ordersController.adminConfirmManual);
 adminOrdersRouter.post("/:id/status", ordersController.adminUpdateStatus);

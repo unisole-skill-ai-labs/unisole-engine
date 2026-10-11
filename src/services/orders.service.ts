@@ -235,11 +235,14 @@ export const ordersService = {
     filters: ListOrdersFilter,
     user?: { id: string; role: string }
   ) {
-    if (!user) return { items: [], total: 0 };
+    if (!user) return { items: [], total: 0, metrics: { totalRevenuePaise: 0, paidOrdersCount: 0, pendingOrdersCount: 0, totalOrdersCount: 0 } };
 
     const queryFilters: ListOrdersFilter = { ...filters };
     if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       queryFilters.userId = user.id;
+    } else {
+      // For Admin, auto-reconcile so captured gateway payments reflect immediately in orders and revenue
+      await ordersRepository.reconcileSuccessfulPayments();
     }
 
     // Auto-sync any active enrollments lacking orders for this user so they immediately appear in their order history

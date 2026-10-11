@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { ordersService } from "../services/orders.service";
+import { ordersRepository } from "../repositories/orders.repository";
 import { asyncHandler } from "../middleware/async-handler";
 import { CustomRequest } from "../middleware/auth";
 import { ValidationError } from "../errors";
@@ -180,6 +181,19 @@ export const ordersController = {
 
     res.json({
       ...result,
+    });
+  }),
+
+  /**
+   * Admin reconcile payments and orders
+   * POST /api/admin/orders/reconcile
+   */
+  adminReconcile: asyncHandler(async (_req: CustomRequest, res: Response) => {
+    const count = await ordersRepository.reconcileSuccessfulPayments();
+    res.json({
+      success: true,
+      message: `Successfully reconciled ${count} payment records with orders`,
+      count,
     });
   }),
 };
