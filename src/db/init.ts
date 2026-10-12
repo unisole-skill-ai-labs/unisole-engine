@@ -228,7 +228,28 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_payments_order" ON "public"."payments" ("order_id");
     `);
 
+    await execSqlSafe("pathways_table_creation", `
+      CREATE SEQUENCE IF NOT EXISTS "public"."pathways_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE TABLE IF NOT EXISTS "public"."pathways" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('pwy_'::text || nextval('public.pathways_id_seq'::regclass)) NOT NULL,
+        "title" varchar(250) NOT NULL,
+        "slug" varchar(280) NOT NULL,
+        "short_description" varchar(500),
+        "description" text,
+        "price_paise" bigint DEFAULT 0 NOT NULL,
+        "status" "public"."pathway_status" DEFAULT 'DRAFT' NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_pathways_slug" ON "public"."pathways" ("slug");
+    `);
+
     await execSqlSafe("courses_alterations", `
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "short_description" varchar(500);
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "price_paise" bigint DEFAULT 0 NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "mrp_paise" bigint DEFAULT 0 NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
@@ -960,7 +981,7 @@ export async function initializeDatabase() {
 
       CREATE TABLE IF NOT EXISTS "public"."submissions" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('sub_'::text || gen_random_uuid()),
-        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "user_id" uuid NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
         "lesson_id" varchar(50),
         "assignment_id" varchar(50),
         "pathway_id" varchar(50),
@@ -996,7 +1017,7 @@ export async function initializeDatabase() {
 
       CREATE TABLE IF NOT EXISTS "public"."notes" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('note_'::text || gen_random_uuid()),
-        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "user_id" uuid NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
         "pathway_id" varchar(100) NOT NULL,
         "lesson_id" varchar(100),
         "lesson_title" varchar(255),

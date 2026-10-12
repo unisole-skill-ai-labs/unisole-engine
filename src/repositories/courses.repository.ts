@@ -1,4 +1,4 @@
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   courses, Course, NewCourse,
@@ -184,7 +184,7 @@ export const coursesRepository = {
         status: modules.status,
       })
       .from(courseModules)
-      .leftJoin(modules, eq(courseModules.moduleId, modules.id))
+      .leftJoin(modules, sql`${courseModules.moduleId}::text = ${modules.id}::text`)
       .where(eq(courseModules.courseId, courseId))
       .orderBy(asc(courseModules.position));
     return rows;

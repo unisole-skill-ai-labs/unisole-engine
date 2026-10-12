@@ -77,17 +77,20 @@ export const authService = {
     }
 
     const cleanLower = loginIdentifier.toLowerCase();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(loginIdentifier);
+    const whereConditions = [
+      sql`LOWER(${users.username}) = ${cleanLower}`,
+      eq(users.phone, loginIdentifier),
+      eq(users.phone, `+91${loginIdentifier.slice(-10)}`),
+    ];
+    if (isUuid) {
+      whereConditions.push(eq(users.id, loginIdentifier));
+    }
+
     const rows = await db
       .select()
       .from(users)
-      .where(
-        or(
-          sql`LOWER(${users.username}) = ${cleanLower}`,
-          eq(users.phone, loginIdentifier),
-          eq(users.phone, `+91${loginIdentifier.slice(-10)}`),
-          eq(users.id, loginIdentifier)
-        )
-      )
+      .where(or(...whereConditions))
       .limit(1);
 
     const user = rows[0];

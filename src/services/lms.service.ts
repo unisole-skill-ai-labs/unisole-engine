@@ -141,20 +141,29 @@ export const lmsService = {
           expiresAt: enrollments.expiresAt,
           status: enrollments.status,
           pathway: pathways,
+          course: courses,
         })
         .from(enrollments)
         .leftJoin(
           pathways,
           or(
-            eq(enrollments.pathwayId, pathways.id),
-            eq(enrollments.itemId, pathways.id),
-            eq(enrollments.pathwayId, pathways.slug),
-            eq(enrollments.itemId, pathways.slug)
+            sql`${enrollments.pathwayId}::text = ${pathways.id}::text`,
+            sql`${enrollments.itemId}::text = ${pathways.id}::text`,
+            sql`${enrollments.pathwayId}::text = ${pathways.slug}::text`,
+            sql`${enrollments.itemId}::text = ${pathways.slug}::text`
+          )
+        )
+        .leftJoin(
+          courses,
+          or(
+            sql`${enrollments.itemId}::text = ${courses.id}::text`,
+            sql`${enrollments.pathwayId}::text = ${courses.id}::text`,
+            sql`${enrollments.itemId}::text = ${courses.slug}::text`
           )
         )
         .where(
           and(
-            eq(enrollments.userId, userId),
+            sql`${enrollments.userId}::text = ${userId}::text`,
             eq(enrollments.status, "ACTIVE")
           )
         );
@@ -217,6 +226,28 @@ export const lmsService = {
     }
 
     return activeEnrollments.map((enr) => {
+      if (enr.course) {
+        return {
+          enrollmentId: enr.enrollmentId,
+          enrolledAt: enr.enrolledAt,
+          expiresAt: enr.expiresAt,
+          status: enr.status,
+          pathway: {
+            id: enr.course.id,
+            title: enr.course.title,
+            description: enr.course.description || enr.course.shortDescription || "Curriculum, Labs & Projects",
+            slug: enr.course.slug,
+            duration: "Self-Paced Track",
+            level: "Intermediate",
+            isActive: enr.course.isActive,
+            isPublic: true,
+            pricePaise: enr.course.pricePaise || 0,
+            createdAt: enr.course.createdAt,
+            updatedAt: enr.course.updatedAt,
+          },
+        };
+      }
+
       if (enr.pathway) {
         return {
           enrollmentId: enr.enrollmentId,
@@ -276,6 +307,34 @@ export const lmsService = {
 
     let pathway: any = pathwayRows[0];
     if (!pathway) {
+      try {
+        const courseRows = await db
+          .select()
+          .from(courses)
+          .where(or(sql`${courses.id}::text = ${pathwayId}::text`, eq(courses.slug, pathwayId)))
+          .limit(1);
+        if (courseRows[0]) {
+          const c = courseRows[0];
+          pathway = {
+            id: c.id,
+            title: c.title,
+            slug: c.slug,
+            description: c.description || c.shortDescription || "Curriculum, Labs & Projects",
+            duration: "Self-Paced Track",
+            level: "Intermediate",
+            isActive: c.isActive,
+            isPublic: true,
+            pricePaise: c.pricePaise || 0,
+            createdAt: c.createdAt,
+            updatedAt: c.updatedAt,
+          };
+        }
+      } catch (err) {
+        console.warn("[LMSService] Course lookup fallback in getPathwayContent:", err);
+      }
+    }
+
+    if (!pathway) {
       const canon = getCanonicalPathway(pathwayId);
       if (canon) {
         pathway = {
@@ -304,15 +363,15 @@ export const lmsService = {
           .from(enrollments)
           .where(
             and(
-              eq(enrollments.userId, userId),
+              sql`${enrollments.userId}::text = ${userId}::text`,
               eq(enrollments.status, "ACTIVE"),
               or(
-                eq(enrollments.pathwayId, pathwayId),
-                eq(enrollments.itemId, pathwayId),
-                eq(enrollments.pathwayId, pathway.id),
-                eq(enrollments.itemId, pathway.id),
-                eq(enrollments.pathwayId, pathway.slug),
-                eq(enrollments.itemId, pathway.slug)
+                sql`${enrollments.pathwayId}::text = ${pathwayId}::text`,
+                sql`${enrollments.itemId}::text = ${pathwayId}::text`,
+                sql`${enrollments.pathwayId}::text = ${pathway.id}::text`,
+                sql`${enrollments.itemId}::text = ${pathway.id}::text`,
+                sql`${enrollments.pathwayId}::text = ${pathway.slug}::text`,
+                sql`${enrollments.itemId}::text = ${pathway.slug}::text`
               )
             )
           )
@@ -352,11 +411,28 @@ export const lmsService = {
           course: courses,
         })
         .from(pathwayCourses)
-        .innerJoin(courses, eq(pathwayCourses.courseId, courses.id))
-        .where(or(eq(pathwayCourses.pathwayId, pathway.id), eq(pathwayCourses.pathwayId, pathway.slug)))
+        .innerJoin(courses, sql`${pathwayCourses.courseId}::text = ${courses.id}::text`)
+        .where(or(
+          sql`${pathwayCourses.pathwayId}::text = ${pathway.id}::text`,
+          sql`${pathwayCourses.pathwayId}::text = ${pathway.slug}::text`
+        ))
         .orderBy(asc(pathwayCourses.position));
     } catch {
       // In offline DB, linkedCourses will be empty, triggering synthetic canon modules below
+    }
+
+    // If this is a standalone course, directly attach it as the single course
+    if (linkedCourses.length === 0) {
+      try {
+        const directCourse = await db
+          .select()
+          .from(courses)
+          .where(or(sql`${courses.id}::text = ${pathway.id}::text`, eq(courses.slug, pathway.slug)))
+          .limit(1);
+        if (directCourse[0]) {
+          linkedCourses = [{ position: 1, course: directCourse[0] }];
+        }
+      } catch {}
     }
 
     const courseList: any[] = [];
@@ -369,8 +445,8 @@ export const lmsService = {
           module: modules,
         })
         .from(courseModules)
-        .innerJoin(modules, eq(courseModules.moduleId, modules.id))
-        .where(eq(courseModules.courseId, course.id))
+        .innerJoin(modules, sql`${courseModules.moduleId}::text = ${modules.id}::text`)
+        .where(sql`${courseModules.courseId}::text = ${course.id}::text`)
         .orderBy(asc(courseModules.position));
 
       const moduleList: any[] = [];
@@ -383,8 +459,8 @@ export const lmsService = {
             lesson: lessons,
           })
           .from(moduleLessons)
-          .innerJoin(lessons, eq(moduleLessons.lessonId, lessons.id))
-          .where(eq(moduleLessons.moduleId, mod.id))
+          .innerJoin(lessons, sql`${moduleLessons.lessonId}::text = ${lessons.id}::text`)
+          .where(sql`${moduleLessons.moduleId}::text = ${mod.id}::text`)
           .orderBy(asc(moduleLessons.position));
 
         moduleList.push({
@@ -413,13 +489,22 @@ export const lmsService = {
               parsedContent?.type === "QUIZ" ||
               parsedContent?.practiceType === "MCQ" ||
               lesson.id.includes("_quiz") ||
-              lesson.slug?.includes("quiz");
+              lesson.slug?.includes("quiz") ||
+              lesson.title?.toLowerCase().includes("quiz") ||
+              lesson.title?.toLowerCase().includes("knowledge check");
             const isAssignmentItem =
               parsedContent?.type === "ASSIGNMENT" ||
               parsedContent?.practiceType === "PROJECT" ||
               parsedContent?.testType === "PROJECT" ||
               lesson.id.includes("_lab") ||
-              lesson.id.includes("_cap");
+              lesson.id.includes("_cap") ||
+              lesson.slug?.includes("task") ||
+              lesson.slug?.includes("assignment") ||
+              lesson.slug?.includes("capstone") ||
+              lesson.title?.toLowerCase().includes("capstone") ||
+              lesson.title?.toLowerCase().includes("task") ||
+              lesson.title?.toLowerCase().includes("assignment") ||
+              lesson.title?.toLowerCase().includes("lab");
 
             const isFolder =
               parsedContent?.type === "FOLDER" ||
@@ -447,6 +532,9 @@ export const lmsService = {
             } else if (isAssignmentItem) {
               computedType = "assignment";
               computedCategory = parsedContent?.category || (parsedContent?.testType ? "TEST" : "PRACTICE");
+            } else if (!lesson.videoUrl && lesson.content) {
+              computedType = "reading";
+              computedCategory = "LECTURE";
             }
 
             return {
@@ -458,7 +546,9 @@ export const lmsService = {
               videoUrl:
                 lesson.videoUrl ||
                 parsedContent?.videoUrl ||
-                "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
+                (computedType === "video"
+                  ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1"
+                  : null),
               content: lesson.content,
               contentType: computedType.toUpperCase(),
               type: computedType,
