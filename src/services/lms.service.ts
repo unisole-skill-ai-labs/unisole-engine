@@ -891,14 +891,18 @@ export const lmsService = {
 
     const completedLessonIds = new Set(progress.completedLessonIds);
 
-    const completedList: any[] = [];
+    const missedList: any[] = [];
     const upcomingList: any[] = [];
+    const completedList: any[] = [];
 
     const monthNames = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
     const now = new Date();
+
+    let primaryCourseTitle = "AI Agent Engineering: From Fundamentals to Production";
+    let primaryPathwayId = "cs-agentic";
 
     for (const enr of accessible) {
       const pathwayId = enr.pathway?.id || enr.pathway?.slug;
@@ -912,30 +916,46 @@ export const lmsService = {
       }
 
       const coursesList = content?.courses || [];
-      const courseTitle = content?.pathway?.title || enr.pathway?.title || "Pathway Course";
+      const courseTitle = content?.courses?.[0]?.title || content?.pathway?.title || enr.pathway?.title || "AI Agent Engineering";
+      if (courseTitle && !primaryCourseTitle) {
+        primaryCourseTitle = courseTitle;
+        primaryPathwayId = pathwayId;
+      } else if (pathwayId === "cs-agentic" || pathwayId === "course1") {
+        primaryCourseTitle = courseTitle;
+        primaryPathwayId = pathwayId;
+      }
 
-      for (const crs of coursesList) {
+    const seenLessonIds = new Set<string>();
+
+    for (const crs of coursesList) {
         const mods = crs.modules || [];
         mods.forEach((mod: any, mIdx: number) => {
           const modLessons = mod.lessons || [];
           modLessons.forEach((les: any, lIdx: number) => {
+            if (seenLessonIds.has(les.id)) return;
+            seenLessonIds.add(les.id);
+
             const isQuiz = les.contentType === "QUIZ" || les.id?.includes("_quiz");
             const isAssignment =
               les.contentType === "ASSIGNMENT" ||
               les.id?.includes("_lab") ||
               les.id?.includes("_cap") ||
               les.id?.includes("milestone");
-
-            if (!isQuiz && !isAssignment) return;
+            const isLive = les.contentType === "LIVE" || les.id?.includes("_live");
+            const isLecture = !isQuiz && !isAssignment && !isLive;
 
             const existingSub = studentSubmissions.find((s) => s.lessonId === les.id);
             const isDone = completedLessonIds.has(les.id) || !!existingSub;
 
             const category = isQuiz
               ? "Graded Quiz"
-              : les.title?.toLowerCase().includes("capstone")
-              ? "Capstone"
-              : "Hands-on Lab";
+              : isAssignment
+              ? les.title?.toLowerCase().includes("capstone")
+                ? "Capstone Project"
+                : "Hands-on Lab"
+              : isLive
+              ? "Live Class"
+              : "Video Lecture";
 
             // If completed, add to completedList
             if (isDone) {
@@ -949,42 +969,88 @@ export const lmsService = {
                 id: `act-${les.id}`,
                 lessonId: les.id,
                 pathwayId,
-                type: isQuiz ? "quiz" : "assignment",
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
                 category,
                 course: courseTitle,
+                moduleTitle: mod.title,
                 title: les.title,
-                datePrefix: isQuiz ? "Completed" : "Submitted",
+                datePrefix: isQuiz ? "Completed" : isAssignment ? "Submitted" : "Watched",
                 date: `${day} ${monthShort} ${yr} ${time}`,
                 statusText: isQuiz
                   ? `Marks: ${existingSub?.score !== null && existingSub?.score !== undefined ? existingSub.score : 10}/10`
                   : existingSub?.status === "APPROVED"
                   ? "Evaluation Complete"
-                  : "Evaluation Pending",
+                  : "Completed",
               });
-            } else {
-              // Upcoming activity: calculate target week deadline
-              const targetDate = new Date(now.getTime() + (mIdx * 7 + 4) * 24 * 60 * 60 * 1000);
-              const day = String(targetDate.getDate()).padStart(2, "0");
-              const monthShort = targetDate.toLocaleString("default", { month: "short" });
-              const yr = String(targetDate.getFullYear()).slice(-2);
-              const monthFull = monthNames[targetDate.getMonth()];
-              const groupKey = `${monthFull} ${targetDate.getFullYear()}`;
-
+            } else if (mIdx === 0) {
+              // Week 1 (Past week) - Uncompleted lessons, quizzes, or assignments are MISSED
+              missedList.push({
+                id: `act-missed-${les.id}`,
+                lessonId: les.id,
+                pathwayId,
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
+                category,
+                course: courseTitle,
+                moduleTitle: mod.title,
+                title: les.title,
+                dateText: isQuiz
+                  ? "Missed deadline: 09 Oct 2026"
+                  : isAssignment
+                  ? "Missed deadline: 11 Oct 2026"
+                  : "Missed schedule: 07 Oct 2026",
+                status: "MISSED",
+                isOverdue: true,
+                actionText: isQuiz ? "Take Quiz" : isAssignment ? "Submit Lab" : "Watch Lecture",
+              });
+            } else if (mIdx === 1) {
+              // Week 2 (Current week) - UPCOMING
               upcomingList.push({
                 id: `act-up-${les.id}`,
                 lessonId: les.id,
                 pathwayId,
-                type: isQuiz ? "quiz" : "assignment",
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
                 category,
                 course: courseTitle,
+                moduleTitle: mod.title,
                 title: les.title,
-                dateText: isQuiz
-                  ? `${day} ${monthShort} ${yr} 12:00 AM - ${day} ${monthShort} ${yr} 11:59 PM`
-                  : `Due: ${day} ${monthShort} ${yr} 11:59 PM`,
-                isUrgent: mIdx <= 1,
-                iconStyle: isQuiz ? "crimson" : mIdx <= 1 ? "crimson" : "rose",
-                monthGroup: groupKey,
-                sortTime: targetDate.getTime(),
+                dateText: isLive
+                  ? "Today • 6:00 PM – 7:30 PM IST"
+                  : isQuiz
+                  ? "Due Tonight • 11:59 PM"
+                  : isAssignment
+                  ? "Due Friday • 11:59 PM"
+                  : "Target: Today / This Week",
+                status: "UPCOMING",
+                isToday: isLive || isQuiz,
+                isUrgent: isQuiz || isAssignment,
+                meetUrl: isLive ? "https://meet.google.com/uni-sole-live" : undefined,
+                actionText: isLive ? "Join Live Class" : isQuiz ? "Start Quiz" : isAssignment ? "Start Lab" : "Watch Now",
+                sortTime: isLive ? now.getTime() + 1000 : isQuiz ? now.getTime() + 2000 : now.getTime() + 5000,
+                monthGroup: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+              });
+            } else if (mIdx === 2) {
+              // Week 3 - UPCOMING
+              upcomingList.push({
+                id: `act-up-${les.id}`,
+                lessonId: les.id,
+                pathwayId,
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
+                category,
+                course: courseTitle,
+                moduleTitle: mod.title,
+                title: les.title,
+                dateText: isLive
+                  ? "Saturday • 6:00 PM – 8:00 PM IST"
+                  : isQuiz
+                  ? "Due Sunday • 11:59 PM"
+                  : "Upcoming Next Week",
+                status: "UPCOMING",
+                isToday: false,
+                isUrgent: false,
+                meetUrl: isLive ? "https://meet.google.com/uni-sole-live" : undefined,
+                actionText: isLive ? "Join Workshop" : isQuiz ? "View Quiz" : "Preview",
+                sortTime: now.getTime() + 7 * 24 * 60 * 60 * 1000,
+                monthGroup: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
               });
             }
           });
@@ -992,14 +1058,52 @@ export const lmsService = {
       }
     }
 
-    // Group upcoming by month
-    upcomingList.sort((a, b) => a.sortTime - b.sortTime);
+    // Query live calendar events from DB to enrich upcoming activities
+    try {
+      const calRes = await db.execute<any>(sql`
+        SELECT * FROM calendar_events
+        WHERE scope = 'GLOBAL' OR course_id = 'cs-agentic' OR course_id = 'course1'
+        ORDER BY start_time ASC;
+      `);
+      const calRows = calRes.rows || calRes;
+      if (Array.isArray(calRows)) {
+        calRows.forEach((cev: any) => {
+          const isTodayEv = cev.id.includes("today") || (cev.start_time && new Date(cev.start_time).toDateString() === now.toDateString());
+          if (!upcomingList.some((u) => u.lessonId === cev.lesson_id || u.title === cev.title)) {
+            upcomingList.push({
+              id: `act-cal-${cev.id}`,
+              lessonId: cev.lesson_id || cev.id,
+              pathwayId: primaryPathwayId,
+              type: cev.event_type === "LIVE_CLASS" ? "live" : cev.event_type === "MILESTONE" ? "quiz" : "assignment",
+              category: cev.event_type === "LIVE_CLASS" ? "Live Class" : cev.event_type === "MILESTONE" ? "Graded Quiz" : "Hands-on Lab",
+              course: primaryCourseTitle,
+              moduleTitle: "AI Agent Engineering Live",
+              title: cev.title,
+              dateText: isTodayEv ? "Today • " + new Date(cev.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : new Date(cev.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+              status: "UPCOMING",
+              isToday: isTodayEv,
+              isUrgent: isTodayEv,
+              meetUrl: cev.meet_url,
+              actionText: cev.event_type === "LIVE_CLASS" ? "Join Live Class" : cev.event_type === "MILESTONE" ? "Take Quiz" : "View Lab",
+              sortTime: cev.start_time ? new Date(cev.start_time).getTime() : now.getTime(),
+              monthGroup: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+            });
+          }
+        });
+      }
+    } catch (calErr) {
+      console.warn("[LMSService] Calendar enrichment notice:", calErr);
+    }
+
+    // Group upcoming by month for backwards compatibility
+    upcomingList.sort((a, b) => (a.sortTime || 0) - (b.sortTime || 0));
     const monthGroupsMap: Record<string, any[]> = {};
     for (const item of upcomingList) {
-      if (!monthGroupsMap[item.monthGroup]) {
-        monthGroupsMap[item.monthGroup] = [];
+      const g = item.monthGroup || `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      if (!monthGroupsMap[g]) {
+        monthGroupsMap[g] = [];
       }
-      monthGroupsMap[item.monthGroup].push(item);
+      monthGroupsMap[g].push(item);
     }
 
     const scheduled = Object.entries(monthGroupsMap).map(([month, items]) => ({
@@ -1008,8 +1112,12 @@ export const lmsService = {
     }));
 
     return {
-      scheduled,
+      courseName: primaryCourseTitle,
+      pathwayId: primaryPathwayId,
+      missed: missedList,
+      upcoming: upcomingList,
       completed: completedList,
+      scheduled,
     };
   },
 
