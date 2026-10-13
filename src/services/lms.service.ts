@@ -25,6 +25,18 @@ import { ForbiddenError, NotFoundError } from "../errors";
 import { getCanonicalPathway, CANONICAL_GROUPS } from "../constants/canonical-catalog";
 
 const PATHWAY_CATALOG: Record<string, { title: string; description: string; duration: string; level: string }> = {
+  "cs-agentic": {
+    title: "AI Agent Engineering",
+    description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+    duration: "12 Weeks (132 Hours)",
+    level: "Production AI Agent Engineering",
+  },
+  "course1": {
+    title: "AI Agent Engineering",
+    description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+    duration: "12 Weeks (132 Hours)",
+    level: "Production AI Agent Engineering",
+  },
   "cs-p1": {
     title: "Machine Learning Engineering in Production",
     description: "Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.",
@@ -171,18 +183,31 @@ export const lmsService = {
       console.warn("[LMSService] DB offline or query issue in getAccessiblePathways, using fallback enrollments:", dbErr);
     }
 
-    if (activeEnrollments.length === 0) {
-      // In staging/preview or offline DB, provide immediate access to Flagship tracks
-      const flagshipIds = ["cs-genai", "cs-common"];
+    // Filter active enrollments to ONLY AI Agent Engineering
+    const agenticEnrollments = activeEnrollments.filter((enr) => {
+      const slug = enr.course?.slug || enr.pathway?.slug || enr.itemId || enr.pathwayId || "";
+      const title = enr.course?.title || enr.pathway?.title || "";
+      return slug === "cs-agentic" || slug === "course1" || title.toLowerCase().includes("ai agent");
+    });
+
+    if (agenticEnrollments.length === 0) {
+      // Auto-enroll user in the official AI Agent Engineering course
+      try {
+        await pool.query(
+          `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
+           VALUES ($1, $2, 'cs-agentic', 'PATHWAY', 'cs-agentic', 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
+           ON CONFLICT DO NOTHING`,
+          [`enr_${userId}_cs-agentic`, userId]
+        );
+      } catch {}
+
       let flagshipRows: any[] = [];
       try {
         flagshipRows = await db
           .select()
           .from(pathways)
-          .where(inArray(pathways.id, flagshipIds));
-      } catch {
-        // Fallback below
-      }
+          .where(or(eq(pathways.id, "cs-agentic"), eq(pathways.slug, "cs-agentic")));
+      } catch {}
 
       if (flagshipRows.length > 0) {
         return flagshipRows.map((pwy) => ({
@@ -194,38 +219,32 @@ export const lmsService = {
         }));
       }
 
-      // Offline in-memory fallback
-      return flagshipIds.map((targetId) => {
-        const canon = getCanonicalPathway(targetId);
-        const cat = PATHWAY_CATALOG[targetId] || {
-          title: canon?.title || "Generative AI Engineering",
-          description: canon?.description || "Verified academic training track.",
-          duration: canon?.duration || "12 Weeks (132 Hours)",
-          level: canon?.level || "Foundations to Agentic AI",
-        };
-        return {
-          enrollmentId: `enr_${targetId}_demo`,
+      // Live canonical AI Agent Engineering
+      const cat = PATHWAY_CATALOG["cs-agentic"];
+      return [
+        {
+          enrollmentId: `enr_cs-agentic_active`,
           enrolledAt: new Date().toISOString(),
           expiresAt: null,
           status: "ACTIVE" as const,
           pathway: {
-            id: targetId,
+            id: "cs-agentic",
             title: cat.title,
             description: cat.description,
-            slug: targetId,
+            slug: "cs-agentic",
             duration: cat.duration,
             level: cat.level,
             isActive: true,
             isPublic: true,
-            pricePaise: canon?.price ? canon.price * 100 : 299900,
+            pricePaise: 299900,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
-        };
-      });
+        },
+      ];
     }
 
-    return activeEnrollments.map((enr) => {
+    return agenticEnrollments.map((enr) => {
       if (enr.course) {
         return {
           enrollmentId: enr.enrollmentId,
@@ -235,13 +254,13 @@ export const lmsService = {
           pathway: {
             id: enr.course.id,
             title: enr.course.title,
-            description: enr.course.description || enr.course.shortDescription || "Curriculum, Labs & Projects",
+            description: enr.course.description || enr.course.shortDescription || "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
             slug: enr.course.slug,
-            duration: "Self-Paced Track",
-            level: "Intermediate",
+            duration: "12 Weeks (132 Hours)",
+            level: "Production AI Agent Engineering",
             isActive: enr.course.isActive,
             isPublic: true,
-            pricePaise: enr.course.pricePaise || 0,
+            pricePaise: enr.course.pricePaise || 299900,
             createdAt: enr.course.createdAt,
             updatedAt: enr.course.updatedAt,
           },
@@ -258,30 +277,22 @@ export const lmsService = {
         };
       }
 
-      const targetId = enr.itemId || enr.pathwayId || "cs-genai";
-      const canon = getCanonicalPathway(targetId);
-      const cat = PATHWAY_CATALOG[targetId] || {
-        title: canon?.title || "Generative AI Engineering",
-        description: canon?.description || "Verified academic training track.",
-        duration: canon?.duration || "12 Weeks (132 Hours)",
-        level: canon?.level || "Foundations to Agentic AI",
-      };
-
+      const cat = PATHWAY_CATALOG["cs-agentic"];
       return {
         enrollmentId: enr.enrollmentId,
         enrolledAt: enr.enrolledAt,
         expiresAt: enr.expiresAt,
         status: enr.status,
         pathway: {
-          id: targetId,
+          id: "cs-agentic",
           title: cat.title,
           description: cat.description,
-          slug: targetId,
+          slug: "cs-agentic",
           duration: cat.duration,
           level: cat.level,
           isActive: true,
           isPublic: true,
-          pricePaise: canon?.price ? canon.price * 100 : 299900,
+          pricePaise: 299900,
           createdAt: enr.enrolledAt,
           updatedAt: enr.enrolledAt,
         },
@@ -381,23 +392,18 @@ export const lmsService = {
       }
 
       if (activeEnrollment.length === 0) {
-        const isFlagship = ["cs-genai", "cs-common", "pwy_cs-genai", "pwy_cs-common"].includes(pathway.id) ||
-          ["cs-genai", "cs-common"].includes(pathwayId);
-        if (isFlagship) {
-          try {
-            await db.insert(enrollments).values({
-              userId,
-              itemType: "PATHWAY",
-              itemId: pathway.id,
-              pathwayId: pathway.id,
-              status: "ACTIVE",
-              enrolledAt: new Date().toISOString(),
-            }).onConflictDoNothing();
-          } catch (autoErr) {
-            console.warn("[LMS] Auto-enrollment info:", autoErr);
-          }
-        } else {
-          throw new ForbiddenError("You are not enrolled in this pathway");
+        // Auto-enroll user into AI Agent Engineering pathway so every LMS user has immediate access
+        try {
+          await db.insert(enrollments).values({
+            userId,
+            itemType: "PATHWAY",
+            itemId: pathway.id,
+            pathwayId: pathway.id,
+            status: "ACTIVE",
+            enrolledAt: new Date().toISOString(),
+          }).onConflictDoNothing();
+        } catch (autoErr) {
+          console.warn("[LMS] Auto-enrollment info:", autoErr);
         }
       }
     }

@@ -60,7 +60,9 @@ export const pathwaysService = {
       console.warn("[PATHWAYS-SYNC] Non-critical warning cleaning legacy courses/modules:", cleanErr);
     }
 
-    const pathwaysToSync = CANONICAL_SEO_OFFERINGS.filter((o) => o.itemType === "PATHWAY");
+    const pathwaysToSync = CANONICAL_SEO_OFFERINGS.filter(
+      (o) => o.itemType === "PATHWAY" && (o.itemId === "cs-agentic" || o.slug === "cs-agentic")
+    );
 
     for (const offering of pathwaysToSync) {
       // 1. Upsert Pathway

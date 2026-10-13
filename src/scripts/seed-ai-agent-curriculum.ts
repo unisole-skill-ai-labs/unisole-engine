@@ -612,6 +612,24 @@ export const WEEKS_DATA = [
 export async function seedAiAgentCurriculum() {
   console.log("[Seed:AI-Agent] Starting official 12-week AI Agent Engineering curriculum database sync...");
 
+  // 0. PURGE ALL OTHER COURSES & PATHWAYS FROM DB
+  try {
+    console.log("[Seed:AI-Agent] Purging non-AI-Agent courses and pathways from DB...");
+    await pool.query(`DELETE FROM pathway_categories WHERE pathway_id NOT IN ('cs-agentic', 'course1')`);
+    await pool.query(`DELETE FROM pathway_colleges WHERE pathway_id NOT IN ('cs-agentic', 'course1')`);
+    await pool.query(`DELETE FROM pathway_courses WHERE pathway_id NOT IN ('cs-agentic', 'course1') AND course_id NOT IN ('cs-agentic', 'course1')`);
+    await pool.query(`DELETE FROM course_modules WHERE course_id NOT IN ('cs-agentic', 'course1')`);
+    await pool.query(`DELETE FROM module_lessons WHERE lesson_id NOT LIKE 'les_agent_%'`);
+    await pool.query(`DELETE FROM lessons WHERE id NOT LIKE 'les_agent_%'`);
+    await pool.query(`DELETE FROM modules WHERE course_id NOT IN ('cs-agentic', 'course1') AND course_id IS NOT NULL`);
+    await pool.query(`DELETE FROM enrollments WHERE pathway_id NOT IN ('cs-agentic', 'course1') AND item_id NOT IN ('cs-agentic', 'course1')`);
+    await pool.query(`DELETE FROM courses WHERE id NOT IN ('cs-agentic', 'course1') AND slug NOT IN ('cs-agentic', 'course1')`);
+    await pool.query(`DELETE FROM pathways WHERE id NOT IN ('cs-agentic', 'course1') AND slug NOT IN ('cs-agentic', 'course1')`);
+    console.log("[Seed:AI-Agent] Successfully purged non-AI-Agent courses and legacy content.");
+  } catch (cleanErr) {
+    console.warn("[Seed:AI-Agent] Notice during cleanup of legacy courses:", cleanErr);
+  }
+
   // 1. Upsert Pathway entries: 'cs-agentic' and 'course1'
   const pathwayEntries = [
     {
@@ -664,21 +682,41 @@ export async function seedAiAgentCurriculum() {
        SET title = 'AI Agent Engineering',
            slug = 'cs-agentic',
            short_description = '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)',
+           description = 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.',
            status = 'PUBLISHED',
            is_active = TRUE,
+           price_paise = 299900,
+           mrp_paise = 999900,
+           metadata = '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb,
            updated_at = NOW()
        WHERE id = $1`,
       [courseId]
     );
   } else {
-    courseId = crypto.randomUUID();
+    courseId = "cs-agentic";
     await pool.query(
-      `INSERT INTO courses (id, title, slug, short_description, description, status, is_active, price_paise, mrp_paise, created_at, updated_at)
-       VALUES ($1, 'AI Agent Engineering', 'cs-agentic', '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)', 'Production AI Agent Engineering curriculum', 'PUBLISHED', TRUE, 299900, 999900, NOW(), NOW())`,
+      `INSERT INTO courses (id, title, slug, short_description, description, status, is_active, price_paise, mrp_paise, metadata, created_at, updated_at)
+       VALUES ($1, 'AI Agent Engineering', 'cs-agentic', '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 'PUBLISHED', TRUE, 299900, 999900, '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb, NOW(), NOW())
+       ON CONFLICT (id) DO UPDATE
+       SET title = EXCLUDED.title, slug = EXCLUDED.slug, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
       [courseId]
     );
   }
   console.log(`[Seed:AI-Agent] Using course ID: ${courseId}`);
+
+  // Link pathway_courses
+  await pool.query(
+    `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
+     VALUES ('cs-agentic', $1, 1, NOW())
+     ON CONFLICT DO NOTHING`,
+    [courseId]
+  );
+  await pool.query(
+    `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
+     VALUES ('course1', $1, 1, NOW())
+     ON CONFLICT DO NOTHING`,
+    [courseId]
+  );
 
   // 3. For each week, create/update Module and 4 Lessons
   for (const week of WEEKS_DATA) {
@@ -831,18 +869,23 @@ export async function seedAiAgentCurriculum() {
     }
   }
 
-  // 4. Ensure demo student and any enrolled users have active enrollment for cs-agentic and course1
-  const allUsers = await pool.query(`SELECT id FROM users LIMIT 50`);
-  for (const u of allUsers.rows) {
-    for (const pwyId of ["cs-agentic", "course1"]) {
-      const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
-      await pool.query(
-        `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
-         VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
-         ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'`,
-        [enrId, u.id, pwyId]
-      );
+  // 4. Ensure ALL users in DB have active enrollment for cs-agentic and course1
+  try {
+    const allUsers = await pool.query(`SELECT id FROM users`);
+    for (const u of allUsers.rows) {
+      for (const pwyId of ["cs-agentic", "course1"]) {
+        const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
+        await pool.query(
+          `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
+           VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
+           ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'`,
+          [enrId, u.id, pwyId]
+        );
+      }
     }
+    console.log(`[Seed:AI-Agent] Verified active enrollments for ${allUsers.rows?.length || 0} users.`);
+  } catch (enrErr) {
+    console.warn("[Seed:AI-Agent] Note on user auto-enrollment:", enrErr);
   }
 
   console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons (Lectures, Quizzes, Labs, Live sessions) into PostgreSQL!`);

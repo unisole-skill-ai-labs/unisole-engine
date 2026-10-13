@@ -79,8 +79,6 @@ export async function seedLmsDemoData() {
 
     // 3. Link Pathways to Categories
     const pathwayCatLinks = [
-      { pathwayId: "cs-genai", categoryId: "cat_cs_ai" },
-      { pathwayId: "cs-common", categoryId: "cat_biz_ai" },
       { pathwayId: "cs-agentic", categoryId: "cat_cs_ai" },
     ];
 
@@ -128,23 +126,14 @@ export async function seedLmsDemoData() {
     const studentId = studentUserRes.rows[0]?.id || "usr_demo_aarav_sharma";
     console.log(`[Seed:LMS] Synchronized Demo Student user: Aarav Sharma (${studentId})`);
 
-    // 5. Enroll Demo Student in cs-genai and cs-common
+    // 5. Enroll Demo Student in cs-agentic
     const enrollmentsToSeed = [
       {
-        id: `enr_${studentId}_cs-genai`,
+        id: `enr_${studentId}_cs-agentic`,
         userId: studentId,
-        pathwayId: "cs-genai",
+        pathwayId: "cs-agentic",
         itemType: "PATHWAY" as const,
-        itemId: "cs-genai",
-        status: "ACTIVE" as const,
-        source: "PURCHASE" as const,
-      },
-      {
-        id: `enr_${studentId}_cs-common`,
-        userId: studentId,
-        pathwayId: "cs-common",
-        itemType: "PATHWAY" as const,
-        itemId: "cs-common",
+        itemId: "cs-agentic",
         status: "ACTIVE" as const,
         source: "CAMPUS_SPONSORED" as const,
       },
@@ -163,7 +152,7 @@ export async function seedLmsDemoData() {
         console.warn(`[Seed:LMS] Enrollment note for ${enr.pathwayId}:`, e);
       }
     }
-    console.log(`[Seed:LMS] Enrolled Aarav Sharma in cs-genai and cs-common.`);
+    console.log(`[Seed:LMS] Enrolled Aarav Sharma in cs-agentic.`);
 
     // 6. Seed Initial Completed Lesson & Submissions
     // 6a. Lesson progress for Lesson 1
@@ -173,7 +162,7 @@ export async function seedLmsDemoData() {
          VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW())
          ON CONFLICT (user_id, lesson_id) DO UPDATE
          SET is_completed = TRUE`,
-        [`prog_${studentId}_cs-genai_1_1`, studentId, "cs-genai_1_1", "cs-genai"]
+        [`prog_${studentId}_cs-agentic_1`, studentId, "les_agent_w1_lec", "cs-agentic"]
       );
     } catch {
       // Non-critical
