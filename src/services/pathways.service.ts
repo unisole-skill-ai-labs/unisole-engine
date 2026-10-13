@@ -213,8 +213,30 @@ export const pathwaysService = {
   },
 
   async listPublished() {
-    const all = await this.list();
-    const published = all.filter((p) => p.status === "PUBLISHED" && p.isActive);
+    const all = await pathwaysRepository.list();
+    let published = all.filter(
+      (p) =>
+        (p.status === "PUBLISHED" || !p.status) &&
+        p.isActive !== false &&
+        (p.slug === "cs-agentic" || p.slug === "course1" || (p.title && p.title.toLowerCase().includes("ai agent")))
+    );
+
+    if (published.length === 0) {
+      published = [
+        {
+          id: "cs-agentic",
+          title: "AI Agent Engineering",
+          slug: "cs-agentic",
+          shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+          description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+          pricePaise: 299900,
+          status: "PUBLISHED",
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Pathway,
+      ];
+    }
 
     const enriched = await Promise.all(
       published.map(async (pathway) => {

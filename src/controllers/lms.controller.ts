@@ -12,14 +12,28 @@ export const lmsController = {
 
   getPathwayContent: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user!.id;
-    const isStaffOrMentor = ["ADMIN", "SUPER_ADMIN", "MENTOR", "MEMBER"].includes(req.user?.role || "");
+    const userRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean).map((r) => String(r).toUpperCase());
+    const isStaffOrMentor = userRoles.some((r) =>
+      ["ADMIN", "SUPER_ADMIN", "MENTOR", "MEMBER", "COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r)
+    );
     const pathwayContent = await lmsService.getPathwayContent(userId, req.params.id, isStaffOrMentor);
     res.json(pathwayContent);
   }),
 
   getLessonContent: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user!.id;
-    const isStaffOrMentor = ["ADMIN", "SUPER_ADMIN", "MENTOR", "MEMBER"].includes(req.user?.role || "");
+    const userRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean).map((r) => String(r).toUpperCase());
+    const isStaffOrMentor = userRoles.some((r) =>
+      ["ADMIN", "SUPER_ADMIN", "MENTOR", "MEMBER", "COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r)
+    );
     const lesson = await lmsService.getLessonContent(userId, req.params.id, isStaffOrMentor);
     res.json(lesson);
   }),
@@ -177,7 +191,12 @@ export const lmsController = {
 
   createCalendarEvent: asyncHandler(async (req: CustomRequest, res: Response) => {
     const callerUserId = req.user!.id;
-    const result = await lmsService.createCalendarEvent(callerUserId, req.body);
+    const callerRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean);
+    const result = await lmsService.createCalendarEvent(callerUserId, callerRoles, req.body);
     res.json(result);
   }),
 

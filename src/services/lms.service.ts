@@ -474,6 +474,7 @@ export const lmsService = {
       }
 
       const moduleList: any[] = [];
+      const nowMs = Date.now();
 
       for (const { position: modPos, module: mod } of linkedModules) {
         // Fetch linked lessons for this module
@@ -487,10 +488,30 @@ export const lmsService = {
           .where(sql`${moduleLessons.moduleId}::text = ${mod.id}::text`)
           .orderBy(asc(moduleLessons.position));
 
+        const modUnlockMs = mod.unlockAt ? new Date(mod.unlockAt).getTime() : null;
+        const modLockMs = mod.lockAt ? new Date(mod.lockAt).getTime() : null;
+
+        const isModUnlockPending = modUnlockMs !== null && modUnlockMs > nowMs;
+        const isModLockExpired = modLockMs !== null && modLockMs <= nowMs;
+        const isModScheduleLocked = isModUnlockPending || isModLockExpired;
+        const isModLocked = !isAdmin && isModScheduleLocked;
+
         moduleList.push({
           ...mod,
           position: modPos,
+          unlockAt: mod.unlockAt || null,
+          lockAt: mod.lockAt || null,
+          isLocked: isModLocked,
+          isScheduleLocked: isModScheduleLocked,
           lessons: linkedLessons.map(({ position: lesPos, lesson }) => {
+            const lesUnlockMs = lesson.unlockAt ? new Date(lesson.unlockAt).getTime() : null;
+            const lesLockMs = lesson.lockAt ? new Date(lesson.lockAt).getTime() : null;
+
+            const isLesUnlockPending = lesUnlockMs !== null && lesUnlockMs > nowMs;
+            const isLesLockExpired = lesLockMs !== null && lesLockMs <= nowMs;
+            const isLesScheduleLocked = isLesUnlockPending || isLesLockExpired || isModScheduleLocked;
+            const isLesLocked = !isAdmin && (isModLocked || isLesScheduleLocked);
+
             let parsedContent: any = null;
             try {
               if (lesson.content && lesson.content.startsWith("{")) {
@@ -579,32 +600,37 @@ export const lmsService = {
               id: lesson.id,
               title: lesson.title,
               slug: lesson.slug,
-              description: lesson.description || parsedContent?.contentMarkdown,
+              description: isLesLocked
+                ? "This activity is scheduled and locked until unlock time."
+                : lesson.description || parsedContent?.contentMarkdown,
               durationMinutes: lesson.durationMinutes,
-              videoUrl:
-                lesson.videoUrl ||
-                parsedContent?.videoUrl ||
-                (computedType === "video"
-                  ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1"
-                  : null),
-              content: lesson.content,
+              videoUrl: isLesLocked
+                ? null
+                : (lesson.videoUrl ||
+                    parsedContent?.videoUrl ||
+                    (computedType === "video"
+                      ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1"
+                      : null)),
+              content: isLesLocked ? null : lesson.content,
               contentType: computedType.toUpperCase(),
               type: computedType,
               category: computedCategory,
               isTest: computedCategory === "TEST",
               folderId: parsedContent?.folderId || null,
-              attachments: parsedContent?.attachments || [],
-              config:
-                parsedContent?.codingTest ||
-                parsedContent?.subjectiveTest ||
-                parsedContent?.videoTest ||
-                parsedContent?.assignment ||
-                parsedContent?.quiz,
-              questions: parsedContent?.quiz?.questions || parsedContent?.questions,
-              instructions:
-                parsedContent?.assignment?.instructions ||
-                parsedContent?.instructions ||
-                lesson.description,
+              attachments: isLesLocked ? [] : (parsedContent?.attachments || []),
+              config: isLesLocked
+                ? null
+                : (parsedContent?.codingTest ||
+                    parsedContent?.subjectiveTest ||
+                    parsedContent?.videoTest ||
+                    parsedContent?.assignment ||
+                    parsedContent?.quiz),
+              questions: isLesLocked ? [] : (parsedContent?.quiz?.questions || parsedContent?.questions),
+              instructions: isLesLocked
+                ? "Content is scheduled and locked."
+                : (parsedContent?.assignment?.instructions ||
+                    parsedContent?.instructions ||
+                    lesson.description),
               maxScore:
                 parsedContent?.maxScore ||
                 parsedContent?.assignment?.maxPoints ||
@@ -616,6 +642,10 @@ export const lmsService = {
               mentorName: parsedContent?.mentorName,
               status: lesson.status,
               position: lesPos,
+              unlockAt: lesson.unlockAt || mod.unlockAt || null,
+              lockAt: lesson.lockAt || mod.lockAt || null,
+              isLocked: isLesLocked,
+              isScheduleLocked: isLesScheduleLocked,
             };
           }),
         });
@@ -649,6 +679,39 @@ export const lmsService = {
       const lesson = lessonRows[0];
       if (isAdmin) {
         return lesson;
+      }
+
+      // Time lock enforcement for students
+      const nowMs = Date.now();
+      if (lesson.unlockAt && new Date(lesson.unlockAt).getTime() > nowMs) {
+        throw new ForbiddenError(
+          `This activity is scheduled and locked until ${new Date(lesson.unlockAt).toLocaleString()}`
+        );
+      }
+      if (lesson.lockAt && new Date(lesson.lockAt).getTime() <= nowMs) {
+        throw new ForbiddenError(
+          `This activity closed on ${new Date(lesson.lockAt).toLocaleString()}`
+        );
+      }
+
+      // Check parent module time lock
+      const parentModules = await db
+        .select({ unlockAt: modules.unlockAt, lockAt: modules.lockAt })
+        .from(moduleLessons)
+        .innerJoin(modules, sql`${moduleLessons.moduleId}::text = ${modules.id}::text`)
+        .where(sql`${moduleLessons.lessonId}::text = ${lessonId}::text`);
+
+      for (const pm of parentModules) {
+        if (pm.unlockAt && new Date(pm.unlockAt).getTime() > nowMs) {
+          throw new ForbiddenError(
+            `This module is scheduled and locked until ${new Date(pm.unlockAt).toLocaleString()}`
+          );
+        }
+        if (pm.lockAt && new Date(pm.lockAt).getTime() <= nowMs) {
+          throw new ForbiddenError(
+            `This module closed on ${new Date(pm.lockAt).toLocaleString()}`
+          );
+        }
       }
 
       // Check if user has active enrollment in this lesson's pathway
@@ -2801,20 +2864,34 @@ export const lmsService = {
     }
   },
 
-  async createCalendarEvent(callerUserId: string, data: {
-    title: string;
-    description?: string;
-    eventType?: string;
-    startTime: string;
-    endTime: string;
-    scope?: string;
-    courseId?: string;
-    lessonId?: string;
-    mentorId?: string;
-    studentId?: string;
-    meetUrl?: string;
-    colorScheme?: string;
-  }) {
+  async createCalendarEvent(
+    callerUserId: string,
+    arg2: string[] | any,
+    arg3?: any
+  ) {
+    const callerRoles: string[] = Array.isArray(arg2) ? arg2 : [];
+    const data: {
+      title: string;
+      description?: string;
+      eventType?: string;
+      startTime: string;
+      endTime: string;
+      scope?: string;
+      courseId?: string;
+      lessonId?: string;
+      mentorId?: string;
+      studentId?: string;
+      meetUrl?: string;
+      colorScheme?: string;
+    } = Array.isArray(arg2) ? arg3 : arg2;
+
+    const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
+    const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
+    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers and Admins can create calendar events");
+    }
+
     const id = `ev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const payload: any = {
       id,
@@ -2869,7 +2946,14 @@ export const lmsService = {
     };
   },
 
-  async updateCalendarEvent(id: string, callerUserId: string, callerRoles: string[], data: any) {
+  async updateCalendarEvent(id: string, callerUserId: string, callerRoles: string[] = [], data: any) {
+    const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
+    const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
+    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers and Admins can edit calendar events");
+    }
+
     const updatePayload: any = {
       ...data,
       updatedAt: new Date().toISOString(),
@@ -2893,7 +2977,14 @@ export const lmsService = {
     };
   },
 
-  async deleteCalendarEvent(id: string, callerUserId: string, callerRoles: string[]) {
+  async deleteCalendarEvent(id: string, callerUserId: string, callerRoles: string[] = []) {
+    const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
+    const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
+    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers and Admins can delete calendar events");
+    }
+
     const idx = inMemoryCalendarEvents.findIndex((e) => e.id === id);
     if (idx !== -1) {
       inMemoryCalendarEvents.splice(idx, 1);

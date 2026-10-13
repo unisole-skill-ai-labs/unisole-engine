@@ -14,7 +14,7 @@ export const lessonsService = {
   },
 
   async create(body: Record<string, unknown>): Promise<Lesson> {
-    const { title, slug, description, content, videoUrl, durationMinutes } = body as any;
+    const { title, slug, description, content, videoUrl, durationMinutes, unlockAt, lockAt } = body as any;
     if (!title || !slug) throw new ValidationError("title and slug are required");
 
     const existing = await lessonsRepository.getBySlug(slug);
@@ -27,6 +27,8 @@ export const lessonsService = {
       content: content || null,
       videoUrl: videoUrl || null,
       durationMinutes: durationMinutes ? Number(durationMinutes) : null,
+      unlockAt: unlockAt ? new Date(unlockAt).toISOString() : null,
+      lockAt: lockAt ? new Date(lockAt).toISOString() : null,
       status: "DRAFT",
     });
   },
@@ -42,6 +44,8 @@ export const lessonsService = {
     if (body.content !== undefined) data.content = body.content as string;
     if (body.videoUrl !== undefined) data.videoUrl = body.videoUrl as string;
     if (body.durationMinutes !== undefined) data.durationMinutes = Number(body.durationMinutes);
+    if (body.unlockAt !== undefined) data.unlockAt = body.unlockAt ? new Date(body.unlockAt as string).toISOString() : null;
+    if (body.lockAt !== undefined) data.lockAt = body.lockAt ? new Date(body.lockAt as string).toISOString() : null;
     if (body.status !== undefined) {
       const status = body.status as string;
       if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");

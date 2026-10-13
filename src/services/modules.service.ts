@@ -14,7 +14,7 @@ export const modulesService = {
   },
 
   async create(body: Record<string, unknown>): Promise<Module> {
-    const { title, slug, description } = body as any;
+    const { title, slug, description, unlockAt, lockAt } = body as any;
     if (!title || !slug) throw new ValidationError("title and slug are required");
 
     const existing = await modulesRepository.getBySlug(slug);
@@ -24,6 +24,8 @@ export const modulesService = {
       title,
       slug,
       description: description || null,
+      unlockAt: unlockAt ? new Date(unlockAt).toISOString() : null,
+      lockAt: lockAt ? new Date(lockAt).toISOString() : null,
       status: "DRAFT",
     });
   },
@@ -36,6 +38,8 @@ export const modulesService = {
     if (body.title !== undefined) data.title = body.title as string;
     if (body.slug !== undefined) data.slug = body.slug as string;
     if (body.description !== undefined) data.description = body.description as string;
+    if (body.unlockAt !== undefined) data.unlockAt = body.unlockAt ? new Date(body.unlockAt as string).toISOString() : null;
+    if (body.lockAt !== undefined) data.lockAt = body.lockAt ? new Date(body.lockAt as string).toISOString() : null;
     if (body.status !== undefined) {
       const status = body.status as string;
       if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");

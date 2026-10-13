@@ -6,7 +6,7 @@ import { pool } from "../db";
 import crypto from "crypto";
 
 // Exact 12-week curriculum data transcribed from the official syllabus
-const WEEKS_DATA = [
+export const WEEKS_DATA = [
   {
     weekNum: 1,
     title: "Week 1: What is an AI Agent?",

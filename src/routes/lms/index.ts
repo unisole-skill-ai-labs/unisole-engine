@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authMiddleware } from "../../middleware/auth";
+import { authMiddleware, requireRole } from "../../middleware/auth";
 import { authController } from "../../controllers/auth.controller";
 import { lmsController } from "../../controllers/lms.controller";
 import { mentorshipController } from "../../controllers/mentorship.controller";
@@ -8,6 +8,8 @@ import { paymentsController } from "../../controllers/payments.controller";
 import { validateBody } from "../../middleware/validate";
 
 export const lmsRouter: Router = Router();
+
+const canManageCalendar = requireRole(["SUPER_ADMIN", "ADMIN", "COURSE_MANAGER", "PROGRAM_MANAGER"]);
 
 // Protect all LMS routes with authentication
 lmsRouter.use(authMiddleware);
@@ -54,9 +56,9 @@ lmsRouter.get("/enrollments", enrollmentsController.list);
 
 // Calendar & Scheduling
 lmsRouter.get("/calendar/events", lmsController.getCalendarEvents);
-lmsRouter.post("/calendar/events", validateBody({ required: ["title", "startTime", "endTime"] }), lmsController.createCalendarEvent);
-lmsRouter.put("/calendar/events/:id", lmsController.updateCalendarEvent);
-lmsRouter.delete("/calendar/events/:id", lmsController.deleteCalendarEvent);
+lmsRouter.post("/calendar/events", canManageCalendar, validateBody({ required: ["title", "startTime", "endTime"] }), lmsController.createCalendarEvent);
+lmsRouter.put("/calendar/events/:id", canManageCalendar, lmsController.updateCalendarEvent);
+lmsRouter.delete("/calendar/events/:id", canManageCalendar, lmsController.deleteCalendarEvent);
 
 // Payments
 lmsRouter.post(

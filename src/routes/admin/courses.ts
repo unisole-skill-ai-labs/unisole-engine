@@ -1,8 +1,14 @@
 import { Router } from "express";
 import { coursesController } from "../../controllers/courses.controller";
 import { validateBody } from "../../middleware/validate";
+import { requireRole } from "../../middleware/auth";
 
 export const adminCoursesRouter: Router = Router();
+
+const canManageCourses = requireRole(["SUPER_ADMIN", "ADMIN", "COURSE_MANAGER", "PROGRAM_MANAGER"]);
+
+// Enforce canManageCourses on ALL admin course endpoints: Mentors cannot view or edit courses
+adminCoursesRouter.use(canManageCourses);
 
 adminCoursesRouter.get("/", coursesController.list);
 adminCoursesRouter.post("/sync-canonical", coursesController.syncCanonical);
