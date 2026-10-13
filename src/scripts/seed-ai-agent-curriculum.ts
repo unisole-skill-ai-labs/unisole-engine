@@ -615,6 +615,11 @@ export async function seedAiAgentCurriculum() {
   // 0. PURGE ALL OTHER COURSES & PATHWAYS FROM DB
   try {
     console.log("[Seed:AI-Agent] Purging non-AI-Agent courses and pathways from DB...");
+    // Explicitly delete any dummy modules (such as "Intro to AI Agents") and non-standard curriculum
+    await pool.query(`DELETE FROM course_modules WHERE module_id IN (SELECT id FROM modules WHERE title ILIKE '%Intro to AI%' OR (title NOT LIKE 'Week %' AND slug NOT LIKE 'cs-agentic-week-%'))`);
+    await pool.query(`DELETE FROM module_lessons WHERE module_id IN (SELECT id FROM modules WHERE title ILIKE '%Intro to AI%' OR (title NOT LIKE 'Week %' AND slug NOT LIKE 'cs-agentic-week-%'))`);
+    await pool.query(`DELETE FROM modules WHERE title ILIKE '%Intro to AI%' OR (title NOT LIKE 'Week %' AND slug NOT LIKE 'cs-agentic-week-%')`);
+
     await pool.query(`DELETE FROM pathway_categories WHERE pathway_id NOT IN ('cs-agentic', 'course1')`);
     await pool.query(`DELETE FROM pathway_colleges WHERE pathway_id NOT IN ('cs-agentic', 'course1')`);
     await pool.query(`DELETE FROM pathway_courses WHERE pathway_id NOT IN ('cs-agentic', 'course1') AND course_id NOT IN ('cs-agentic', 'course1')`);
@@ -746,13 +751,16 @@ export async function seedAiAgentCurriculum() {
       );
     }
 
-    // Link in course_modules
-    await pool.query(
-      `INSERT INTO course_modules (course_id, module_id, position, created_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (course_id, module_id) DO UPDATE SET position = EXCLUDED.position`,
-      [courseId, moduleId, week.weekNum]
-    );
+    // Link in course_modules for all course aliases
+    const targetCourseIds = Array.from(new Set([courseId, "cs-agentic", "course1"]));
+    for (const cId of targetCourseIds) {
+      await pool.query(
+        `INSERT INTO course_modules (course_id, module_id, position, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (course_id, module_id) DO UPDATE SET position = EXCLUDED.position`,
+        [cId, moduleId, week.weekNum]
+      );
+    }
 
     // 4 Lessons per week:
     // 1. Lecture Video
