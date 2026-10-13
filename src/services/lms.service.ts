@@ -1777,6 +1777,68 @@ export const lmsService = {
           for (const ev of defaultEvents) {
             await db.insert(calendarEvents).values(ev as any).onConflictDoNothing();
           }
+
+          // Ensure events for arts-p1 (Applied AI for Humanities) exist
+          const artsEvents = [
+            {
+              id: "ev_arts_missed_1",
+              title: "Module 1 Portfolio: Executive Communication & Prompt Synthesis",
+              description: "Submit portfolio draft analyzing LLM impact on humanities research.",
+              eventType: "DEADLINE",
+              startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              colorScheme: "rose",
+            },
+            {
+              id: "ev_arts_missed_2",
+              title: "Applied AI Ethics & Archival Case Study",
+              description: "Critique of automated content pipelines and academic integrity.",
+              eventType: "MILESTONE",
+              startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              colorScheme: "purple",
+            },
+            {
+              id: "ev_arts_up_1",
+              title: "Live Masterclass: AI Archival Research & Scholarly Workflows",
+              description: "Interactive session on prompt strategies for archival analysis and synthesis.",
+              eventType: "LIVE_CLASS",
+              startTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 5400000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              meetUrl: "https://meet.google.com/uni-sole-humanities",
+              colorScheme: "blue",
+            },
+            {
+              id: "ev_arts_up_2",
+              title: "1-on-1 Capstone Proposal Review & Career Mentorship",
+              description: "Mentorship review of student capstone research deliverable.",
+              eventType: "VIVA_1ON1",
+              startTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              meetUrl: "https://meet.google.com/uni-sole-mentor",
+              colorScheme: "amber",
+            },
+          ];
+
+          for (const ev of artsEvents) {
+            await db.insert(calendarEvents).values(ev as any).onConflictDoNothing();
+          }
+
+          try {
+            await db.execute(sql`
+              UPDATE calendar_events 
+              SET scope = 'COURSE' 
+              WHERE course_id IS NOT NULL AND scope = 'GLOBAL';
+            `);
+          } catch {}
         }
 
         // 4. Construct enriched student details with enrolled courses, missed, and upcoming items
@@ -1824,6 +1886,15 @@ export const lmsService = {
             .from(enrollments)
             .where(and(inArray(enrollments.userId, studentIds), eq(enrollments.status, "ACTIVE")));
 
+          // Ensure events with course_id are scoped to COURSE, not GLOBAL
+          try {
+            await db.execute(sql`
+              UPDATE calendar_events 
+              SET scope = 'COURSE' 
+              WHERE course_id IS NOT NULL AND scope = 'GLOBAL';
+            `);
+          } catch {}
+
           const now = new Date();
 
           menteesList = studentUsers.map((u) => {
@@ -1838,12 +1909,15 @@ export const lmsService = {
             const finalPwys = enrolledPwys.length > 0 ? enrolledPwys : allPathways.slice(0, 2);
 
             const enrolledCourses = finalPwys.map((pwy) => {
-              const courseEvents = allEvents.filter((ev) => 
-                ev.courseId === pwy.id ||
-                ev.courseId === pwy.slug ||
-                ev.studentId === u.id ||
-                ev.scope === "GLOBAL"
-              );
+              const courseEvents = allEvents.filter((ev) => {
+                if (ev.courseId) {
+                  return ev.courseId === pwy.id || ev.courseId === pwy.slug;
+                }
+                if (ev.studentId) {
+                  return ev.studentId === u.id;
+                }
+                return ev.scope === "GLOBAL";
+              });
 
               const missed: any[] = [];
               const upcoming: any[] = [];
