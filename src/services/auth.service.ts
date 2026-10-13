@@ -108,7 +108,7 @@ export const authService = {
     ];
 
     const hasStaffPrivileges = userRoles.some((r) =>
-      ["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR", "PROGRAM_MANAGER"].includes(r)
+      ["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR", "COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r)
     );
 
     if (!hasStaffPrivileges) {

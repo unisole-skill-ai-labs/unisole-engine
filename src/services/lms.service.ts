@@ -1449,7 +1449,7 @@ export const lmsService = {
     }
 
     const isAdmin = callerRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r.toUpperCase()));
-    const isProgramManager = callerRoles.some((r) => r.toUpperCase() === "PROGRAM_MANAGER");
+    const isProgramManager = callerRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r.toUpperCase()));
     const isMentor = callerRoles.some((r) => r.toUpperCase() === "MENTOR");
 
     // 1. Auto-sync users having role = 'MENTOR' into mentors table if not already present
@@ -2018,7 +2018,7 @@ export const lmsService = {
     const { callerUserId, callerRoles, status, search, mentorId, courseId } = options;
     const isAdmin = callerRoles.includes("SUPER_ADMIN") || callerRoles.includes("ADMIN");
     const isMentor = callerRoles.includes("MENTOR") && !isAdmin;
-    const isProgramManager = callerRoles.includes("PROGRAM_MANAGER") && !isAdmin;
+    const isProgramManager = (callerRoles.includes("COURSE_MANAGER") || callerRoles.includes("PROGRAM_MANAGER")) && !isAdmin;
 
     const whereClauses: any[] = [];
 
@@ -2396,7 +2396,7 @@ export const lmsService = {
   }) {
     const { callerUserId, callerRoles, startDate, endDate, eventType, courseId, mentorId, studentId, search } = options;
     const isAdmin = callerRoles.includes("SUPER_ADMIN") || callerRoles.includes("ADMIN");
-    const isProgramManager = callerRoles.includes("PROGRAM_MANAGER") && !isAdmin;
+    const isProgramManager = (callerRoles.includes("COURSE_MANAGER") || callerRoles.includes("PROGRAM_MANAGER")) && !isAdmin;
     const isMentor = callerRoles.includes("MENTOR") && !isAdmin && !isProgramManager;
     const isStudent = !isAdmin && !isProgramManager && !isMentor;
 

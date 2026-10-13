@@ -116,6 +116,7 @@ export async function initializeDatabase() {
 
     // 2. Safe standalone enum additions (outside PL/pgSQL transaction blocks)
     await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "COURSE_MANAGER");
     await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
     await addEnumValueSafely("enrollment_source", "SURVEY");
     await addEnumValueSafely("lead_source", "SURVEY");
@@ -150,6 +151,7 @@ export async function initializeDatabase() {
 
     await addEnumValueSafely("user_role", "SALES");
     await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "COURSE_MANAGER");
     await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
 
     // 3. Sequences

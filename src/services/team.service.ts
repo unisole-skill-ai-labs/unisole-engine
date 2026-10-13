@@ -69,14 +69,14 @@ export const teamService = {
         OR t.sub_project_lead_id = u.id
       )
       LEFT JOIN leads l ON l.assigned_to_user_id = u.id
-      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'PROGRAM_MANAGER')
+      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'COURSE_MANAGER', 'PROGRAM_MANAGER')
         ${searchFilter}
       GROUP BY u.id, d.name, d.color
       ORDER BY 
         CASE 
           WHEN u.role::text = 'SUPER_ADMIN' THEN 1 
           WHEN u.role::text = 'ADMIN' THEN 2 
-          WHEN u.role::text = 'PROGRAM_MANAGER' THEN 3 
+          WHEN u.role::text IN ('COURSE_MANAGER', 'PROGRAM_MANAGER') THEN 3 
           WHEN u.role::text = 'MENTOR' THEN 4 
           WHEN u.role::text = 'SALES' THEN 5 
           ELSE 6 
@@ -97,7 +97,7 @@ export const teamService = {
     username: string;
     password?: string;
     phone?: string;
-    role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES" | "MENTOR" | "PROGRAM_MANAGER";
+    role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES" | "MENTOR" | "COURSE_MANAGER" | "PROGRAM_MANAGER";
     roles?: string[];
     departmentId?: string;
     designation?: string;
@@ -163,7 +163,7 @@ export const teamService = {
       username?: string;
       password?: string;
       phone?: string;
-      role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES" | "MENTOR" | "PROGRAM_MANAGER";
+      role?: "SUPER_ADMIN" | "ADMIN" | "MEMBER" | "SALES" | "MENTOR" | "COURSE_MANAGER" | "PROGRAM_MANAGER";
       roles?: string[];
       departmentId?: string;
       designation?: string;
@@ -851,7 +851,7 @@ export const teamService = {
       LEFT JOIN team_departments d ON u.department_id = d.id
       LEFT JOIN tasks t ON t.assignee_id = u.id
       LEFT JOIN daily_eod_logs e ON e.user_id = u.id AND e.log_date >= CURRENT_DATE - INTERVAL '30 days'
-      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'PROGRAM_MANAGER') AND u.is_active = TRUE
+      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'COURSE_MANAGER', 'PROGRAM_MANAGER') AND u.is_active = TRUE
       GROUP BY u.id, d.name, d.color
       ORDER BY u.name ASC;
     `);
@@ -926,7 +926,7 @@ export const teamService = {
         d.color as "departmentColor"
       FROM users u
       LEFT JOIN team_departments d ON u.department_id = d.id
-      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'PROGRAM_MANAGER') AND u.is_active = TRUE
+      WHERE u.role::text IN ('SUPER_ADMIN', 'ADMIN', 'MEMBER', 'SALES', 'MENTOR', 'COURSE_MANAGER', 'PROGRAM_MANAGER') AND u.is_active = TRUE
       ORDER BY u.name ASC
     `);
     const allStaff = (staffRes.rows || staffRes) as any[];
