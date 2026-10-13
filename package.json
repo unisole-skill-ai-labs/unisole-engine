@@ -18,6 +18,7 @@
     "db:seed:demo": "node dist/scripts/seed-demo-analytics.js",
     "db:seed:survey": "tsx src/scripts/seed-survey.ts",
     "db:seed:dev": "tsx src/scripts/seed-system.ts",
+    "db:seed:agent": "tsx src/scripts/seed-ai-agent-curriculum.ts",
     "db:sync:pathways": "tsx src/scripts/sync-canonical-pathways.ts"
   },
   "dependencies": {

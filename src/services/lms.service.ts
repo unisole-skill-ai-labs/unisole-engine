@@ -1,5 +1,5 @@
 import { eq, and, or, inArray, asc, desc, sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import {
   users,
   enrollments,
@@ -422,12 +422,23 @@ export const lmsService = {
     }
 
     // If this is a standalone course, directly attach it as the single course
+    // If this is a standalone course, directly attach it as the single course
     if (linkedCourses.length === 0) {
       try {
         const directCourse = await db
           .select()
           .from(courses)
-          .where(or(sql`${courses.id}::text = ${pathway.id}::text`, eq(courses.slug, pathway.slug)))
+          .where(
+            or(
+              sql`${courses.id}::text = ${pathway.id}::text`,
+              eq(courses.slug, pathway.slug),
+              eq(courses.title, pathway.title),
+              and(
+                sql`${pathway.id}::text IN ('course1', 'cs-agentic')`,
+                or(eq(courses.slug, 'cs-agentic'), eq(courses.title, 'AI Agent Engineering'))
+              )
+            )
+          )
           .limit(1);
         if (directCourse[0]) {
           linkedCourses = [{ position: 1, course: directCourse[0] }];
@@ -448,6 +459,19 @@ export const lmsService = {
         .innerJoin(modules, sql`${courseModules.moduleId}::text = ${modules.id}::text`)
         .where(sql`${courseModules.courseId}::text = ${course.id}::text`)
         .orderBy(asc(courseModules.position));
+
+      // Fallback: If courseModules link wasn't populated, check modules.course_id directly
+      if (linkedModules.length === 0) {
+        try {
+          const directMods = await pool.query(
+            `SELECT * FROM modules WHERE course_id = $1::uuid OR course_id::text = $1::text ORDER BY order_index ASC`,
+            [course.id]
+          );
+          for (const m of directMods.rows) {
+            linkedModules.push({ position: m.order_index || 1, module: m as any });
+          }
+        } catch {}
+      }
 
       const moduleList: any[] = [];
 
@@ -487,6 +511,7 @@ export const lmsService = {
               parsedContent?.type === "SUBJECTIVE_TEST";
             const isQuizItem =
               parsedContent?.type === "QUIZ" ||
+              parsedContent?.type === "quiz" ||
               parsedContent?.practiceType === "MCQ" ||
               lesson.id.includes("_quiz") ||
               lesson.slug?.includes("quiz") ||
@@ -494,6 +519,7 @@ export const lmsService = {
               lesson.title?.toLowerCase().includes("knowledge check");
             const isAssignmentItem =
               parsedContent?.type === "ASSIGNMENT" ||
+              parsedContent?.type === "assignment" ||
               parsedContent?.practiceType === "PROJECT" ||
               parsedContent?.testType === "PROJECT" ||
               lesson.id.includes("_lab") ||
@@ -506,6 +532,15 @@ export const lmsService = {
               lesson.title?.toLowerCase().includes("assignment") ||
               lesson.title?.toLowerCase().includes("lab");
 
+            const isLiveItem =
+              parsedContent?.type === "LIVE" ||
+              parsedContent?.type === "live" ||
+              parsedContent?.category === "LIVE" ||
+              parsedContent?.curriculumMode === "LIVE" ||
+              lesson.slug?.includes("live") ||
+              lesson.id.includes("_live") ||
+              lesson.title?.toLowerCase().includes("live");
+
             const isFolder =
               parsedContent?.type === "FOLDER" ||
               parsedContent?.curriculumMode === "FOLDER" ||
@@ -517,6 +552,9 @@ export const lmsService = {
             if (isFolder) {
               computedType = "folder";
               computedCategory = "FOLDER";
+            } else if (isLiveItem) {
+              computedType = "live";
+              computedCategory = "LIVE";
             } else if (isCoding) {
               computedType = "coding_test";
               computedCategory = "TEST";
@@ -572,6 +610,10 @@ export const lmsService = {
                 parsedContent?.assignment?.maxPoints ||
                 parsedContent?.codingTest?.maxScore ||
                 100,
+              liveDate: parsedContent?.liveDate,
+              liveTime: parsedContent?.liveTime,
+              liveMeetingUrl: parsedContent?.liveMeetingUrl,
+              mentorName: parsedContent?.mentorName,
               status: lesson.status,
               position: lesPos,
             };
