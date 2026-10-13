@@ -2642,7 +2642,7 @@ export const lmsService = {
         .from(enrollments)
         .where(and(eq(enrollments.userId, callerUserId), eq(enrollments.status, "ACTIVE")));
 
-      const pathwayId = userEnrollments[0]?.pathwayId || userEnrollments[0]?.itemId || "cs-p1";
+      const pathwayId = userEnrollments[0]?.pathwayId || userEnrollments[0]?.itemId || "cs-agentic";
       const canon = getCanonicalPathway(pathwayId) || CANONICAL_GROUPS[0].pathways[0];
 
       // Query completed lessons for student
@@ -2756,8 +2756,8 @@ export const lmsService = {
         eventType: "VIVA_1ON1",
         startTime: makeDate(1, 16, 30),
         endTime: makeDate(1, 17, 30),
-        scope: "STUDENT",
-        studentId: callerUserId,
+        scope: isStudent ? "STUDENT" : "GLOBAL",
+        studentId: isStudent ? callerUserId : undefined,
         mentorName: mentorInfo.name,
         meetUrl: "https://meet.google.com/uni-mentor-office-hours",
         colorScheme: "rose",
@@ -2803,8 +2803,8 @@ export const lmsService = {
         eventType: "VIVA_1ON1",
         startTime: makeDate(3, 16, 30),
         endTime: makeDate(3, 17, 30),
-        scope: "STUDENT",
-        studentId: callerUserId,
+        scope: isStudent ? "STUDENT" : "GLOBAL",
+        studentId: isStudent ? callerUserId : undefined,
         mentorName: mentorInfo.name,
         meetUrl: "https://meet.google.com/uni-mentor-office-hours",
         colorScheme: "rose",
