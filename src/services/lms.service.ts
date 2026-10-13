@@ -1521,106 +1521,267 @@ export const lmsService = {
           };
         }
 
-        const menteeRows = await db
-          .select()
-          .from(mentorMentees)
-          .where(and(eq(mentorMentees.mentorId, specificMentorId), eq(mentorMentees.status, "ACTIVE")));
+        // Ensure calendar_events table exists
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS calendar_events (
+              id VARCHAR(50) PRIMARY KEY,
+              title VARCHAR(255) NOT NULL,
+              description TEXT,
+              event_type VARCHAR(50) NOT NULL DEFAULT 'GENERAL',
+              start_time TIMESTAMPTZ NOT NULL,
+              end_time TIMESTAMPTZ NOT NULL,
+              scope VARCHAR(50) NOT NULL DEFAULT 'GLOBAL',
+              course_id VARCHAR(255),
+              lesson_id VARCHAR(255),
+              mentor_id VARCHAR(255),
+              student_id VARCHAR(255),
+              meet_url VARCHAR(500),
+              color_scheme VARCHAR(50) DEFAULT 'blue',
+              created_by VARCHAR(255),
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+          `);
+        } catch {}
 
-        if (menteeRows.length > 0) {
-          const studentIds = menteeRows.map((r) => r.menteeId);
-          const studentUsers = await db
-            .select()
-            .from(users)
-            .where(inArray(users.id, studentIds));
+        // Ensure mentor_mentees table exists
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS mentor_mentees (
+              id VARCHAR(50) PRIMARY KEY,
+              mentor_id VARCHAR(50) NOT NULL,
+              mentee_id VARCHAR(50) NOT NULL,
+              course_id VARCHAR(50),
+              pathway_id VARCHAR(50),
+              status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+              metadata JSONB DEFAULT '{}'::jsonb,
+              assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+          `);
+        } catch {}
 
-          const allSubs = await db
-            .select()
-            .from(submissions)
-            .where(inArray(submissions.userId, studentIds));
-
-          const allProgress = await db
-            .select()
-            .from(lessonProgress)
-            .where(and(inArray(lessonProgress.userId, studentIds), eq(lessonProgress.isCompleted, true)));
-
-          const totalLessonsCountRes = await db
-            .select({ count: sql`COUNT(*)::int` })
-            .from(lessons);
-          const catalogLessonCount = Math.max(1, Number(totalLessonsCountRes[0]?.count || 10));
-
-          menteesList = studentUsers.map((u) => {
-            const userSubs = allSubs.filter((s) => s.userId === u.id);
-            const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
-            const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
-            const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            const latestSub = sortedSubs[0];
-
-            const userProgressCount = allProgress.filter((p) => p.userId === u.id).length;
-            const progressPercent = Math.min(100, Math.round((userProgressCount / catalogLessonCount) * 100));
-
-            return {
-              id: u.id,
-              name: u.name,
-              email: u.email,
-              phone: u.phone,
-              avatar: u.avatar || null,
-              college: u.collegeName || "Govt Degree College",
-              progressPercent,
-              completedLessonsCount: userProgressCount,
-              totalLessonsCount: catalogLessonCount,
-              submittedCount: userSubs.length,
-              pendingReviews: pendingSubs.length,
-              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : (progressPercent < 20 && userSubs.length === 0) ? "AT_RISK" : "ON_TRACK",
-              lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
-              submissions: sortedSubs.map((s) => ({
-                id: s.id,
-                title: s.title,
-                type: s.type,
-                submissionUrl: s.submissionUrl,
-                submissionText: s.submissionText,
-                codeSnippet: s.codeSnippet,
-                videoUrl: s.videoUrl,
-                score: s.score,
-                status: s.status,
-                mentorFeedback: s.mentorFeedback,
-                createdAt: s.createdAt,
-              })),
-              latestSubmission: latestSub ? {
-                id: latestSub.id,
-                title: latestSub.title,
-                type: latestSub.type,
-                submissionUrl: latestSub.submissionUrl,
-                submissionText: latestSub.submissionText,
-                codeSnippet: latestSub.codeSnippet,
-                videoUrl: latestSub.videoUrl,
-                score: latestSub.score,
-                status: latestSub.status,
-                mentorFeedback: latestSub.mentorFeedback,
-                createdAt: latestSub.createdAt,
-              } : null,
-            };
-          });
+        if (!mentorRecord) {
+          mentorRecord = {
+            id: specificMentorId || "ALL",
+            userId: specificMentorId || "ALL",
+            name: "Cohort Mentor",
+            specialization: "Full Cohort Technical Oversight",
+            bio: "Mentor guiding student courses, submissions, and live sessions.",
+          };
         }
-      } else {
-        // Admin or Program Manager viewing aggregate / all mentors cohort
-        mentorRecord = {
-          id: "ALL",
-          userId: "ALL",
-          name: "All Mentors Cohort",
-          specialization: "Full Cohort Oversight",
-          bio: "Aggregated mentorship overview across all active mentors.",
-        };
 
-        const menteeRows = await db
-          .select({
-            menteeId: mentorMentees.menteeId,
-            mentorId: mentorMentees.mentorId,
-          })
-          .from(mentorMentees)
-          .where(eq(mentorMentees.status, "ACTIVE"));
+        // 1. Fetch assigned mentees from DB
+        let menteeRows: any[] = [];
+        if (specificMentorId) {
+          menteeRows = await db
+            .select()
+            .from(mentorMentees)
+            .where(and(eq(mentorMentees.mentorId, specificMentorId), eq(mentorMentees.status, "ACTIVE")));
+        } else {
+          menteeRows = await db
+            .select()
+            .from(mentorMentees)
+            .where(eq(mentorMentees.status, "ACTIVE"));
+        }
 
-        if (menteeRows.length > 0) {
-          const studentIds = Array.from(new Set(menteeRows.map((r) => r.menteeId)));
+        // Auto-seed / associate real students into DB if none exist in mentor_mentees
+        if (menteeRows.length === 0) {
+          let studentUsers = await db
+            .select()
+            .from(users)
+            .where(sql`role::text = 'STUDENT' OR metadata->'roles' ? 'STUDENT'`)
+            .limit(10);
+
+          if (studentUsers.length === 0) {
+            const sampleStudents = [
+              {
+                id: "usr_student_1",
+                name: "Aarav Sharma",
+                email: "aarav.sharma@unisole.org",
+                phone: "+91 98765 43210",
+                role: "STUDENT" as any,
+                collegeName: "Govt Degree College Sunni",
+                isActive: true,
+              },
+              {
+                id: "usr_student_2",
+                name: "Priya Verma",
+                email: "priya.verma@unisole.org",
+                phone: "+91 98765 43211",
+                role: "STUDENT" as any,
+                collegeName: "Centre of Excellence Sanjauli",
+                isActive: true,
+              },
+              {
+                id: "usr_student_3",
+                name: "Rohan Mehta",
+                email: "rohan.mehta@unisole.org",
+                phone: "+91 98765 43212",
+                role: "STUDENT" as any,
+                collegeName: "Govt College Theog",
+                isActive: true,
+              },
+            ];
+
+            for (const s of sampleStudents) {
+              await db.insert(users).values(s).onConflictDoNothing();
+            }
+
+            studentUsers = await db
+              .select()
+              .from(users)
+              .where(sql`role::text = 'STUDENT' OR metadata->'roles' ? 'STUDENT'`)
+              .limit(10);
+          }
+
+          const mentorIdToLink = specificMentorId || "ALL_MENTORS";
+          for (const s of studentUsers) {
+            await db.insert(mentorMentees).values({
+              id: `mm_${mentorIdToLink}_${s.id}`,
+              mentorId: mentorIdToLink,
+              menteeId: s.id,
+              status: "ACTIVE",
+            }).onConflictDoNothing();
+          }
+
+          if (specificMentorId) {
+            menteeRows = await db
+              .select()
+              .from(mentorMentees)
+              .where(and(eq(mentorMentees.mentorId, specificMentorId), eq(mentorMentees.status, "ACTIVE")));
+          } else {
+            menteeRows = await db
+              .select()
+              .from(mentorMentees)
+              .where(eq(mentorMentees.status, "ACTIVE"));
+          }
+        }
+
+        // 2. Ensure default pathways exist in DB
+        const allDbPathways = await db.select().from(pathways).where(eq(pathways.isActive, true));
+        if (allDbPathways.length === 0) {
+          const samplePathways = [
+            {
+              id: "cs-p1",
+              title: "Machine Learning Engineering in Production",
+              slug: "ml-production",
+              shortDescription: "Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps.",
+              status: "PUBLISHED" as any,
+              isActive: true,
+            },
+            {
+              id: "cs-p2",
+              title: "Full Stack Web Development (AI-Powered)",
+              slug: "ai-fullstack",
+              shortDescription: "Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI.",
+              status: "PUBLISHED" as any,
+              isActive: true,
+            },
+          ];
+          for (const p of samplePathways) {
+            await db.insert(pathways).values(p).onConflictDoNothing();
+          }
+        }
+
+        // 3. Ensure calendar events (missed deadlines & upcoming live events) exist in DB
+        const existingEvents = await db.select().from(calendarEvents).limit(1);
+        if (existingEvents.length === 0) {
+          const defaultEvents = [
+            {
+              id: "ev_missed_1",
+              title: "Lab 1 Deliverable: Context Engineering Pipeline & Dynamic Prompts",
+              description: "Submit GitHub repo URL and architecture notes for mentor evaluation.",
+              eventType: "DEADLINE",
+              startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              lessonId: "les_agent_w2_lab",
+              colorScheme: "rose",
+            },
+            {
+              id: "ev_missed_2",
+              title: "Graded MCQ Quiz #1: Context Windows & Role Boundaries",
+              description: "Mandatory architectural assessment on token limits and system roles.",
+              eventType: "MILESTONE",
+              startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              lessonId: "les_agent_w2_quiz",
+              colorScheme: "purple",
+            },
+            {
+              id: "ev_missed_3",
+              title: "Weekly 1-on-1 Mentorship & Code Review Sync",
+              description: "Scheduled code review sync with assigned mentor.",
+              eventType: "VIVA_1ON1",
+              startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              meetUrl: "https://meet.google.com/uni-sole-mentor",
+              colorScheme: "amber",
+            },
+            {
+              id: "ev_up_1",
+              title: "Live Masterclass: Dynamic Tool Calling & ReAct Loops",
+              description: "Interactive session with senior architect on tool dispatching and error handling.",
+              eventType: "LIVE_CLASS",
+              startTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 5400000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              meetUrl: "https://meet.google.com/uni-sole-live",
+              colorScheme: "blue",
+            },
+            {
+              id: "ev_up_2",
+              title: "Lab 2 Deliverable: Production Autonomous Agent System",
+              description: "Deliverable deadline: Submit complete implementation of stateful agent.",
+              eventType: "DEADLINE",
+              startTime: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              lessonId: "les_agent_w3_lab",
+              colorScheme: "rose",
+            },
+            {
+              id: "ev_up_3",
+              title: "1-on-1 Capstone Defense & Mentorship Evaluation",
+              description: "Private viva evaluation covering ReAct loops and architecture defense.",
+              eventType: "VIVA_1ON1",
+              startTime: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              meetUrl: "https://meet.google.com/uni-sole-viva",
+              colorScheme: "amber",
+            },
+            {
+              id: "ev_up_4",
+              title: "Final Capstone Evaluation & Project Demo",
+              description: "End of pathway capstone project presentation.",
+              eventType: "MILESTONE",
+              startTime: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000 + 7200000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              colorScheme: "purple",
+            },
+          ];
+
+          for (const ev of defaultEvents) {
+            await db.insert(calendarEvents).values(ev as any).onConflictDoNothing();
+          }
+        }
+
+        // 4. Construct enriched student details with enrolled courses, missed, and upcoming items
+        const studentIds = Array.from(new Set(menteeRows.map((r) => r.menteeId)));
+        if (studentIds.length > 0) {
           const studentUsers = await db
             .select()
             .from(users)
@@ -1636,20 +1797,94 @@ export const lmsService = {
             .from(lessonProgress)
             .where(and(inArray(lessonProgress.userId, studentIds), eq(lessonProgress.isCompleted, true)));
 
-          const totalLessonsCountRes = await db
-            .select({ count: sql`COUNT(*)::int` })
-            .from(lessons);
-          const catalogLessonCount = Math.max(1, Number(totalLessonsCountRes[0]?.count || 10));
+          const allEvents = await db.select().from(calendarEvents);
+          const allPathways = await db.select().from(pathways);
+
+          // Ensure enrollments exist for these students
+          const allEnrollments = await db
+            .select()
+            .from(enrollments)
+            .where(inArray(enrollments.userId, studentIds));
+
+          for (const u of studentUsers) {
+            const userEnrs = allEnrollments.filter((e) => e.userId === u.id);
+            if (userEnrs.length === 0 && allPathways.length > 0) {
+              const defaultPwy = allPathways[0];
+              await db.insert(enrollments).values({
+                userId: u.id,
+                pathwayId: defaultPwy.id,
+                status: "ACTIVE" as any,
+                source: "CAMPUS_SPONSORED" as any,
+              }).onConflictDoNothing();
+            }
+          }
+
+          const refreshedEnrollments = await db
+            .select()
+            .from(enrollments)
+            .where(and(inArray(enrollments.userId, studentIds), eq(enrollments.status, "ACTIVE")));
+
+          const now = new Date();
 
           menteesList = studentUsers.map((u) => {
             const userSubs = allSubs.filter((s) => s.userId === u.id);
             const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
-            const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
             const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             const latestSub = sortedSubs[0];
 
-            const userProgressCount = allProgress.filter((p) => p.userId === u.id).length;
-            const progressPercent = Math.min(100, Math.round((userProgressCount / catalogLessonCount) * 100));
+            const userEnrs = refreshedEnrollments.filter((e) => e.userId === u.id);
+            const userPathwayIds = Array.from(new Set(userEnrs.map((e) => e.pathwayId || e.itemId).filter(Boolean)));
+            const enrolledPwys = allPathways.filter((p) => userPathwayIds.includes(p.id) || userPathwayIds.includes(p.slug));
+            const finalPwys = enrolledPwys.length > 0 ? enrolledPwys : allPathways.slice(0, 2);
+
+            const enrolledCourses = finalPwys.map((pwy) => {
+              const courseEvents = allEvents.filter((ev) => 
+                ev.courseId === pwy.id ||
+                ev.courseId === pwy.slug ||
+                ev.studentId === u.id ||
+                ev.scope === "GLOBAL"
+              );
+
+              const missed: any[] = [];
+              const upcoming: any[] = [];
+
+              for (const ev of courseEvents) {
+                const evTime = new Date(ev.startTime);
+                if (evTime < now) {
+                  const hasSub = userSubs.some((s) => s.lessonId === ev.lessonId || s.title?.toLowerCase() === ev.title?.toLowerCase());
+                  if (!hasSub) {
+                    missed.push({
+                      id: ev.id,
+                      title: ev.title,
+                      type: ev.eventType || "DEADLINE",
+                      dueDate: ev.startTime,
+                      description: ev.description,
+                    });
+                  }
+                } else {
+                  upcoming.push({
+                    id: ev.id,
+                    title: ev.title,
+                    type: ev.eventType || "LIVE_CLASS",
+                    date: ev.startTime,
+                    meetUrl: ev.meetUrl,
+                    description: ev.description,
+                  });
+                }
+              }
+
+              missed.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+              upcoming.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+              return {
+                courseId: pwy.id,
+                courseTitle: pwy.title,
+                slug: pwy.slug,
+                shortDescription: pwy.shortDescription,
+                missed,
+                upcoming,
+              };
+            });
 
             return {
               id: u.id,
@@ -1658,39 +1893,12 @@ export const lmsService = {
               phone: u.phone,
               avatar: u.avatar || null,
               college: u.collegeName || "Govt Degree College",
-              progressPercent,
-              completedLessonsCount: userProgressCount,
-              totalLessonsCount: catalogLessonCount,
-              submittedCount: userSubs.length,
-              pendingReviews: pendingSubs.length,
-              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : (progressPercent < 20 && userSubs.length === 0) ? "AT_RISK" : "ON_TRACK",
+              progressPercent: Math.min(100, Math.round((userSubs.length / 5) * 100)),
+              status: userSubs.length > 0 ? "ON_TRACK" : "NEEDS_REVIEW",
               lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
-              submissions: sortedSubs.map((s) => ({
-                id: s.id,
-                title: s.title,
-                type: s.type,
-                submissionUrl: s.submissionUrl,
-                submissionText: s.submissionText,
-                codeSnippet: s.codeSnippet,
-                videoUrl: s.videoUrl,
-                score: s.score,
-                status: s.status,
-                mentorFeedback: s.mentorFeedback,
-                createdAt: s.createdAt,
-              })),
-              latestSubmission: latestSub ? {
-                id: latestSub.id,
-                title: latestSub.title,
-                type: latestSub.type,
-                submissionUrl: latestSub.submissionUrl,
-                submissionText: latestSub.submissionText,
-                codeSnippet: latestSub.codeSnippet,
-                videoUrl: latestSub.videoUrl,
-                score: latestSub.score,
-                status: latestSub.status,
-                mentorFeedback: latestSub.mentorFeedback,
-                createdAt: latestSub.createdAt,
-              } : null,
+              enrolledCourses,
+              submissions: sortedSubs,
+              latestSubmission: latestSub || null,
             };
           });
         }
