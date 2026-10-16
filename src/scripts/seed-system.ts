@@ -5,6 +5,7 @@ import { SANJAULI_COLLEGE_PPT_SLIDES } from "../data/sanjauliDeck";
 import { SUNNI_COLLEGE_PPT_SLIDES } from "../data/sunniDeck";
 import { UNISOLE_AI_CAMPUS_DECK_SLIDES } from "../data/aiCampusDeck";
 import { SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES } from "../data/seemaRoadshowDeck";
+import { VGC_MANDI_ROADSHOW_DECK_SLIDES } from "../data/vgcMandiRoadshowDeck";
 
 /**
  * System Seeder — Sets up foundational, non-mock system data:
@@ -216,6 +217,50 @@ export async function seedSystemData() {
       console.log(`[Seed:System] Synchronized Govt College Seema (Rohru) branches.`);
     }
 
+    // 1E. Sync Vallabh Government College Mandi (vgc-mandi)
+    const vgcMandiClgRes = await pool.query(
+      `INSERT INTO colleges (name, short_name, slug, description, is_active)
+       VALUES ('Vallabh Government College Mandi', 'VGC Mandi', 'vgc-mandi', 'Vallabh Government College Mandi (VGC Mandi), Mandi District, Himachal Pradesh.', TRUE)
+       ON CONFLICT (slug) DO UPDATE 
+       SET name = EXCLUDED.name, short_name = EXCLUDED.short_name, description = EXCLUDED.description, is_active = TRUE
+       RETURNING id, name`
+    );
+
+    const vgcMandiCollegeId = vgcMandiClgRes.rows[0]?.id;
+    const vgcMandiCollegeName = vgcMandiClgRes.rows[0]?.name ?? "Vallabh Government College Mandi";
+
+    if (vgcMandiCollegeId) {
+      const vgcMandiBranches = [
+        { name: "BCA", code: "BCA", desc: "Bachelor of Computer Applications." },
+        { name: "BSC Non-Med", code: "BSC_NM", desc: "Bachelor of Science (Non-Medical)." },
+        { name: "BSC Med", code: "BSC_MED", desc: "Bachelor of Science (Medical)." },
+        { name: "BCOM", code: "BCOM", desc: "Bachelor of Commerce." },
+        { name: "BA", code: "BA", desc: "Bachelor of Arts." },
+        { name: "BBA", code: "BBA", desc: "Bachelor of Business Administration." },
+        { name: "PGDCA", code: "PGDCA", desc: "Post Graduate Diploma in Computer Applications." },
+        { name: "Others", code: "OTHERS", desc: "Other / Multidisciplinary streams." },
+      ];
+
+      for (const br of vgcMandiBranches) {
+        const brCheck = await pool.query(
+          "SELECT id FROM branches WHERE college_id = $1 AND (name = $2 OR code = $3) LIMIT 1",
+          [vgcMandiCollegeId, br.name, br.code]
+        );
+        if (brCheck.rows && brCheck.rows[0]) {
+          await pool.query(
+            "UPDATE branches SET name = $1, code = $2, description = $3, is_active = TRUE WHERE id = $4",
+            [br.name, br.code, br.desc, brCheck.rows[0].id]
+          );
+        } else {
+          await pool.query(
+            "INSERT INTO branches (college_id, name, code, description, is_active) VALUES ($1, $2, $3, $4, TRUE)",
+            [vgcMandiCollegeId, br.name, br.code, br.desc]
+          );
+        }
+      }
+      console.log(`[Seed:System] Synchronized Vallabh Government College Mandi branches.`);
+    }
+
     // 2. Seed / Sync Flagship Deck: Theog College PPT
     const theogPresTitle = "Theog College PPT";
     await pool.query(
@@ -295,6 +340,26 @@ export async function seedSystemData() {
       ]
     );
     console.log(`[Seed:System] Synchronized flagship deck: AI Training Program Roadshow (Govt College Seema (Rohru)) (${SEEMA_COLLEGE_ROADSHOW_DECK_SLIDES.length} slides)`);
+
+    // 2E. Seed / Sync Flagship Deck: Vallabh Government College Mandi Roadshow Deck
+    const vgcMandiPresTitle = "AI Training Program Roadshow";
+    await pool.query(
+      `INSERT INTO presentations (id, college_id, college_name, title, description, theme, slides, is_active)
+       VALUES ('pres_vgc_mandi_roadshow', $1, $2, $3, $4, 'dark', $5, TRUE)
+       ON CONFLICT (id) DO UPDATE 
+       SET slides = EXCLUDED.slides, 
+           title = EXCLUDED.title, 
+           college_id = COALESCE(EXCLUDED.college_id, presentations.college_id), 
+           college_name = COALESCE(EXCLUDED.college_name, presentations.college_name)`,
+      [
+        vgcMandiCollegeId,
+        vgcMandiCollegeName,
+        vgcMandiPresTitle,
+        "27-slide industrial training cum internship roadshow presentation for Vallabh Government College Mandi (VGC Mandi) featuring Ajay Mokta, leadership team, 90s vs 20s environment shift, 570M private job landscape, career capital, 7-stage product development cycle, cheap vs valuable skills, 100-to-4 hiring funnel, and Agentic AI boom.",
+        JSON.stringify(VGC_MANDI_ROADSHOW_DECK_SLIDES),
+      ]
+    );
+    console.log(`[Seed:System] Synchronized flagship deck: AI Training Program Roadshow (Vallabh Government College Mandi) (${VGC_MANDI_ROADSHOW_DECK_SLIDES.length} slides)`);
 
     // 3. Seed / Sync Flagship Deck: Unisole AI Campus Deck
     const aiDeckTitle = "UNISOLE AI Campus Program Presentation Deck";

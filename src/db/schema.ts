@@ -26,6 +26,7 @@ export const userRole = pgEnum("user_role", [
   "STUDENT",
   "MEMBER",
   "MENTOR",
+  "COURSE_MANAGER",
   "PROGRAM_MANAGER",
   "ADMIN",
   "SUPER_ADMIN",
@@ -788,6 +789,8 @@ export const modules = pgTable(
     description: text(),
     status: contentStatus().default("DRAFT").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    unlockAt: timestamp("unlock_at", { withTimezone: true, mode: "string" }),
+    lockAt: timestamp("lock_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
@@ -856,6 +859,8 @@ export const lessons = pgTable(
     durationMinutes: integer("duration_minutes"),
     status: contentStatus().default("DRAFT").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    unlockAt: timestamp("unlock_at", { withTimezone: true, mode: "string" }),
+    lockAt: timestamp("lock_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),

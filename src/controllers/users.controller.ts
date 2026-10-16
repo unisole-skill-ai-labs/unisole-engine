@@ -17,7 +17,8 @@ export const usersController = {
 
     const isAdmin = userRoles.includes("SUPER_ADMIN") || userRoles.includes("ADMIN");
     const isMentor = userRoles.includes("MENTOR") && !isAdmin;
-    const isProgramManager = userRoles.includes("PROGRAM_MANAGER") && !isAdmin;
+    const isProgramManager =
+      (userRoles.includes("COURSE_MANAGER") || userRoles.includes("PROGRAM_MANAGER")) && !isAdmin;
 
     let mentorUserIdFilter: string | undefined = undefined;
     let onlyAssignedMentorshipFilter: boolean | undefined = undefined;

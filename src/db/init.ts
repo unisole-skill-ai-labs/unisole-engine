@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
 import { pricingService } from "../services/pricing.service";
 import { seedLmsDemoData } from "../scripts/seed-lms-demo";
+import { seedAiAgentCurriculum } from "../scripts/seed-ai-agent-curriculum";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -116,6 +117,7 @@ export async function initializeDatabase() {
 
     // 2. Safe standalone enum additions (outside PL/pgSQL transaction blocks)
     await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "COURSE_MANAGER");
     await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
     await addEnumValueSafely("enrollment_source", "SURVEY");
     await addEnumValueSafely("lead_source", "SURVEY");
@@ -150,6 +152,7 @@ export async function initializeDatabase() {
 
     await addEnumValueSafely("user_role", "SALES");
     await addEnumValueSafely("user_role", "MENTOR");
+    await addEnumValueSafely("user_role", "COURSE_MANAGER");
     await addEnumValueSafely("user_role", "PROGRAM_MANAGER");
 
     // 3. Sequences
@@ -228,7 +231,28 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_payments_order" ON "public"."payments" ("order_id");
     `);
 
+    await execSqlSafe("pathways_table_creation", `
+      CREATE SEQUENCE IF NOT EXISTS "public"."pathways_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+      CREATE TABLE IF NOT EXISTS "public"."pathways" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('pwy_'::text || nextval('public.pathways_id_seq'::regclass)) NOT NULL,
+        "title" varchar(250) NOT NULL,
+        "slug" varchar(280) NOT NULL,
+        "short_description" varchar(500),
+        "description" text,
+        "price_paise" bigint DEFAULT 0 NOT NULL,
+        "status" "public"."pathway_status" DEFAULT 'DRAFT' NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_pathways_slug" ON "public"."pathways" ("slug");
+    `);
+
     await execSqlSafe("courses_alterations", `
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "short_description" varchar(500);
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "status" "public"."content_status" DEFAULT 'DRAFT' NOT NULL;
+      ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "price_paise" bigint DEFAULT 0 NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "mrp_paise" bigint DEFAULT 0 NOT NULL;
       ALTER TABLE "public"."courses" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb;
@@ -252,6 +276,8 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
       ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
       ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "unlock_at" timestamp with time zone;
+      ALTER TABLE "public"."modules" ADD COLUMN IF NOT EXISTS "lock_at" timestamp with time zone;
 
       CREATE SEQUENCE IF NOT EXISTS "public"."lessons_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
       CREATE TABLE IF NOT EXISTS "public"."lessons" (
@@ -276,6 +302,8 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;
       ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
       ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "unlock_at" timestamp with time zone;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "lock_at" timestamp with time zone;
 
       DO $$ BEGIN
         ALTER TABLE "public"."modules" ALTER COLUMN "id" TYPE varchar(50) USING id::text;
@@ -810,20 +838,11 @@ export async function initializeDatabase() {
       DELETE FROM "public"."course_modules" WHERE "course_id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1') OR "module_id" IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
       DELETE FROM "public"."module_lessons" WHERE "module_id" IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8') OR "lesson_id" IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
       DELETE FROM "public"."lessons" WHERE "id" IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
-      DELETE FROM "public"."modules" WHERE "id" IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
-      DELETE FROM "public"."courses" WHERE "id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1');
+      DELETE FROM "public"."courses" WHERE "slug" NOT IN ('cs-agentic', 'course1') AND "title" NOT ILIKE '%AI Agent%';
 
       INSERT INTO "public"."courses" ("id", "title", "slug", "short_description", "price_paise", "mrp_paise", "status", "metadata", "is_active")
       VALUES 
-        ('cs-genai', 'Generative AI Engineering', 'cs-genai', 'Master enterprise-grade LLM architectures, production RAG pipelines, vector databases (Qdrant), PEFT/LoRA fine-tuning, and high-throughput vLLM serving.', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-genai", "badge": "GROUP 01 • PATHWAY 01", "shortName": "CS & IT: Generative AI"}'::jsonb, TRUE),
-        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE),
-        ('cs-p1', 'Machine Learning in Production: MLOps Engineering', 'cs-p1', 'End-to-end ML engineering: data pipelines, deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG architectures.', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-p1", "badge": "GROUP 01 • PATHWAY 03", "shortName": "CS & IT: ML Engineering"}'::jsonb, TRUE),
-        ('cs-common', 'AI Entrepreneurship & Business Innovation', 'cs-common', 'Structured incubator track teaching students how to convert AI technical capability into validated commercial products and startups.', 59900, 299900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-common", "badge": "GROUP 01 • WEEKEND", "shortName": "CS & IT: AI Entrepreneurship"}'::jsonb, TRUE),
-        ('sci-p1', 'Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)', 'sci-p1', 'Combines mathematical principles with modern scientific computing, differential equations, and Physics-Informed Neural Networks (PINNs).', 299900, 899900, 'PUBLISHED'::content_status, '{"group": "group-2", "pathwayId": "sci-p1", "badge": "GROUP 02 • PATHWAY 01", "shortName": "Science & Math: SciML & AI"}'::jsonb, TRUE),
-        ('sci-p2', 'Mathematics + AI / Computational Intelligence', 'sci-p2', 'Rigorous mathematics-oriented pathway focusing on mathematical proofs, optimization theory, statistical learning, and computational algorithms.', 150000, 599900, 'PUBLISHED'::content_status, '{"group": "group-2", "pathwayId": "sci-p2", "badge": "GROUP 02 • PATHWAY 02", "shortName": "Science & Math: Computational Math"}'::jsonb, TRUE),
-        ('mgmt-p1', 'Business Analytics & Data Engineering', 'mgmt-p1', 'Equips business students with advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, 'PUBLISHED'::content_status, '{"group": "group-3", "pathwayId": "mgmt-p1", "badge": "GROUP 03 • PATHWAY 01", "shortName": "Commerce: Business Analytics"}'::jsonb, TRUE),
-        ('arts-p1', 'Applied AI for Humanities, Research & Careers', 'arts-p1', 'Elite professional program: prompt engineering, AI research methods, automated content, executive communication, and career mastery.', 99900, 399900, 'PUBLISHED'::content_status, '{"group": "group-4", "pathwayId": "arts-p1", "badge": "GROUP 04 • PATHWAY 01", "shortName": "Humanities: Applied AI"}'::jsonb, TRUE),
-        ('ai-masterclass', 'AI Revolution & Agentic Engineering Masterclass (2-Hour Intensive)', 'ai-masterclass', 'Live 2-Hour Intensive Masterclass on Advanced AI Prompting & Context Engineering.', 3900, 99900, 'PUBLISHED'::content_status, '{"group": "workshop", "pathwayId": "ai-masterclass", "badge": "MASTERCLASS", "shortName": "AI Masterclass"}'::jsonb, TRUE)
+        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE)
       ON CONFLICT ("slug") DO UPDATE SET
         "title" = EXCLUDED."title",
         "short_description" = EXCLUDED."short_description",
@@ -960,7 +979,7 @@ export async function initializeDatabase() {
 
       CREATE TABLE IF NOT EXISTS "public"."submissions" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('sub_'::text || gen_random_uuid()),
-        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "user_id" uuid NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
         "lesson_id" varchar(50),
         "assignment_id" varchar(50),
         "pathway_id" varchar(50),
@@ -996,7 +1015,7 @@ export async function initializeDatabase() {
 
       CREATE TABLE IF NOT EXISTS "public"."notes" (
         "id" varchar(50) PRIMARY KEY DEFAULT ('note_'::text || gen_random_uuid()),
-        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "user_id" uuid NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
         "pathway_id" varchar(100) NOT NULL,
         "lesson_id" varchar(100),
         "lesson_title" varchar(255),
@@ -1052,6 +1071,14 @@ export async function initializeDatabase() {
       console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
     } catch (lmsSeedErr) {
       console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
+    }
+
+    // 20. Seed AI Agent Curriculum (12 weeks, 48 lessons, quizzes, labs, live workshops)
+    try {
+      await seedAiAgentCurriculum();
+      console.log("[DB-INIT] ✅ Seeded official 12-week AI Agent Engineering curriculum.");
+    } catch (aiSeedErr) {
+      console.warn("[DB-INIT] Warning running seedAiAgentCurriculum:", aiSeedErr);
     }
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment, LMS, and Survey tables verified successfully.");

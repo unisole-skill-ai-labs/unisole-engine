@@ -28,8 +28,8 @@ import { adminMentorshipRouter } from "./mentorship";
 
 export const adminRouter: Router = Router();
 
-// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES, MENTOR, PROGRAM_MANAGER)
-adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR", "PROGRAM_MANAGER"]));
+// Protect all admin routes with authentication and role check (SUPER_ADMIN, ADMIN, MEMBER, SALES, MENTOR, COURSE_MANAGER, PROGRAM_MANAGER)
+adminRouter.use(authMiddleware, requireRole(["SUPER_ADMIN", "ADMIN", "MEMBER", "SALES", "MENTOR", "COURSE_MANAGER", "PROGRAM_MANAGER"]));
 
 // Dashboard Stats & Academic Metrics
 adminRouter.use("/dashboard", adminDashboardRouter);

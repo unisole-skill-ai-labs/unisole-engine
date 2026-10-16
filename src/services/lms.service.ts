@@ -1,5 +1,5 @@
 import { eq, and, or, inArray, asc, desc, sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import {
   users,
   enrollments,
@@ -23,8 +23,21 @@ import {
 } from "../db/schema";
 import { ForbiddenError, NotFoundError } from "../errors";
 import { getCanonicalPathway, CANONICAL_GROUPS } from "../constants/canonical-catalog";
+import { WEEKS_DATA } from "../scripts/seed-ai-agent-curriculum";
 
 const PATHWAY_CATALOG: Record<string, { title: string; description: string; duration: string; level: string }> = {
+  "cs-agentic": {
+    title: "AI Agent Engineering",
+    description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+    duration: "12 Weeks (132 Hours)",
+    level: "Production AI Agent Engineering",
+  },
+  "course1": {
+    title: "AI Agent Engineering",
+    description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+    duration: "12 Weeks (132 Hours)",
+    level: "Production AI Agent Engineering",
+  },
   "cs-p1": {
     title: "Machine Learning Engineering in Production",
     description: "Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.",
@@ -141,20 +154,29 @@ export const lmsService = {
           expiresAt: enrollments.expiresAt,
           status: enrollments.status,
           pathway: pathways,
+          course: courses,
         })
         .from(enrollments)
         .leftJoin(
           pathways,
           or(
-            eq(enrollments.pathwayId, pathways.id),
-            eq(enrollments.itemId, pathways.id),
-            eq(enrollments.pathwayId, pathways.slug),
-            eq(enrollments.itemId, pathways.slug)
+            sql`${enrollments.pathwayId}::text = ${pathways.id}::text`,
+            sql`${enrollments.itemId}::text = ${pathways.id}::text`,
+            sql`${enrollments.pathwayId}::text = ${pathways.slug}::text`,
+            sql`${enrollments.itemId}::text = ${pathways.slug}::text`
+          )
+        )
+        .leftJoin(
+          courses,
+          or(
+            sql`${enrollments.itemId}::text = ${courses.id}::text`,
+            sql`${enrollments.pathwayId}::text = ${courses.id}::text`,
+            sql`${enrollments.itemId}::text = ${courses.slug}::text`
           )
         )
         .where(
           and(
-            eq(enrollments.userId, userId),
+            sql`${enrollments.userId}::text = ${userId}::text`,
             eq(enrollments.status, "ACTIVE")
           )
         );
@@ -162,18 +184,31 @@ export const lmsService = {
       console.warn("[LMSService] DB offline or query issue in getAccessiblePathways, using fallback enrollments:", dbErr);
     }
 
-    if (activeEnrollments.length === 0) {
-      // In staging/preview or offline DB, provide immediate access to Flagship tracks
-      const flagshipIds = ["cs-genai", "cs-common"];
+    // Filter active enrollments to ONLY AI Agent Engineering
+    const agenticEnrollments = activeEnrollments.filter((enr) => {
+      const slug = enr.course?.slug || enr.pathway?.slug || enr.itemId || enr.pathwayId || "";
+      const title = enr.course?.title || enr.pathway?.title || "";
+      return slug === "cs-agentic" || slug === "course1" || title.toLowerCase().includes("ai agent");
+    });
+
+    if (agenticEnrollments.length === 0) {
+      // Auto-enroll user in the official AI Agent Engineering course
+      try {
+        await pool.query(
+          `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
+           VALUES ($1, $2, 'cs-agentic', 'PATHWAY', 'cs-agentic', 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
+           ON CONFLICT DO NOTHING`,
+          [`enr_${userId}_cs-agentic`, userId]
+        );
+      } catch {}
+
       let flagshipRows: any[] = [];
       try {
         flagshipRows = await db
           .select()
           .from(pathways)
-          .where(inArray(pathways.id, flagshipIds));
-      } catch {
-        // Fallback below
-      }
+          .where(or(eq(pathways.id, "cs-agentic"), eq(pathways.slug, "cs-agentic")));
+      } catch {}
 
       if (flagshipRows.length > 0) {
         return flagshipRows.map((pwy) => ({
@@ -185,38 +220,54 @@ export const lmsService = {
         }));
       }
 
-      // Offline in-memory fallback
-      return flagshipIds.map((targetId) => {
-        const canon = getCanonicalPathway(targetId);
-        const cat = PATHWAY_CATALOG[targetId] || {
-          title: canon?.title || "Generative AI Engineering",
-          description: canon?.description || "Verified academic training track.",
-          duration: canon?.duration || "12 Weeks (132 Hours)",
-          level: canon?.level || "Foundations to Agentic AI",
-        };
-        return {
-          enrollmentId: `enr_${targetId}_demo`,
+      // Live canonical AI Agent Engineering
+      const cat = PATHWAY_CATALOG["cs-agentic"];
+      return [
+        {
+          enrollmentId: `enr_cs-agentic_active`,
           enrolledAt: new Date().toISOString(),
           expiresAt: null,
           status: "ACTIVE" as const,
           pathway: {
-            id: targetId,
+            id: "cs-agentic",
             title: cat.title,
             description: cat.description,
-            slug: targetId,
+            slug: "cs-agentic",
             duration: cat.duration,
             level: cat.level,
             isActive: true,
             isPublic: true,
-            pricePaise: canon?.price ? canon.price * 100 : 299900,
+            pricePaise: 299900,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
-        };
-      });
+        },
+      ];
     }
 
-    return activeEnrollments.map((enr) => {
+    return agenticEnrollments.map((enr) => {
+      if (enr.course) {
+        return {
+          enrollmentId: enr.enrollmentId,
+          enrolledAt: enr.enrolledAt,
+          expiresAt: enr.expiresAt,
+          status: enr.status,
+          pathway: {
+            id: enr.course.id,
+            title: enr.course.title,
+            description: enr.course.description || enr.course.shortDescription || "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+            slug: enr.course.slug,
+            duration: "12 Weeks (132 Hours)",
+            level: "Production AI Agent Engineering",
+            isActive: enr.course.isActive,
+            isPublic: true,
+            pricePaise: enr.course.pricePaise || 299900,
+            createdAt: enr.course.createdAt,
+            updatedAt: enr.course.updatedAt,
+          },
+        };
+      }
+
       if (enr.pathway) {
         return {
           enrollmentId: enr.enrollmentId,
@@ -227,30 +278,22 @@ export const lmsService = {
         };
       }
 
-      const targetId = enr.itemId || enr.pathwayId || "cs-genai";
-      const canon = getCanonicalPathway(targetId);
-      const cat = PATHWAY_CATALOG[targetId] || {
-        title: canon?.title || "Generative AI Engineering",
-        description: canon?.description || "Verified academic training track.",
-        duration: canon?.duration || "12 Weeks (132 Hours)",
-        level: canon?.level || "Foundations to Agentic AI",
-      };
-
+      const cat = PATHWAY_CATALOG["cs-agentic"];
       return {
         enrollmentId: enr.enrollmentId,
         enrolledAt: enr.enrolledAt,
         expiresAt: enr.expiresAt,
         status: enr.status,
         pathway: {
-          id: targetId,
+          id: "cs-agentic",
           title: cat.title,
           description: cat.description,
-          slug: targetId,
+          slug: "cs-agentic",
           duration: cat.duration,
           level: cat.level,
           isActive: true,
           isPublic: true,
-          pricePaise: canon?.price ? canon.price * 100 : 299900,
+          pricePaise: 299900,
           createdAt: enr.enrolledAt,
           updatedAt: enr.enrolledAt,
         },
@@ -275,6 +318,34 @@ export const lmsService = {
     }
 
     let pathway: any = pathwayRows[0];
+    if (!pathway) {
+      try {
+        const courseRows = await db
+          .select()
+          .from(courses)
+          .where(or(sql`${courses.id}::text = ${pathwayId}::text`, eq(courses.slug, pathwayId)))
+          .limit(1);
+        if (courseRows[0]) {
+          const c = courseRows[0];
+          pathway = {
+            id: c.id,
+            title: c.title,
+            slug: c.slug,
+            description: c.description || c.shortDescription || "Curriculum, Labs & Projects",
+            duration: "Self-Paced Track",
+            level: "Intermediate",
+            isActive: c.isActive,
+            isPublic: true,
+            pricePaise: c.pricePaise || 0,
+            createdAt: c.createdAt,
+            updatedAt: c.updatedAt,
+          };
+        }
+      } catch (err) {
+        console.warn("[LMSService] Course lookup fallback in getPathwayContent:", err);
+      }
+    }
+
     if (!pathway) {
       const canon = getCanonicalPathway(pathwayId);
       if (canon) {
@@ -304,15 +375,15 @@ export const lmsService = {
           .from(enrollments)
           .where(
             and(
-              eq(enrollments.userId, userId),
+              sql`${enrollments.userId}::text = ${userId}::text`,
               eq(enrollments.status, "ACTIVE"),
               or(
-                eq(enrollments.pathwayId, pathwayId),
-                eq(enrollments.itemId, pathwayId),
-                eq(enrollments.pathwayId, pathway.id),
-                eq(enrollments.itemId, pathway.id),
-                eq(enrollments.pathwayId, pathway.slug),
-                eq(enrollments.itemId, pathway.slug)
+                sql`${enrollments.pathwayId}::text = ${pathwayId}::text`,
+                sql`${enrollments.itemId}::text = ${pathwayId}::text`,
+                sql`${enrollments.pathwayId}::text = ${pathway.id}::text`,
+                sql`${enrollments.itemId}::text = ${pathway.id}::text`,
+                sql`${enrollments.pathwayId}::text = ${pathway.slug}::text`,
+                sql`${enrollments.itemId}::text = ${pathway.slug}::text`
               )
             )
           )
@@ -322,23 +393,18 @@ export const lmsService = {
       }
 
       if (activeEnrollment.length === 0) {
-        const isFlagship = ["cs-genai", "cs-common", "pwy_cs-genai", "pwy_cs-common"].includes(pathway.id) ||
-          ["cs-genai", "cs-common"].includes(pathwayId);
-        if (isFlagship) {
-          try {
-            await db.insert(enrollments).values({
-              userId,
-              itemType: "PATHWAY",
-              itemId: pathway.id,
-              pathwayId: pathway.id,
-              status: "ACTIVE",
-              enrolledAt: new Date().toISOString(),
-            }).onConflictDoNothing();
-          } catch (autoErr) {
-            console.warn("[LMS] Auto-enrollment info:", autoErr);
-          }
-        } else {
-          throw new ForbiddenError("You are not enrolled in this pathway");
+        // Auto-enroll user into AI Agent Engineering pathway so every LMS user has immediate access
+        try {
+          await db.insert(enrollments).values({
+            userId,
+            itemType: "PATHWAY",
+            itemId: pathway.id,
+            pathwayId: pathway.id,
+            status: "ACTIVE",
+            enrolledAt: new Date().toISOString(),
+          }).onConflictDoNothing();
+        } catch (autoErr) {
+          console.warn("[LMS] Auto-enrollment info:", autoErr);
         }
       }
     }
@@ -352,45 +418,242 @@ export const lmsService = {
           course: courses,
         })
         .from(pathwayCourses)
-        .innerJoin(courses, eq(pathwayCourses.courseId, courses.id))
-        .where(or(eq(pathwayCourses.pathwayId, pathway.id), eq(pathwayCourses.pathwayId, pathway.slug)))
+        .innerJoin(courses, sql`${pathwayCourses.courseId}::text = ${courses.id}::text`)
+        .where(or(
+          sql`${pathwayCourses.pathwayId}::text = ${pathway.id}::text`,
+          sql`${pathwayCourses.pathwayId}::text = ${pathway.slug}::text`
+        ))
         .orderBy(asc(pathwayCourses.position));
     } catch {
       // In offline DB, linkedCourses will be empty, triggering synthetic canon modules below
+    }
+
+    // If this is a standalone course, directly attach it as the single course
+    // If this is a standalone course, directly attach it as the single course
+    if (linkedCourses.length === 0) {
+      try {
+        const directCourse = await db
+          .select()
+          .from(courses)
+          .where(
+            or(
+              sql`${courses.id}::text = ${pathway.id}::text`,
+              eq(courses.slug, pathway.slug),
+              eq(courses.title, pathway.title),
+              and(
+                sql`${pathway.id}::text IN ('course1', 'cs-agentic')`,
+                or(eq(courses.slug, 'cs-agentic'), eq(courses.title, 'AI Agent Engineering'))
+              )
+            )
+          )
+          .limit(1);
+        if (directCourse[0]) {
+          linkedCourses = [{ position: 1, course: directCourse[0] }];
+        }
+      } catch {}
     }
 
     const courseList: any[] = [];
 
     for (const { position: coursePos, course } of linkedCourses) {
       // Fetch linked modules for this course
-      const linkedModules = await db
+      let linkedModules = await db
         .select({
           position: courseModules.position,
           module: modules,
         })
         .from(courseModules)
-        .innerJoin(modules, eq(courseModules.moduleId, modules.id))
-        .where(eq(courseModules.courseId, course.id))
+        .innerJoin(modules, sql`${courseModules.moduleId}::text = ${modules.id}::text`)
+        .where(sql`${courseModules.courseId}::text = ${course.id}::text`)
         .orderBy(asc(courseModules.position));
 
+      // Filter out any obsolete dummy modules like "Intro to AI Agents"
+      linkedModules = linkedModules.filter(
+        (lm) => lm.module && !lm.module.title.toLowerCase().includes("intro to ai")
+      );
+
+      // Fallback: If courseModules link wasn't populated or incomplete, check modules directly
+      if (linkedModules.length < 12) {
+        try {
+          const directMods = await pool.query(
+            `SELECT * FROM modules WHERE (course_id = $1::uuid OR course_id::text = $1::text OR title LIKE 'Week %' OR slug LIKE 'cs-agentic-week-%') AND title NOT ILIKE '%Intro to AI%' ORDER BY order_index ASC`,
+            [course.id]
+          );
+          if (directMods.rows && directMods.rows.length >= 12) {
+            linkedModules = directMods.rows.map((m: any) => ({
+              position: m.order_index || 1,
+              module: m,
+            }));
+          }
+        } catch {}
+      }
+
+      // If still fewer than 12 modules, synthesize from official WEEKS_DATA
+      if (linkedModules.length < 12) {
+        linkedModules = WEEKS_DATA.map((w) => ({
+          position: w.weekNum,
+          module: {
+            id: `mod_agent_w${w.weekNum}`,
+            title: w.title,
+            slug: `cs-agentic-week-${w.weekNum}`,
+            description: w.keyConcepts,
+            orderIndex: w.weekNum,
+            status: "PUBLISHED",
+            isActive: true,
+          } as any,
+        }));
+      }
+
       const moduleList: any[] = [];
+      const nowMs = Date.now();
 
       for (const { position: modPos, module: mod } of linkedModules) {
         // Fetch linked lessons for this module
-        const linkedLessons = await db
+        let linkedLessons = await db
           .select({
             position: moduleLessons.position,
             lesson: lessons,
           })
           .from(moduleLessons)
-          .innerJoin(lessons, eq(moduleLessons.lessonId, lessons.id))
-          .where(eq(moduleLessons.moduleId, mod.id))
+          .innerJoin(lessons, sql`${moduleLessons.lessonId}::text = ${lessons.id}::text`)
+          .where(sql`${moduleLessons.moduleId}::text = ${mod.id}::text`)
           .orderBy(asc(moduleLessons.position));
+
+        // If lessons were not linked in module_lessons, query by lesson prefix or synthesize 4 lessons
+        if (linkedLessons.length === 0) {
+          try {
+            const dbLessons = await pool.query(
+              `SELECT * FROM lessons WHERE id LIKE $1 ORDER BY id ASC`,
+              [`les_agent_w${modPos}_%`]
+            );
+            if (dbLessons.rows && dbLessons.rows.length > 0) {
+              linkedLessons = dbLessons.rows.map((l: any, lIdx: number) => ({
+                position: lIdx + 1,
+                lesson: l,
+              }));
+            }
+          } catch {}
+        }
+
+        if (linkedLessons.length === 0) {
+          const wData = WEEKS_DATA.find((w) => w.weekNum === modPos || w.title === mod.title) || WEEKS_DATA[modPos - 1];
+          if (wData) {
+            linkedLessons = [
+              {
+                position: 1,
+                lesson: {
+                  id: `les_agent_w${wData.weekNum}_lec`,
+                  title: `${wData.weekNum}.1 Concept Lecture: ${wData.title.replace(/^Week \d+:\s*/, "")}`,
+                  slug: `agent-w${wData.weekNum}-lecture`,
+                  description: wData.keyConcepts,
+                  videoUrl: wData.videoUrl,
+                  durationMinutes: 45,
+                  status: "PUBLISHED",
+                  content: JSON.stringify({
+                    category: "LECTURE",
+                    type: "video",
+                    contentType: "VIDEO",
+                    curriculumMode: "LECTURE",
+                    duration: "45 Mins",
+                    videoUrl: wData.videoUrl,
+                    keyConcepts: wData.keyConcepts,
+                    handsOn: wData.practical,
+                  }),
+                } as any,
+              },
+              {
+                position: 2,
+                lesson: {
+                  id: `les_agent_w${wData.weekNum}_quiz`,
+                  title: `${wData.weekNum}.2 Knowledge Check: MCQ Quiz (${wData.questions.length} Questions)`,
+                  slug: `agent-w${wData.weekNum}-quiz`,
+                  description: `Test your understanding of ${wData.title}.`,
+                  durationMinutes: 20,
+                  status: "PUBLISHED",
+                  content: JSON.stringify({
+                    category: "PRACTICE",
+                    type: "quiz",
+                    contentType: "QUIZ",
+                    curriculumMode: "PRACTICE",
+                    practiceType: "MCQ",
+                    duration: "20 Mins",
+                    questions: wData.questions,
+                  }),
+                } as any,
+              },
+              {
+                position: 3,
+                lesson: {
+                  id: `les_agent_w${wData.weekNum}_lab`,
+                  title: `${wData.weekNum}.3 Hands-on Practical: ${wData.practical.split(".")[0]}`,
+                  slug: `agent-w${wData.weekNum}-lab`,
+                  description: wData.assignmentDeliverable,
+                  durationMinutes: 90,
+                  status: "PUBLISHED",
+                  content: JSON.stringify({
+                    category: "TEST",
+                    type: "assignment",
+                    contentType: "ASSIGNMENT",
+                    curriculumMode: "TEST",
+                    testType: "PROJECT",
+                    duration: "90 Mins",
+                    maxScore: 100,
+                    instructions: wData.assignmentDeliverable,
+                    practical: wData.practical,
+                  }),
+                } as any,
+              },
+              {
+                position: 4,
+                lesson: {
+                  id: `les_agent_w${wData.weekNum}_live`,
+                  title: `${wData.weekNum}.4 ${wData.liveTopic}`,
+                  slug: `agent-w${wData.weekNum}-live`,
+                  description: `Interactive live cohort workshop on ${wData.liveDate} at ${wData.liveTime}.`,
+                  durationMinutes: 120,
+                  status: "PUBLISHED",
+                  content: JSON.stringify({
+                    category: "LIVE",
+                    type: "live",
+                    contentType: "LIVE",
+                    curriculumMode: "LIVE",
+                    duration: "120 Mins",
+                    liveDate: wData.liveDate,
+                    liveTime: wData.liveTime,
+                    mentorName: wData.mentorName,
+                    liveMeetingUrl: "https://meet.google.com/new",
+                    instructions: `Agenda for ${wData.liveTopic}:\n• 45 Mins: Architecture Deep-dive & Code Walkthrough\n• 45 Mins: Hands-on Lab Implementation\n• 30 Mins: Live Open Q&A & Code Reviews with ${wData.mentorName}.`,
+                  }),
+                } as any,
+              },
+            ];
+          }
+        }
+
+        const modUnlockMs = mod.unlockAt ? new Date(mod.unlockAt).getTime() : null;
+        const modLockMs = mod.lockAt ? new Date(mod.lockAt).getTime() : null;
+
+        const isModUnlockPending = modUnlockMs !== null && modUnlockMs > nowMs;
+        const isModLockExpired = modLockMs !== null && modLockMs <= nowMs;
+        const isModScheduleLocked = isModUnlockPending || isModLockExpired;
+        const isModLocked = !isAdmin && isModScheduleLocked;
 
         moduleList.push({
           ...mod,
           position: modPos,
+          unlockAt: mod.unlockAt || null,
+          lockAt: mod.lockAt || null,
+          isLocked: isModLocked,
+          isScheduleLocked: isModScheduleLocked,
           lessons: linkedLessons.map(({ position: lesPos, lesson }) => {
+            const lesUnlockMs = lesson.unlockAt ? new Date(lesson.unlockAt).getTime() : null;
+            const lesLockMs = lesson.lockAt ? new Date(lesson.lockAt).getTime() : null;
+
+            const isLesUnlockPending = lesUnlockMs !== null && lesUnlockMs > nowMs;
+            const isLesLockExpired = lesLockMs !== null && lesLockMs <= nowMs;
+            const isLesScheduleLocked = isLesUnlockPending || isLesLockExpired || isModScheduleLocked;
+            const isLesLocked = !isAdmin && (isModLocked || isLesScheduleLocked);
+
             let parsedContent: any = null;
             try {
               if (lesson.content && lesson.content.startsWith("{")) {
@@ -411,15 +674,35 @@ export const lmsService = {
               parsedContent?.type === "SUBJECTIVE_TEST";
             const isQuizItem =
               parsedContent?.type === "QUIZ" ||
+              parsedContent?.type === "quiz" ||
               parsedContent?.practiceType === "MCQ" ||
               lesson.id.includes("_quiz") ||
-              lesson.slug?.includes("quiz");
+              lesson.slug?.includes("quiz") ||
+              lesson.title?.toLowerCase().includes("quiz") ||
+              lesson.title?.toLowerCase().includes("knowledge check");
             const isAssignmentItem =
               parsedContent?.type === "ASSIGNMENT" ||
+              parsedContent?.type === "assignment" ||
               parsedContent?.practiceType === "PROJECT" ||
               parsedContent?.testType === "PROJECT" ||
               lesson.id.includes("_lab") ||
-              lesson.id.includes("_cap");
+              lesson.id.includes("_cap") ||
+              lesson.slug?.includes("task") ||
+              lesson.slug?.includes("assignment") ||
+              lesson.slug?.includes("capstone") ||
+              lesson.title?.toLowerCase().includes("capstone") ||
+              lesson.title?.toLowerCase().includes("task") ||
+              lesson.title?.toLowerCase().includes("assignment") ||
+              lesson.title?.toLowerCase().includes("lab");
+
+            const isLiveItem =
+              parsedContent?.type === "LIVE" ||
+              parsedContent?.type === "live" ||
+              parsedContent?.category === "LIVE" ||
+              parsedContent?.curriculumMode === "LIVE" ||
+              lesson.slug?.includes("live") ||
+              lesson.id.includes("_live") ||
+              lesson.title?.toLowerCase().includes("live");
 
             const isFolder =
               parsedContent?.type === "FOLDER" ||
@@ -432,6 +715,9 @@ export const lmsService = {
             if (isFolder) {
               computedType = "folder";
               computedCategory = "FOLDER";
+            } else if (isLiveItem) {
+              computedType = "live";
+              computedCategory = "LIVE";
             } else if (isCoding) {
               computedType = "coding_test";
               computedCategory = "TEST";
@@ -447,43 +733,61 @@ export const lmsService = {
             } else if (isAssignmentItem) {
               computedType = "assignment";
               computedCategory = parsedContent?.category || (parsedContent?.testType ? "TEST" : "PRACTICE");
+            } else if (!lesson.videoUrl && lesson.content) {
+              computedType = "reading";
+              computedCategory = "LECTURE";
             }
 
             return {
               id: lesson.id,
               title: lesson.title,
               slug: lesson.slug,
-              description: lesson.description || parsedContent?.contentMarkdown,
+              description: isLesLocked
+                ? "This activity is scheduled and locked until unlock time."
+                : lesson.description || parsedContent?.contentMarkdown,
               durationMinutes: lesson.durationMinutes,
-              videoUrl:
-                lesson.videoUrl ||
-                parsedContent?.videoUrl ||
-                "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1",
-              content: lesson.content,
+              videoUrl: isLesLocked
+                ? null
+                : (lesson.videoUrl ||
+                    parsedContent?.videoUrl ||
+                    (computedType === "video"
+                      ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1"
+                      : null)),
+              content: isLesLocked ? null : lesson.content,
               contentType: computedType.toUpperCase(),
               type: computedType,
               category: computedCategory,
               isTest: computedCategory === "TEST",
               folderId: parsedContent?.folderId || null,
-              attachments: parsedContent?.attachments || [],
-              config:
-                parsedContent?.codingTest ||
-                parsedContent?.subjectiveTest ||
-                parsedContent?.videoTest ||
-                parsedContent?.assignment ||
-                parsedContent?.quiz,
-              questions: parsedContent?.quiz?.questions || parsedContent?.questions,
-              instructions:
-                parsedContent?.assignment?.instructions ||
-                parsedContent?.instructions ||
-                lesson.description,
+              attachments: isLesLocked ? [] : (parsedContent?.attachments || []),
+              config: isLesLocked
+                ? null
+                : (parsedContent?.codingTest ||
+                    parsedContent?.subjectiveTest ||
+                    parsedContent?.videoTest ||
+                    parsedContent?.assignment ||
+                    parsedContent?.quiz),
+              questions: isLesLocked ? [] : (parsedContent?.quiz?.questions || parsedContent?.questions),
+              instructions: isLesLocked
+                ? "Content is scheduled and locked."
+                : (parsedContent?.assignment?.instructions ||
+                    parsedContent?.instructions ||
+                    lesson.description),
               maxScore:
                 parsedContent?.maxScore ||
                 parsedContent?.assignment?.maxPoints ||
                 parsedContent?.codingTest?.maxScore ||
                 100,
+              liveDate: parsedContent?.liveDate,
+              liveTime: parsedContent?.liveTime,
+              liveMeetingUrl: parsedContent?.liveMeetingUrl,
+              mentorName: parsedContent?.mentorName,
               status: lesson.status,
               position: lesPos,
+              unlockAt: lesson.unlockAt || mod.unlockAt || null,
+              lockAt: lesson.lockAt || mod.lockAt || null,
+              isLocked: isLesLocked,
+              isScheduleLocked: isLesScheduleLocked,
             };
           }),
         });
@@ -517,6 +821,39 @@ export const lmsService = {
       const lesson = lessonRows[0];
       if (isAdmin) {
         return lesson;
+      }
+
+      // Time lock enforcement for students
+      const nowMs = Date.now();
+      if (lesson.unlockAt && new Date(lesson.unlockAt).getTime() > nowMs) {
+        throw new ForbiddenError(
+          `This activity is scheduled and locked until ${new Date(lesson.unlockAt).toLocaleString()}`
+        );
+      }
+      if (lesson.lockAt && new Date(lesson.lockAt).getTime() <= nowMs) {
+        throw new ForbiddenError(
+          `This activity closed on ${new Date(lesson.lockAt).toLocaleString()}`
+        );
+      }
+
+      // Check parent module time lock
+      const parentModules = await db
+        .select({ unlockAt: modules.unlockAt, lockAt: modules.lockAt })
+        .from(moduleLessons)
+        .innerJoin(modules, sql`${moduleLessons.moduleId}::text = ${modules.id}::text`)
+        .where(sql`${moduleLessons.lessonId}::text = ${lessonId}::text`);
+
+      for (const pm of parentModules) {
+        if (pm.unlockAt && new Date(pm.unlockAt).getTime() > nowMs) {
+          throw new ForbiddenError(
+            `This module is scheduled and locked until ${new Date(pm.unlockAt).toLocaleString()}`
+          );
+        }
+        if (pm.lockAt && new Date(pm.lockAt).getTime() <= nowMs) {
+          throw new ForbiddenError(
+            `This module closed on ${new Date(pm.lockAt).toLocaleString()}`
+          );
+        }
       }
 
       // Check if user has active enrollment in this lesson's pathway
@@ -759,14 +1096,18 @@ export const lmsService = {
 
     const completedLessonIds = new Set(progress.completedLessonIds);
 
-    const completedList: any[] = [];
+    const missedList: any[] = [];
     const upcomingList: any[] = [];
+    const completedList: any[] = [];
 
     const monthNames = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
     const now = new Date();
+
+    let primaryCourseTitle = "AI Agent Engineering: From Fundamentals to Production";
+    let primaryPathwayId = "cs-agentic";
 
     for (const enr of accessible) {
       const pathwayId = enr.pathway?.id || enr.pathway?.slug;
@@ -780,30 +1121,46 @@ export const lmsService = {
       }
 
       const coursesList = content?.courses || [];
-      const courseTitle = content?.pathway?.title || enr.pathway?.title || "Pathway Course";
+      const courseTitle = content?.courses?.[0]?.title || content?.pathway?.title || enr.pathway?.title || "AI Agent Engineering";
+      if (courseTitle && !primaryCourseTitle) {
+        primaryCourseTitle = courseTitle;
+        primaryPathwayId = pathwayId;
+      } else if (pathwayId === "cs-agentic" || pathwayId === "course1") {
+        primaryCourseTitle = courseTitle;
+        primaryPathwayId = pathwayId;
+      }
 
-      for (const crs of coursesList) {
+    const seenLessonIds = new Set<string>();
+
+    for (const crs of coursesList) {
         const mods = crs.modules || [];
         mods.forEach((mod: any, mIdx: number) => {
           const modLessons = mod.lessons || [];
           modLessons.forEach((les: any, lIdx: number) => {
+            if (seenLessonIds.has(les.id)) return;
+            seenLessonIds.add(les.id);
+
             const isQuiz = les.contentType === "QUIZ" || les.id?.includes("_quiz");
             const isAssignment =
               les.contentType === "ASSIGNMENT" ||
               les.id?.includes("_lab") ||
               les.id?.includes("_cap") ||
               les.id?.includes("milestone");
-
-            if (!isQuiz && !isAssignment) return;
+            const isLive = les.contentType === "LIVE" || les.id?.includes("_live");
+            const isLecture = !isQuiz && !isAssignment && !isLive;
 
             const existingSub = studentSubmissions.find((s) => s.lessonId === les.id);
             const isDone = completedLessonIds.has(les.id) || !!existingSub;
 
             const category = isQuiz
               ? "Graded Quiz"
-              : les.title?.toLowerCase().includes("capstone")
-              ? "Capstone"
-              : "Hands-on Lab";
+              : isAssignment
+              ? les.title?.toLowerCase().includes("capstone")
+                ? "Capstone Project"
+                : "Hands-on Lab"
+              : isLive
+              ? "Live Class"
+              : "Video Lecture";
 
             // If completed, add to completedList
             if (isDone) {
@@ -817,42 +1174,88 @@ export const lmsService = {
                 id: `act-${les.id}`,
                 lessonId: les.id,
                 pathwayId,
-                type: isQuiz ? "quiz" : "assignment",
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
                 category,
                 course: courseTitle,
+                moduleTitle: mod.title,
                 title: les.title,
-                datePrefix: isQuiz ? "Completed" : "Submitted",
+                datePrefix: isQuiz ? "Completed" : isAssignment ? "Submitted" : "Watched",
                 date: `${day} ${monthShort} ${yr} ${time}`,
                 statusText: isQuiz
                   ? `Marks: ${existingSub?.score !== null && existingSub?.score !== undefined ? existingSub.score : 10}/10`
                   : existingSub?.status === "APPROVED"
                   ? "Evaluation Complete"
-                  : "Evaluation Pending",
+                  : "Completed",
               });
-            } else {
-              // Upcoming activity: calculate target week deadline
-              const targetDate = new Date(now.getTime() + (mIdx * 7 + 4) * 24 * 60 * 60 * 1000);
-              const day = String(targetDate.getDate()).padStart(2, "0");
-              const monthShort = targetDate.toLocaleString("default", { month: "short" });
-              const yr = String(targetDate.getFullYear()).slice(-2);
-              const monthFull = monthNames[targetDate.getMonth()];
-              const groupKey = `${monthFull} ${targetDate.getFullYear()}`;
-
+            } else if (mIdx === 0) {
+              // Week 1 (Past week) - Uncompleted lessons, quizzes, or assignments are MISSED
+              missedList.push({
+                id: `act-missed-${les.id}`,
+                lessonId: les.id,
+                pathwayId,
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
+                category,
+                course: courseTitle,
+                moduleTitle: mod.title,
+                title: les.title,
+                dateText: isQuiz
+                  ? "Missed deadline: 09 Oct 2026"
+                  : isAssignment
+                  ? "Missed deadline: 11 Oct 2026"
+                  : "Missed schedule: 07 Oct 2026",
+                status: "MISSED",
+                isOverdue: true,
+                actionText: isQuiz ? "Take Quiz" : isAssignment ? "Submit Lab" : "Watch Lecture",
+              });
+            } else if (mIdx === 1) {
+              // Week 2 (Current week) - UPCOMING
               upcomingList.push({
                 id: `act-up-${les.id}`,
                 lessonId: les.id,
                 pathwayId,
-                type: isQuiz ? "quiz" : "assignment",
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
                 category,
                 course: courseTitle,
+                moduleTitle: mod.title,
                 title: les.title,
-                dateText: isQuiz
-                  ? `${day} ${monthShort} ${yr} 12:00 AM - ${day} ${monthShort} ${yr} 11:59 PM`
-                  : `Due: ${day} ${monthShort} ${yr} 11:59 PM`,
-                isUrgent: mIdx <= 1,
-                iconStyle: isQuiz ? "crimson" : mIdx <= 1 ? "crimson" : "rose",
-                monthGroup: groupKey,
-                sortTime: targetDate.getTime(),
+                dateText: isLive
+                  ? "Today • 6:00 PM – 7:30 PM IST"
+                  : isQuiz
+                  ? "Due Tonight • 11:59 PM"
+                  : isAssignment
+                  ? "Due Friday • 11:59 PM"
+                  : "Target: Today / This Week",
+                status: "UPCOMING",
+                isToday: isLive || isQuiz,
+                isUrgent: isQuiz || isAssignment,
+                meetUrl: isLive ? "https://meet.google.com/uni-sole-live" : undefined,
+                actionText: isLive ? "Join Live Class" : isQuiz ? "Start Quiz" : isAssignment ? "Start Lab" : "Watch Now",
+                sortTime: isLive ? now.getTime() + 1000 : isQuiz ? now.getTime() + 2000 : now.getTime() + 5000,
+                monthGroup: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+              });
+            } else if (mIdx === 2) {
+              // Week 3 - UPCOMING
+              upcomingList.push({
+                id: `act-up-${les.id}`,
+                lessonId: les.id,
+                pathwayId,
+                type: isQuiz ? "quiz" : isAssignment ? "assignment" : isLive ? "live" : "lecture",
+                category,
+                course: courseTitle,
+                moduleTitle: mod.title,
+                title: les.title,
+                dateText: isLive
+                  ? "Saturday • 6:00 PM – 8:00 PM IST"
+                  : isQuiz
+                  ? "Due Sunday • 11:59 PM"
+                  : "Upcoming Next Week",
+                status: "UPCOMING",
+                isToday: false,
+                isUrgent: false,
+                meetUrl: isLive ? "https://meet.google.com/uni-sole-live" : undefined,
+                actionText: isLive ? "Join Workshop" : isQuiz ? "View Quiz" : "Preview",
+                sortTime: now.getTime() + 7 * 24 * 60 * 60 * 1000,
+                monthGroup: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
               });
             }
           });
@@ -860,14 +1263,52 @@ export const lmsService = {
       }
     }
 
-    // Group upcoming by month
-    upcomingList.sort((a, b) => a.sortTime - b.sortTime);
+    // Query live calendar events from DB to enrich upcoming activities
+    try {
+      const calRes = await db.execute<any>(sql`
+        SELECT * FROM calendar_events
+        WHERE scope = 'GLOBAL' OR course_id = 'cs-agentic' OR course_id = 'course1'
+        ORDER BY start_time ASC;
+      `);
+      const calRows = calRes.rows || calRes;
+      if (Array.isArray(calRows)) {
+        calRows.forEach((cev: any) => {
+          const isTodayEv = cev.id.includes("today") || (cev.start_time && new Date(cev.start_time).toDateString() === now.toDateString());
+          if (!upcomingList.some((u) => u.lessonId === cev.lesson_id || u.title === cev.title)) {
+            upcomingList.push({
+              id: `act-cal-${cev.id}`,
+              lessonId: cev.lesson_id || cev.id,
+              pathwayId: primaryPathwayId,
+              type: cev.event_type === "LIVE_CLASS" ? "live" : cev.event_type === "MILESTONE" ? "quiz" : "assignment",
+              category: cev.event_type === "LIVE_CLASS" ? "Live Class" : cev.event_type === "MILESTONE" ? "Graded Quiz" : "Hands-on Lab",
+              course: primaryCourseTitle,
+              moduleTitle: "AI Agent Engineering Live",
+              title: cev.title,
+              dateText: isTodayEv ? "Today • " + new Date(cev.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : new Date(cev.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+              status: "UPCOMING",
+              isToday: isTodayEv,
+              isUrgent: isTodayEv,
+              meetUrl: cev.meet_url,
+              actionText: cev.event_type === "LIVE_CLASS" ? "Join Live Class" : cev.event_type === "MILESTONE" ? "Take Quiz" : "View Lab",
+              sortTime: cev.start_time ? new Date(cev.start_time).getTime() : now.getTime(),
+              monthGroup: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+            });
+          }
+        });
+      }
+    } catch (calErr) {
+      console.warn("[LMSService] Calendar enrichment notice:", calErr);
+    }
+
+    // Group upcoming by month for backwards compatibility
+    upcomingList.sort((a, b) => (a.sortTime || 0) - (b.sortTime || 0));
     const monthGroupsMap: Record<string, any[]> = {};
     for (const item of upcomingList) {
-      if (!monthGroupsMap[item.monthGroup]) {
-        monthGroupsMap[item.monthGroup] = [];
+      const g = item.monthGroup || `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      if (!monthGroupsMap[g]) {
+        monthGroupsMap[g] = [];
       }
-      monthGroupsMap[item.monthGroup].push(item);
+      monthGroupsMap[g].push(item);
     }
 
     const scheduled = Object.entries(monthGroupsMap).map(([month, items]) => ({
@@ -876,8 +1317,12 @@ export const lmsService = {
     }));
 
     return {
-      scheduled,
+      courseName: primaryCourseTitle,
+      pathwayId: primaryPathwayId,
+      missed: missedList,
+      upcoming: upcomingList,
       completed: completedList,
+      scheduled,
     };
   },
 
@@ -1209,7 +1654,7 @@ export const lmsService = {
     }
 
     const isAdmin = callerRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r.toUpperCase()));
-    const isProgramManager = callerRoles.some((r) => r.toUpperCase() === "PROGRAM_MANAGER");
+    const isProgramManager = callerRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r.toUpperCase()));
     const isMentor = callerRoles.some((r) => r.toUpperCase() === "MENTOR");
 
     // 1. Auto-sync users having role = 'MENTOR' into mentors table if not already present
@@ -1281,106 +1726,257 @@ export const lmsService = {
           };
         }
 
-        const menteeRows = await db
-          .select()
-          .from(mentorMentees)
-          .where(and(eq(mentorMentees.mentorId, specificMentorId), eq(mentorMentees.status, "ACTIVE")));
+        // Ensure calendar_events table exists
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS calendar_events (
+              id VARCHAR(50) PRIMARY KEY,
+              title VARCHAR(255) NOT NULL,
+              description TEXT,
+              event_type VARCHAR(50) NOT NULL DEFAULT 'GENERAL',
+              start_time TIMESTAMPTZ NOT NULL,
+              end_time TIMESTAMPTZ NOT NULL,
+              scope VARCHAR(50) NOT NULL DEFAULT 'GLOBAL',
+              course_id VARCHAR(255),
+              lesson_id VARCHAR(255),
+              mentor_id VARCHAR(255),
+              student_id VARCHAR(255),
+              meet_url VARCHAR(500),
+              color_scheme VARCHAR(50) DEFAULT 'blue',
+              created_by VARCHAR(255),
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+          `);
+        } catch {}
 
-        if (menteeRows.length > 0) {
-          const studentIds = menteeRows.map((r) => r.menteeId);
-          const studentUsers = await db
-            .select()
-            .from(users)
-            .where(inArray(users.id, studentIds));
+        // Ensure mentor_mentees table exists
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS mentor_mentees (
+              id VARCHAR(50) PRIMARY KEY,
+              mentor_id VARCHAR(50) NOT NULL,
+              mentee_id VARCHAR(50) NOT NULL,
+              course_id VARCHAR(50),
+              pathway_id VARCHAR(50),
+              status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+              metadata JSONB DEFAULT '{}'::jsonb,
+              assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+          `);
+        } catch {}
 
-          const allSubs = await db
-            .select()
-            .from(submissions)
-            .where(inArray(submissions.userId, studentIds));
-
-          const allProgress = await db
-            .select()
-            .from(lessonProgress)
-            .where(and(inArray(lessonProgress.userId, studentIds), eq(lessonProgress.isCompleted, true)));
-
-          const totalLessonsCountRes = await db
-            .select({ count: sql`COUNT(*)::int` })
-            .from(lessons);
-          const catalogLessonCount = Math.max(1, Number(totalLessonsCountRes[0]?.count || 10));
-
-          menteesList = studentUsers.map((u) => {
-            const userSubs = allSubs.filter((s) => s.userId === u.id);
-            const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
-            const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
-            const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            const latestSub = sortedSubs[0];
-
-            const userProgressCount = allProgress.filter((p) => p.userId === u.id).length;
-            const progressPercent = Math.min(100, Math.round((userProgressCount / catalogLessonCount) * 100));
-
-            return {
-              id: u.id,
-              name: u.name,
-              email: u.email,
-              phone: u.phone,
-              avatar: u.avatar || null,
-              college: u.collegeName || "Govt Degree College",
-              progressPercent,
-              completedLessonsCount: userProgressCount,
-              totalLessonsCount: catalogLessonCount,
-              submittedCount: userSubs.length,
-              pendingReviews: pendingSubs.length,
-              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : (progressPercent < 20 && userSubs.length === 0) ? "AT_RISK" : "ON_TRACK",
-              lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
-              submissions: sortedSubs.map((s) => ({
-                id: s.id,
-                title: s.title,
-                type: s.type,
-                submissionUrl: s.submissionUrl,
-                submissionText: s.submissionText,
-                codeSnippet: s.codeSnippet,
-                videoUrl: s.videoUrl,
-                score: s.score,
-                status: s.status,
-                mentorFeedback: s.mentorFeedback,
-                createdAt: s.createdAt,
-              })),
-              latestSubmission: latestSub ? {
-                id: latestSub.id,
-                title: latestSub.title,
-                type: latestSub.type,
-                submissionUrl: latestSub.submissionUrl,
-                submissionText: latestSub.submissionText,
-                codeSnippet: latestSub.codeSnippet,
-                videoUrl: latestSub.videoUrl,
-                score: latestSub.score,
-                status: latestSub.status,
-                mentorFeedback: latestSub.mentorFeedback,
-                createdAt: latestSub.createdAt,
-              } : null,
-            };
-          });
+        if (!mentorRecord) {
+          mentorRecord = {
+            id: specificMentorId || "ALL",
+            userId: specificMentorId || "ALL",
+            name: "Cohort Mentor",
+            specialization: "Full Cohort Technical Oversight",
+            bio: "Mentor guiding student courses, submissions, and live sessions.",
+          };
         }
-      } else {
-        // Admin or Program Manager viewing aggregate / all mentors cohort
-        mentorRecord = {
-          id: "ALL",
-          userId: "ALL",
-          name: "All Mentors Cohort",
-          specialization: "Full Cohort Oversight",
-          bio: "Aggregated mentorship overview across all active mentors.",
-        };
 
-        const menteeRows = await db
-          .select({
-            menteeId: mentorMentees.menteeId,
-            mentorId: mentorMentees.mentorId,
-          })
-          .from(mentorMentees)
-          .where(eq(mentorMentees.status, "ACTIVE"));
+        // 1. Fetch assigned mentees from DB
+        let menteeRows: any[] = [];
+        if (specificMentorId) {
+          menteeRows = await db
+            .select()
+            .from(mentorMentees)
+            .where(and(eq(mentorMentees.mentorId, specificMentorId), eq(mentorMentees.status, "ACTIVE")));
+        } else {
+          menteeRows = await db
+            .select()
+            .from(mentorMentees)
+            .where(eq(mentorMentees.status, "ACTIVE"));
+        }
 
-        if (menteeRows.length > 0) {
-          const studentIds = Array.from(new Set(menteeRows.map((r) => r.menteeId)));
+
+        // 2. Ensure default pathways exist in DB
+        const allDbPathways = await db.select().from(pathways).where(eq(pathways.isActive, true));
+        if (allDbPathways.length === 0) {
+          const samplePathways = [
+            {
+              id: "cs-p1",
+              title: "Machine Learning Engineering in Production",
+              slug: "ml-production",
+              shortDescription: "Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps.",
+              status: "PUBLISHED" as any,
+              isActive: true,
+            },
+            {
+              id: "cs-p2",
+              title: "Full Stack Web Development (AI-Powered)",
+              slug: "ai-fullstack",
+              shortDescription: "Modern full stack engineering with React, Node.js, Express, MongoDB, and integrated AI.",
+              status: "PUBLISHED" as any,
+              isActive: true,
+            },
+          ];
+          for (const p of samplePathways) {
+            await db.insert(pathways).values(p).onConflictDoNothing();
+          }
+        }
+
+        // 3. Ensure calendar events (missed deadlines & upcoming live events) exist in DB
+        const existingEvents = await db.select().from(calendarEvents).limit(1);
+        if (existingEvents.length === 0) {
+          const defaultEvents = [
+            {
+              id: "ev_missed_1",
+              title: "Lab 1 Deliverable: Context Engineering Pipeline & Dynamic Prompts",
+              description: "Submit GitHub repo URL and architecture notes for mentor evaluation.",
+              eventType: "DEADLINE",
+              startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              lessonId: "les_agent_w2_lab",
+              colorScheme: "rose",
+            },
+            {
+              id: "ev_missed_2",
+              title: "Graded MCQ Quiz #1: Context Windows & Role Boundaries",
+              description: "Mandatory architectural assessment on token limits and system roles.",
+              eventType: "MILESTONE",
+              startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              lessonId: "les_agent_w2_quiz",
+              colorScheme: "purple",
+            },
+            {
+              id: "ev_missed_3",
+              title: "Weekly 1-on-1 Mentorship & Code Review Sync",
+              description: "Scheduled code review sync with assigned mentor.",
+              eventType: "VIVA_1ON1",
+              startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              meetUrl: "https://meet.google.com/uni-sole-mentor",
+              colorScheme: "amber",
+            },
+            {
+              id: "ev_up_1",
+              title: "Live Masterclass: Dynamic Tool Calling & ReAct Loops",
+              description: "Interactive session with senior architect on tool dispatching and error handling.",
+              eventType: "LIVE_CLASS",
+              startTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 5400000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              meetUrl: "https://meet.google.com/uni-sole-live",
+              colorScheme: "blue",
+            },
+            {
+              id: "ev_up_2",
+              title: "Lab 2 Deliverable: Production Autonomous Agent System",
+              description: "Deliverable deadline: Submit complete implementation of stateful agent.",
+              eventType: "DEADLINE",
+              startTime: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              lessonId: "les_agent_w3_lab",
+              colorScheme: "rose",
+            },
+            {
+              id: "ev_up_3",
+              title: "1-on-1 Capstone Defense & Mentorship Evaluation",
+              description: "Private viva evaluation covering ReAct loops and architecture defense.",
+              eventType: "VIVA_1ON1",
+              startTime: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              meetUrl: "https://meet.google.com/uni-sole-viva",
+              colorScheme: "amber",
+            },
+            {
+              id: "ev_up_4",
+              title: "Final Capstone Evaluation & Project Demo",
+              description: "End of pathway capstone project presentation.",
+              eventType: "MILESTONE",
+              startTime: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000 + 7200000).toISOString(),
+              scope: "GLOBAL",
+              courseId: "cs-p1",
+              colorScheme: "purple",
+            },
+          ];
+
+          for (const ev of defaultEvents) {
+            await db.insert(calendarEvents).values(ev as any).onConflictDoNothing();
+          }
+
+          // Ensure events for arts-p1 (Applied AI for Humanities) exist
+          const artsEvents = [
+            {
+              id: "ev_arts_missed_1",
+              title: "Module 1 Portfolio: Executive Communication & Prompt Synthesis",
+              description: "Submit portfolio draft analyzing LLM impact on humanities research.",
+              eventType: "DEADLINE",
+              startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              colorScheme: "rose",
+            },
+            {
+              id: "ev_arts_missed_2",
+              title: "Applied AI Ethics & Archival Case Study",
+              description: "Critique of automated content pipelines and academic integrity.",
+              eventType: "MILESTONE",
+              startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              colorScheme: "purple",
+            },
+            {
+              id: "ev_arts_up_1",
+              title: "Live Masterclass: AI Archival Research & Scholarly Workflows",
+              description: "Interactive session on prompt strategies for archival analysis and synthesis.",
+              eventType: "LIVE_CLASS",
+              startTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 5400000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              meetUrl: "https://meet.google.com/uni-sole-humanities",
+              colorScheme: "blue",
+            },
+            {
+              id: "ev_arts_up_2",
+              title: "1-on-1 Capstone Proposal Review & Career Mentorship",
+              description: "Mentorship review of student capstone research deliverable.",
+              eventType: "VIVA_1ON1",
+              startTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000 + 3600000).toISOString(),
+              scope: "COURSE",
+              courseId: "arts-p1",
+              meetUrl: "https://meet.google.com/uni-sole-mentor",
+              colorScheme: "amber",
+            },
+          ];
+
+          for (const ev of artsEvents) {
+            await db.insert(calendarEvents).values(ev as any).onConflictDoNothing();
+          }
+
+          try {
+            await db.execute(sql`
+              UPDATE calendar_events 
+              SET scope = 'COURSE' 
+              WHERE course_id IS NOT NULL AND scope = 'GLOBAL';
+            `);
+          } catch {}
+        }
+
+        // 4. Construct enriched student details with enrolled courses, missed, and upcoming items
+        const studentIds = Array.from(new Set(menteeRows.map((r) => r.menteeId)));
+        if (studentIds.length > 0) {
           const studentUsers = await db
             .select()
             .from(users)
@@ -1396,20 +1992,106 @@ export const lmsService = {
             .from(lessonProgress)
             .where(and(inArray(lessonProgress.userId, studentIds), eq(lessonProgress.isCompleted, true)));
 
-          const totalLessonsCountRes = await db
-            .select({ count: sql`COUNT(*)::int` })
-            .from(lessons);
-          const catalogLessonCount = Math.max(1, Number(totalLessonsCountRes[0]?.count || 10));
+          const allEvents = await db.select().from(calendarEvents);
+          const allPathways = await db.select().from(pathways);
+
+          // Ensure enrollments exist for these students
+          const allEnrollments = await db
+            .select()
+            .from(enrollments)
+            .where(inArray(enrollments.userId, studentIds));
+
+          for (const u of studentUsers) {
+            const userEnrs = allEnrollments.filter((e) => e.userId === u.id);
+            if (userEnrs.length === 0 && allPathways.length > 0) {
+              const defaultPwy = allPathways[0];
+              await db.insert(enrollments).values({
+                userId: u.id,
+                pathwayId: defaultPwy.id,
+                status: "ACTIVE" as any,
+                source: "CAMPUS_SPONSORED" as any,
+              }).onConflictDoNothing();
+            }
+          }
+
+          const refreshedEnrollments = await db
+            .select()
+            .from(enrollments)
+            .where(and(inArray(enrollments.userId, studentIds), eq(enrollments.status, "ACTIVE")));
+
+          // Ensure events with course_id are scoped to COURSE, not GLOBAL
+          try {
+            await db.execute(sql`
+              UPDATE calendar_events 
+              SET scope = 'COURSE' 
+              WHERE course_id IS NOT NULL AND scope = 'GLOBAL';
+            `);
+          } catch {}
+
+          const now = new Date();
 
           menteesList = studentUsers.map((u) => {
             const userSubs = allSubs.filter((s) => s.userId === u.id);
             const pendingSubs = userSubs.filter((s) => ["SUBMITTED", "UNDER_REVIEW", "PENDING"].includes(s.status as string));
-            const gradedSubs = userSubs.filter((s) => ["GRADED", "APPROVED"].includes(s.status as string));
             const sortedSubs = [...userSubs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             const latestSub = sortedSubs[0];
 
-            const userProgressCount = allProgress.filter((p) => p.userId === u.id).length;
-            const progressPercent = Math.min(100, Math.round((userProgressCount / catalogLessonCount) * 100));
+            const userEnrs = refreshedEnrollments.filter((e) => e.userId === u.id);
+            const userPathwayIds = Array.from(new Set(userEnrs.map((e) => e.pathwayId || e.itemId).filter(Boolean)));
+            const enrolledPwys = allPathways.filter((p) => userPathwayIds.includes(p.id) || userPathwayIds.includes(p.slug));
+            const finalPwys = enrolledPwys.length > 0 ? enrolledPwys : allPathways.slice(0, 2);
+
+            const enrolledCourses = finalPwys.map((pwy) => {
+              const courseEvents = allEvents.filter((ev) => {
+                if (ev.courseId) {
+                  return ev.courseId === pwy.id || ev.courseId === pwy.slug;
+                }
+                if (ev.studentId) {
+                  return ev.studentId === u.id;
+                }
+                return ev.scope === "GLOBAL";
+              });
+
+              const missed: any[] = [];
+              const upcoming: any[] = [];
+
+              for (const ev of courseEvents) {
+                const evTime = new Date(ev.startTime);
+                if (evTime < now) {
+                  const hasSub = userSubs.some((s) => s.lessonId === ev.lessonId || s.title?.toLowerCase() === ev.title?.toLowerCase());
+                  if (!hasSub) {
+                    missed.push({
+                      id: ev.id,
+                      title: ev.title,
+                      type: ev.eventType || "DEADLINE",
+                      dueDate: ev.startTime,
+                      description: ev.description,
+                    });
+                  }
+                } else {
+                  upcoming.push({
+                    id: ev.id,
+                    title: ev.title,
+                    type: ev.eventType || "LIVE_CLASS",
+                    date: ev.startTime,
+                    meetUrl: ev.meetUrl,
+                    description: ev.description,
+                  });
+                }
+              }
+
+              missed.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+              upcoming.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+              return {
+                courseId: pwy.id,
+                courseTitle: pwy.title,
+                slug: pwy.slug,
+                shortDescription: pwy.shortDescription,
+                missed,
+                upcoming,
+              };
+            });
 
             return {
               id: u.id,
@@ -1418,39 +2100,12 @@ export const lmsService = {
               phone: u.phone,
               avatar: u.avatar || null,
               college: u.collegeName || "Govt Degree College",
-              progressPercent,
-              completedLessonsCount: userProgressCount,
-              totalLessonsCount: catalogLessonCount,
-              submittedCount: userSubs.length,
-              pendingReviews: pendingSubs.length,
-              status: pendingSubs.length > 0 ? "NEEDS_REVIEW" : (progressPercent < 20 && userSubs.length === 0) ? "AT_RISK" : "ON_TRACK",
+              progressPercent: Math.min(100, Math.round((userSubs.length / 5) * 100)),
+              status: userSubs.length > 0 ? "ON_TRACK" : "NEEDS_REVIEW",
               lastActive: latestSub?.createdAt ? "Active recently" : "Enrolled",
-              submissions: sortedSubs.map((s) => ({
-                id: s.id,
-                title: s.title,
-                type: s.type,
-                submissionUrl: s.submissionUrl,
-                submissionText: s.submissionText,
-                codeSnippet: s.codeSnippet,
-                videoUrl: s.videoUrl,
-                score: s.score,
-                status: s.status,
-                mentorFeedback: s.mentorFeedback,
-                createdAt: s.createdAt,
-              })),
-              latestSubmission: latestSub ? {
-                id: latestSub.id,
-                title: latestSub.title,
-                type: latestSub.type,
-                submissionUrl: latestSub.submissionUrl,
-                submissionText: latestSub.submissionText,
-                codeSnippet: latestSub.codeSnippet,
-                videoUrl: latestSub.videoUrl,
-                score: latestSub.score,
-                status: latestSub.status,
-                mentorFeedback: latestSub.mentorFeedback,
-                createdAt: latestSub.createdAt,
-              } : null,
+              enrolledCourses,
+              submissions: sortedSubs,
+              latestSubmission: latestSub || null,
             };
           });
         }
@@ -1496,7 +2151,7 @@ export const lmsService = {
     const { callerUserId, callerRoles, status, search, mentorId, courseId } = options;
     const isAdmin = callerRoles.includes("SUPER_ADMIN") || callerRoles.includes("ADMIN");
     const isMentor = callerRoles.includes("MENTOR") && !isAdmin;
-    const isProgramManager = callerRoles.includes("PROGRAM_MANAGER") && !isAdmin;
+    const isProgramManager = (callerRoles.includes("COURSE_MANAGER") || callerRoles.includes("PROGRAM_MANAGER")) && !isAdmin;
 
     const whereClauses: any[] = [];
 
@@ -1874,7 +2529,7 @@ export const lmsService = {
   }) {
     const { callerUserId, callerRoles, startDate, endDate, eventType, courseId, mentorId, studentId, search } = options;
     const isAdmin = callerRoles.includes("SUPER_ADMIN") || callerRoles.includes("ADMIN");
-    const isProgramManager = callerRoles.includes("PROGRAM_MANAGER") && !isAdmin;
+    const isProgramManager = (callerRoles.includes("COURSE_MANAGER") || callerRoles.includes("PROGRAM_MANAGER")) && !isAdmin;
     const isMentor = callerRoles.includes("MENTOR") && !isAdmin && !isProgramManager;
     const isStudent = !isAdmin && !isProgramManager && !isMentor;
 
@@ -2057,7 +2712,7 @@ export const lmsService = {
         .from(enrollments)
         .where(and(eq(enrollments.userId, callerUserId), eq(enrollments.status, "ACTIVE")));
 
-      const pathwayId = userEnrollments[0]?.pathwayId || userEnrollments[0]?.itemId || "cs-p1";
+      const pathwayId = userEnrollments[0]?.pathwayId || userEnrollments[0]?.itemId || "cs-agentic";
       const canon = getCanonicalPathway(pathwayId) || CANONICAL_GROUPS[0].pathways[0];
 
       // Query completed lessons for student
@@ -2171,8 +2826,8 @@ export const lmsService = {
         eventType: "VIVA_1ON1",
         startTime: makeDate(1, 16, 30),
         endTime: makeDate(1, 17, 30),
-        scope: "STUDENT",
-        studentId: callerUserId,
+        scope: isStudent ? "STUDENT" : "GLOBAL",
+        studentId: isStudent ? callerUserId : undefined,
         mentorName: mentorInfo.name,
         meetUrl: "https://meet.google.com/uni-mentor-office-hours",
         colorScheme: "rose",
@@ -2218,8 +2873,8 @@ export const lmsService = {
         eventType: "VIVA_1ON1",
         startTime: makeDate(3, 16, 30),
         endTime: makeDate(3, 17, 30),
-        scope: "STUDENT",
-        studentId: callerUserId,
+        scope: isStudent ? "STUDENT" : "GLOBAL",
+        studentId: isStudent ? callerUserId : undefined,
         mentorName: mentorInfo.name,
         meetUrl: "https://meet.google.com/uni-mentor-office-hours",
         colorScheme: "rose",
@@ -2279,20 +2934,34 @@ export const lmsService = {
     }
   },
 
-  async createCalendarEvent(callerUserId: string, data: {
-    title: string;
-    description?: string;
-    eventType?: string;
-    startTime: string;
-    endTime: string;
-    scope?: string;
-    courseId?: string;
-    lessonId?: string;
-    mentorId?: string;
-    studentId?: string;
-    meetUrl?: string;
-    colorScheme?: string;
-  }) {
+  async createCalendarEvent(
+    callerUserId: string,
+    arg2: string[] | any,
+    arg3?: any
+  ) {
+    const callerRoles: string[] = Array.isArray(arg2) ? arg2 : [];
+    const data: {
+      title: string;
+      description?: string;
+      eventType?: string;
+      startTime: string;
+      endTime: string;
+      scope?: string;
+      courseId?: string;
+      lessonId?: string;
+      mentorId?: string;
+      studentId?: string;
+      meetUrl?: string;
+      colorScheme?: string;
+    } = Array.isArray(arg2) ? arg3 : arg2;
+
+    const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
+    const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
+    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers and Admins can create calendar events");
+    }
+
     const id = `ev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const payload: any = {
       id,
@@ -2347,7 +3016,14 @@ export const lmsService = {
     };
   },
 
-  async updateCalendarEvent(id: string, callerUserId: string, callerRoles: string[], data: any) {
+  async updateCalendarEvent(id: string, callerUserId: string, callerRoles: string[] = [], data: any) {
+    const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
+    const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
+    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers and Admins can edit calendar events");
+    }
+
     const updatePayload: any = {
       ...data,
       updatedAt: new Date().toISOString(),
@@ -2371,7 +3047,14 @@ export const lmsService = {
     };
   },
 
-  async deleteCalendarEvent(id: string, callerUserId: string, callerRoles: string[]) {
+  async deleteCalendarEvent(id: string, callerUserId: string, callerRoles: string[] = []) {
+    const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
+    const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
+    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers and Admins can delete calendar events");
+    }
+
     const idx = inMemoryCalendarEvents.findIndex((e) => e.id === id);
     if (idx !== -1) {
       inMemoryCalendarEvents.splice(idx, 1);

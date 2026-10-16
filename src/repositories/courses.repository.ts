@@ -1,4 +1,4 @@
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   courses, Course, NewCourse,
@@ -8,37 +8,33 @@ import {
   moduleLessons,
   lessons,
 } from "../db/schema";
+import { WEEKS_DATA } from "../scripts/seed-ai-agent-curriculum";
 
 export const coursesRepository = {
   async list(): Promise<Course[]> {
-    const rows = await db.select().from(courses);
-    if (rows.length > 0) return rows;
+    try {
+      const rows = await db.select().from(courses);
+      const filtered = rows.filter(
+        (c) =>
+          c.slug === "cs-agentic" ||
+          c.slug === "course1" ||
+          (c.title && c.title.toLowerCase().includes("ai agent"))
+      );
+      if (filtered.length > 0) return filtered;
+    } catch {}
+
     return [
       {
-        id: "cs-genai",
-        title: "Generative AI Engineering",
-        slug: "generative-ai-engineering",
-        shortDescription: "From Foundations to Agentic AI Systems — A 12-Week Industry-Ready Program",
-        description: "12-Week Flagship Program with 132 Contact Hours, Hands-on Labs, and Capstone.",
+        id: "cs-agentic",
+        title: "AI Agent Engineering",
+        slug: "cs-agentic",
+        shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+        description: "Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).",
         pricePaise: 299900,
         mrpPaise: 999900,
         status: "PUBLISHED" as const,
         isActive: true,
-        metadata: { duration: "12 Weeks", level: "Foundations to Agentic AI" },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        id: "cs-common",
-        title: "AI Entrepreneurship & Innovation",
-        slug: "ai-entrepreneurship-innovation",
-        shortDescription: "Weekend Incubator Track — From AI Capability to a Validated Startup",
-        description: "3 Months (12 Weekends, Saturdays & Sundays only) Hands-on Incubator Labs.",
-        pricePaise: 59900,
-        mrpPaise: 299900,
-        status: "PUBLISHED" as const,
-        isActive: true,
-        metadata: { duration: "12 Weekends", level: "All Students" },
+        metadata: { duration: "12 Weeks", level: "Production AI Agent Engineering" },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -46,11 +42,19 @@ export const coursesRepository = {
   },
 
   async listPublished(): Promise<Course[]> {
-    const rows = await db
-      .select()
-      .from(courses)
-      .where(and(eq(courses.isActive, true), eq(courses.status, "PUBLISHED")));
-    if (rows.length > 0) return rows;
+    try {
+      const rows = await db
+        .select()
+        .from(courses)
+        .where(and(eq(courses.isActive, true), eq(courses.status, "PUBLISHED")));
+      const filtered = rows.filter(
+        (c) =>
+          c.slug === "cs-agentic" ||
+          c.slug === "course1" ||
+          (c.title && c.title.toLowerCase().includes("ai agent"))
+      );
+      if (filtered.length > 0) return filtered;
+    } catch {}
     return this.list();
   },
 
@@ -175,18 +179,76 @@ export const coursesRepository = {
   },
 
   async getModules(courseId: string): Promise<any[]> {
-    const rows = await db
-      .select({
-        moduleId: courseModules.moduleId,
-        position: courseModules.position,
-        title: modules.title,
-        slug: modules.slug,
-        status: modules.status,
-      })
-      .from(courseModules)
-      .leftJoin(modules, eq(courseModules.moduleId, modules.id))
-      .where(eq(courseModules.courseId, courseId))
-      .orderBy(asc(courseModules.position));
+    const candidates = new Set<string>([courseId]);
+    if (courseId === "course1" || courseId === "cs-agentic") {
+      candidates.add("cs-agentic");
+      candidates.add("course1");
+    }
+    try {
+      const courseObj = await this.getBySlugOrId(courseId);
+      if (courseObj) {
+        candidates.add(courseObj.id);
+        candidates.add(courseObj.slug);
+      }
+    } catch {}
+
+    const candidateList = Array.from(candidates);
+
+    let rows: any[] = [];
+    try {
+      rows = await db
+        .select({
+          moduleId: courseModules.moduleId,
+          position: courseModules.position,
+          title: modules.title,
+          slug: modules.slug,
+          status: modules.status,
+          description: modules.description,
+          unlockAt: modules.unlockAt,
+          lockAt: modules.lockAt,
+        })
+        .from(courseModules)
+        .leftJoin(modules, sql`${courseModules.moduleId}::text = ${modules.id}::text`)
+        .where(inArray(courseModules.courseId, candidateList))
+        .orderBy(asc(courseModules.position));
+    } catch {}
+
+    if (!rows || rows.length === 0) {
+      try {
+        const directMods = await db
+          .select({
+            moduleId: modules.id,
+            title: modules.title,
+            slug: modules.slug,
+            status: modules.status,
+            description: modules.description,
+            unlockAt: modules.unlockAt,
+            lockAt: modules.lockAt,
+          })
+          .from(modules);
+
+        if (directMods && directMods.length > 0) {
+          rows = directMods.map((m, idx) => ({
+            ...m,
+            position: idx + 1,
+          }));
+        }
+      } catch {}
+    }
+
+    if (!rows || rows.length === 0) {
+      rows = WEEKS_DATA.map((w) => ({
+        moduleId: `mod_agent_w${w.weekNum}`,
+        position: w.weekNum,
+        title: w.title,
+        slug: `cs-agentic-week-${w.weekNum}`,
+        status: "PUBLISHED",
+        description: w.keyConcepts,
+        unlockAt: null,
+        lockAt: null,
+      }));
+    }
+
     return rows;
   },
 
