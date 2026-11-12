@@ -150,7 +150,11 @@ export const authService = {
       throw new ValidationError("Please provide a valid 10-digit mobile number");
     }
 
-    const user = await usersRepository.getByPhone(normalizedPhone);
+    const clean10Digit = normalizedPhone.slice(-10);
+    let user = await usersRepository.getByPhone(normalizedPhone);
+    if (!user) {
+      user = await usersRepository.getByPhone(clean10Digit);
+    }
     if (!user) {
       return { exists: false };
     }
