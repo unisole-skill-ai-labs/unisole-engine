@@ -726,30 +726,15 @@ export async function seedAiAgentCurriculum() {
   // 3. For each week, create/update Module and 4 Lessons
   for (const week of WEEKS_DATA) {
     const modSlug = `cs-agentic-week-${week.weekNum}`;
-    
-    // Check or insert module
-    let moduleId: string;
-    const existingMod = await pool.query(
-      `SELECT id FROM modules WHERE course_id = $1 AND order_index = $2 LIMIT 1`,
-      [courseId, week.weekNum]
-    );
+    const moduleId = `mod_agent_w${week.weekNum}`;
 
-    if (existingMod.rows && existingMod.rows[0]) {
-      moduleId = existingMod.rows[0].id;
-      await pool.query(
-        `UPDATE modules 
-         SET title = $1, slug = $2, description = $3, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()
-         WHERE id = $4`,
-        [week.title, modSlug, week.keyConcepts, moduleId]
-      );
-    } else {
-      moduleId = crypto.randomUUID();
-      await pool.query(
-        `INSERT INTO modules (id, course_id, title, slug, description, order_index, status, is_active, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'PUBLISHED', TRUE, NOW(), NOW())`,
-        [moduleId, courseId, week.title, modSlug, week.keyConcepts, week.weekNum]
-      );
-    }
+    await pool.query(
+      `INSERT INTO modules (id, title, slug, description, status, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'PUBLISHED', TRUE, NOW(), NOW())
+       ON CONFLICT (id) DO UPDATE
+       SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+      [moduleId, week.title, modSlug, week.keyConcepts]
+    );
 
     // Link in course_modules for all course aliases
     const targetCourseIds = Array.from(new Set([courseId, "cs-agentic", "course1"]));

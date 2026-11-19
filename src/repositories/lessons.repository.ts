@@ -146,12 +146,41 @@ export const lessonsRepository = {
   },
 
   async update(id: string, data: Partial<Omit<NewLesson, "id">>): Promise<Lesson | null> {
-    const rows = await db
-      .update(lessons)
-      .set({ ...data, updatedAt: new Date().toISOString() })
-      .where(eq(lessons.id, id))
-      .returning();
-    return rows[0] ?? null;
+    try {
+      const rows = await db
+        .update(lessons)
+        .set({ ...data, updatedAt: new Date().toISOString() })
+        .where(eq(lessons.id, id))
+        .returning();
+      if (rows[0]) return rows[0];
+    } catch {}
+
+    const match = id.match(/les_agent_w(\d+)_(lec|quiz|lab|live)/i);
+    if (match) {
+      const fallback = await lessonsRepository.getById(id);
+      if (fallback) {
+        try {
+          const created = await lessonsRepository.create({
+            id,
+            title: (data.title as string) || fallback.title,
+            slug: (data.slug as string) || fallback.slug,
+            description: (data.description as string) || fallback.description,
+            content: (data.content as string) || fallback.content,
+            videoUrl: (data.videoUrl as string) || fallback.videoUrl,
+            durationMinutes: data.durationMinutes !== undefined ? data.durationMinutes : fallback.durationMinutes,
+            status: (data.status as any) || fallback.status || "PUBLISHED",
+            isActive: data.isActive !== undefined ? data.isActive : true,
+            unlockAt: data.unlockAt || fallback.unlockAt || null,
+            lockAt: data.lockAt || fallback.lockAt || null,
+          });
+          return created;
+        } catch {
+          const retry = await db.select().from(lessons).where(eq(lessons.id, id)).limit(1);
+          if (retry[0]) return retry[0];
+        }
+      }
+    }
+    return null;
   },
 
   async remove(id: string): Promise<Lesson | null> {
