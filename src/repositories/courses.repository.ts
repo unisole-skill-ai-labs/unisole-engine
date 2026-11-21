@@ -8,7 +8,6 @@ import {
   moduleLessons,
   lessons,
 } from "../db/schema";
-import { WEEKS_DATA } from "../scripts/seed-ai-agent-curriculum";
 
 export const coursesRepository = {
   async list(): Promise<Course[]> {
@@ -213,43 +212,7 @@ export const coursesRepository = {
         .orderBy(asc(courseModules.position));
     } catch {}
 
-    if (!rows || rows.length === 0) {
-      try {
-        const directMods = await db
-          .select({
-            moduleId: modules.id,
-            title: modules.title,
-            slug: modules.slug,
-            status: modules.status,
-            description: modules.description,
-            unlockAt: modules.unlockAt,
-            lockAt: modules.lockAt,
-          })
-          .from(modules);
-
-        if (directMods && directMods.length > 0) {
-          rows = directMods.map((m, idx) => ({
-            ...m,
-            position: idx + 1,
-          }));
-        }
-      } catch {}
-    }
-
-    if (!rows || rows.length === 0) {
-      rows = WEEKS_DATA.map((w) => ({
-        moduleId: `mod_agent_w${w.weekNum}`,
-        position: w.weekNum,
-        title: w.title,
-        slug: `cs-agentic-week-${w.weekNum}`,
-        status: "PUBLISHED",
-        description: w.keyConcepts,
-        unlockAt: null,
-        lockAt: null,
-      }));
-    }
-
-    return rows;
+    return rows || [];
   },
 
   // --- Usage lookups ---

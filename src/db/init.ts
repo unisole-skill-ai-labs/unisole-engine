@@ -4,7 +4,6 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
 import { pricingService } from "../services/pricing.service";
 import { seedLmsDemoData } from "../scripts/seed-lms-demo";
-import { seedAiAgentCurriculum } from "../scripts/seed-ai-agent-curriculum";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -1071,14 +1070,6 @@ export async function initializeDatabase() {
       console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
     } catch (lmsSeedErr) {
       console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
-    }
-
-    // 20. Seed AI Agent Curriculum (12 weeks, 48 lessons, quizzes, labs, live workshops)
-    try {
-      await seedAiAgentCurriculum();
-      console.log("[DB-INIT] ✅ Seeded official 12-week AI Agent Engineering curriculum.");
-    } catch (aiSeedErr) {
-      console.warn("[DB-INIT] Warning running seedAiAgentCurriculum:", aiSeedErr);
     }
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment, LMS, and Survey tables verified successfully.");

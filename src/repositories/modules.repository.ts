@@ -6,7 +6,6 @@ import {
   courseModules,
   lessons,
 } from "../db/schema";
-import { WEEKS_DATA } from "../scripts/seed-ai-agent-curriculum";
 
 export const modulesRepository = {
   async list(): Promise<Module[]> {
@@ -14,33 +13,8 @@ export const modulesRepository = {
   },
 
   async getById(id: string): Promise<Module | null> {
-    try {
-      const rows = await db.select().from(modules).where(eq(modules.id, id)).limit(1);
-      if (rows[0]) return rows[0];
-    } catch {}
-
-    const match = id.match(/mod_agent_w(\d+)/i);
-    if (match) {
-      const weekNum = parseInt(match[1], 10);
-      const week = WEEKS_DATA[weekNum - 1] || WEEKS_DATA[0];
-      try {
-        const created = await modulesRepository.create({
-          id,
-          title: week.title,
-          slug: `cs-agentic-week-${weekNum}`,
-          description: week.keyConcepts,
-          status: "PUBLISHED",
-          isActive: true,
-          unlockAt: null,
-          lockAt: null,
-        });
-        return created;
-      } catch {
-        const retry = await db.select().from(modules).where(eq(modules.id, id)).limit(1);
-        if (retry[0]) return retry[0];
-      }
-    }
-    return null;
+    const rows = await db.select().from(modules).where(eq(modules.id, id)).limit(1);
+    return rows[0] ?? null;
   },
 
   async getBySlug(slug: string): Promise<Module | null> {
@@ -54,37 +28,12 @@ export const modulesRepository = {
   },
 
   async update(id: string, data: Partial<Omit<NewModule, "id">>): Promise<Module | null> {
-    try {
-      const rows = await db
-        .update(modules)
-        .set({ ...data, updatedAt: new Date().toISOString() })
-        .where(eq(modules.id, id))
-        .returning();
-      if (rows[0]) return rows[0];
-    } catch {}
-
-    const match = id.match(/mod_agent_w(\d+)/i);
-    if (match) {
-      const weekNum = parseInt(match[1], 10);
-      const week = WEEKS_DATA[weekNum - 1] || WEEKS_DATA[0];
-      try {
-        const created = await modulesRepository.create({
-          id,
-          title: (data.title as string) || week.title,
-          slug: (data.slug as string) || `cs-agentic-week-${weekNum}`,
-          description: (data.description as string) || week.keyConcepts,
-          status: (data.status as any) || "PUBLISHED",
-          isActive: data.isActive !== undefined ? data.isActive : true,
-          unlockAt: data.unlockAt || null,
-          lockAt: data.lockAt || null,
-        });
-        return created;
-      } catch {
-        const retry = await db.select().from(modules).where(eq(modules.id, id)).limit(1);
-        if (retry[0]) return retry[0];
-      }
-    }
-    return null;
+    const rows = await db
+      .update(modules)
+      .set({ ...data, updatedAt: new Date().toISOString() })
+      .where(eq(modules.id, id))
+      .returning();
+    return rows[0] ?? null;
   },
 
   async remove(id: string): Promise<Module | null> {
@@ -98,15 +47,13 @@ export const modulesRepository = {
       .select({ position: moduleLessons.position })
       .from(moduleLessons)
       .where(eq(moduleLessons.moduleId, data.moduleId));
-    const maxPos = existing.reduce((max, r) => Math.max(max, r.position), 0);
-    const pos =
-      data.position && !existing.some((e) => e.position === data.position)
-        ? data.position
-        : maxPos + 1;
+
+    const nextPosition = data.position || (existing.length + 1);
 
     await db.insert(moduleLessons).values({
-      ...data,
-      position: pos,
+      moduleId: data.moduleId,
+      lessonId: data.lessonId,
+      position: nextPosition,
     });
   },
 
@@ -174,128 +121,7 @@ export const modulesRepository = {
         .orderBy(asc(moduleLessons.position));
     } catch {}
 
-    if (rows && rows.length > 0) {
-      return rows;
-    }
-
-    // Determine week number from moduleId or module record
-    let weekNum = 1;
-    const match = moduleId.match(/w(?:eek[-_ ]?)?(\d+)/i);
-    if (match) {
-      weekNum = parseInt(match[1], 10);
-    } else {
-      try {
-        const mod = await db.select().from(modules).where(eq(modules.id, moduleId)).limit(1);
-        if (mod && mod[0]) {
-          const modMatch = (mod[0].title + " " + mod[0].slug).match(/w(?:eek[-_ ]?)?(\d+)/i);
-          if (modMatch) {
-            weekNum = parseInt(modMatch[1], 10);
-          }
-        }
-      } catch {}
-    }
-
-    const week = WEEKS_DATA[weekNum - 1] || WEEKS_DATA[0];
-
-    return [
-      {
-        lessonId: `les_agent_w${week.weekNum}_lec`,
-        position: 1,
-        title: `${week.weekNum}.1 Concept Lecture: ${week.title.replace(/^Week \d+:\s*/, "")}`,
-        slug: `agent-w${week.weekNum}-lecture`,
-        videoUrl: week.videoUrl,
-        durationMinutes: 45,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "LECTURE",
-          type: "video",
-          contentType: "VIDEO",
-          curriculumMode: "LECTURE",
-          duration: "45 Mins",
-          videoUrl: week.videoUrl,
-          keyConcepts: week.keyConcepts,
-          handsOn: week.practical,
-        }),
-        description: week.keyConcepts,
-      },
-      {
-        lessonId: `les_agent_w${week.weekNum}_quiz`,
-        position: 2,
-        title: `${week.weekNum}.2 Knowledge Check: MCQ Quiz (${week.questions.length} Questions)`,
-        slug: `agent-w${week.weekNum}-quiz`,
-        videoUrl: null,
-        durationMinutes: 20,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "PRACTICE",
-          type: "quiz",
-          contentType: "QUIZ",
-          curriculumMode: "PRACTICE",
-          practiceType: "MCQ",
-          duration: "20 Mins",
-          quiz: {
-            passingScorePercent: 70,
-            questions: week.questions,
-          },
-          questions: week.questions,
-        }),
-        description: `Test your understanding of ${week.title}.`,
-      },
-      {
-        lessonId: `les_agent_w${week.weekNum}_lab`,
-        position: 3,
-        title: `${week.weekNum}.3 Hands-on Lab & Project Deliverable`,
-        slug: `agent-w${week.weekNum}-lab`,
-        videoUrl: null,
-        durationMinutes: 60,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "PRACTICE",
-          type: "project",
-          contentType: "PROJECT",
-          curriculumMode: "PRACTICE",
-          practiceType: "PROJECT",
-          duration: "60 Mins",
-          assignment: {
-            instructions: week.assignmentDeliverable,
-            allowedTypes: ["URL", "GITHUB"],
-            maxPoints: 100,
-          },
-          handsOn: week.practical,
-        }),
-        description: week.assignmentDeliverable,
-      },
-      {
-        lessonId: `les_agent_w${week.weekNum}_live`,
-        position: 4,
-        title: `${week.weekNum}.4 Live Workshop: ${week.liveTopic}`,
-        slug: `agent-w${week.weekNum}-live`,
-        videoUrl: null,
-        durationMinutes: 120,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "LIVE",
-          type: "live",
-          contentType: "LIVE",
-          curriculumMode: "LIVE",
-          duration: "120 Mins",
-          liveDate: week.liveDate,
-          liveTime: week.liveTime,
-          mentorName: week.mentorName,
-          liveMeetingUrl: "https://meet.google.com/new",
-          instructions: `Agenda for ${week.liveTopic}:\n• 45 Mins: Architecture Deep-dive & Code Walkthrough\n• 45 Mins: Hands-on Lab Implementation\n• 30 Mins: Live Open Q&A & Code Reviews with ${week.mentorName}.`,
-        }),
-        description: `Interactive live cohort workshop on ${week.liveDate} at ${week.liveTime}.`,
-      },
-    ];
+    return rows || [];
   },
 
   // --- Usage lookups ---

@@ -610,278 +610,280 @@ export const WEEKS_DATA = [
 ];
 
 export async function seedAiAgentCurriculum() {
+  if (process.env.NODE_ENV === "production" && !process.argv.includes("--force")) {
+    const errMsg = "[Seed:AI-Agent] ❌ Seeding course content is blocked in production unless --force is passed.";
+    console.error(errMsg);
+    throw new Error(errMsg);
+  }
+
   console.log("[Seed:AI-Agent] Starting official 12-week AI Agent Engineering curriculum database sync...");
+  const client = await pool.connect();
 
-  // 0. PURGE ALL OTHER COURSES & PATHWAYS FROM DB
   try {
-    console.log("[Seed:AI-Agent] Purging non-AI-Agent courses and pathways from DB...");
-    // Explicitly delete any dummy modules (such as "Intro to AI Agents") and non-standard curriculum
-    await pool.query(`DELETE FROM course_modules WHERE module_id IN (SELECT id FROM modules WHERE title ILIKE '%Intro to AI%' OR (title NOT LIKE 'Week %' AND slug NOT LIKE 'cs-agentic-week-%'))`);
-    await pool.query(`DELETE FROM module_lessons WHERE module_id IN (SELECT id FROM modules WHERE title ILIKE '%Intro to AI%' OR (title NOT LIKE 'Week %' AND slug NOT LIKE 'cs-agentic-week-%'))`);
-    await pool.query(`DELETE FROM modules WHERE title ILIKE '%Intro to AI%' OR (title NOT LIKE 'Week %' AND slug NOT LIKE 'cs-agentic-week-%')`);
+    await client.query("BEGIN");
 
-    await pool.query(`DELETE FROM pathway_categories WHERE pathway_id NOT IN ('cs-agentic', 'course1')`);
-    await pool.query(`DELETE FROM pathway_colleges WHERE pathway_id NOT IN ('cs-agentic', 'course1')`);
-    await pool.query(`DELETE FROM pathway_courses WHERE pathway_id NOT IN ('cs-agentic', 'course1') AND course_id NOT IN ('cs-agentic', 'course1')`);
-    await pool.query(`DELETE FROM course_modules WHERE course_id NOT IN ('cs-agentic', 'course1')`);
-    await pool.query(`DELETE FROM module_lessons WHERE lesson_id NOT LIKE 'les_agent_%'`);
-    await pool.query(`DELETE FROM lessons WHERE id NOT LIKE 'les_agent_%'`);
-    await pool.query(`DELETE FROM modules WHERE course_id NOT IN ('cs-agentic', 'course1') AND course_id IS NOT NULL`);
-    await pool.query(`DELETE FROM enrollments WHERE pathway_id NOT IN ('cs-agentic', 'course1') AND item_id NOT IN ('cs-agentic', 'course1')`);
-    await pool.query(`DELETE FROM courses WHERE id NOT IN ('cs-agentic', 'course1') AND slug NOT IN ('cs-agentic', 'course1')`);
-    await pool.query(`DELETE FROM pathways WHERE id NOT IN ('cs-agentic', 'course1') AND slug NOT IN ('cs-agentic', 'course1')`);
-    console.log("[Seed:AI-Agent] Successfully purged non-AI-Agent courses and legacy content.");
-  } catch (cleanErr) {
-    console.warn("[Seed:AI-Agent] Notice during cleanup of legacy courses:", cleanErr);
-  }
-
-  // 1. Upsert Pathway entries: 'cs-agentic' and 'course1'
-  const pathwayEntries = [
-    {
-      id: "cs-agentic",
-      title: "AI Agent Engineering",
-      slug: "cs-agentic",
-      shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
-      description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-      pricePaise: 299900
-    },
-    {
-      id: "course1",
-      title: "AI Agent Engineering",
-      slug: "course1",
-      shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
-      description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-      pricePaise: 299900
-    }
-  ];
-
-  for (const pwy of pathwayEntries) {
-    await pool.query(
-      `INSERT INTO pathways (id, title, slug, short_description, description, price_paise, status, is_active, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'PUBLISHED', TRUE, NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title,
-           slug = EXCLUDED.slug,
-           short_description = EXCLUDED.short_description,
-           description = EXCLUDED.description,
-           price_paise = EXCLUDED.price_paise,
-           status = 'PUBLISHED',
-           is_active = TRUE,
-           updated_at = NOW()`,
-      [pwy.id, pwy.title, pwy.slug, pwy.shortDescription, pwy.description, pwy.pricePaise]
-    );
-  }
-  console.log("[Seed:AI-Agent] Upserted pathways 'cs-agentic' and 'course1'.");
-
-  // 2. Ensure Course entry in 'courses' table
-  // Look up existing course by slug or create a new UUID
-  let courseId: string;
-  const existingCourse = await pool.query(
-    `SELECT id FROM courses WHERE slug = 'cs-agentic' OR slug = 'course1' OR title = 'AI Agent Engineering' LIMIT 1`
-  );
-
-  if (existingCourse.rows && existingCourse.rows[0]) {
-    courseId = existingCourse.rows[0].id;
-    await pool.query(
-      `UPDATE courses 
-       SET title = 'AI Agent Engineering',
-           slug = 'cs-agentic',
-           short_description = '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)',
-           description = 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.',
-           status = 'PUBLISHED',
-           is_active = TRUE,
-           price_paise = 299900,
-           mrp_paise = 999900,
-           metadata = '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb,
-           updated_at = NOW()
-       WHERE id = $1`,
-      [courseId]
-    );
-  } else {
-    courseId = "cs-agentic";
-    await pool.query(
-      `INSERT INTO courses (id, title, slug, short_description, description, status, is_active, price_paise, mrp_paise, metadata, created_at, updated_at)
-       VALUES ($1, 'AI Agent Engineering', 'cs-agentic', '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 'PUBLISHED', TRUE, 299900, 999900, '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title, slug = EXCLUDED.slug, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-      [courseId]
-    );
-  }
-  console.log(`[Seed:AI-Agent] Using course ID: ${courseId}`);
-
-  // Link pathway_courses
-  await pool.query(
-    `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
-     VALUES ('cs-agentic', $1, 1, NOW())
-     ON CONFLICT DO NOTHING`,
-    [courseId]
-  );
-  await pool.query(
-    `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
-     VALUES ('course1', $1, 1, NOW())
-     ON CONFLICT DO NOTHING`,
-    [courseId]
-  );
-
-  // 3. For each week, create/update Module and 4 Lessons
-  for (const week of WEEKS_DATA) {
-    const modSlug = `cs-agentic-week-${week.weekNum}`;
-    const moduleId = `mod_agent_w${week.weekNum}`;
-
-    await pool.query(
-      `INSERT INTO modules (id, title, slug, description, status, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'PUBLISHED', TRUE, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-      [moduleId, week.title, modSlug, week.keyConcepts]
-    );
-
-    // Link in course_modules for all course aliases
-    const targetCourseIds = Array.from(new Set([courseId, "cs-agentic", "course1"]));
-    for (const cId of targetCourseIds) {
-      await pool.query(
-        `INSERT INTO course_modules (course_id, module_id, position, created_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (course_id, module_id) DO UPDATE SET position = EXCLUDED.position`,
-        [cId, moduleId, week.weekNum]
-      );
-    }
-
-    // 4 Lessons per week:
-    // 1. Lecture Video
-    const lecId = `les_agent_w${week.weekNum}_lec`;
-    const lecContent = JSON.stringify({
-      category: "LECTURE",
-      type: "video",
-      contentType: "VIDEO",
-      curriculumMode: "LECTURE",
-      duration: "45 Mins",
-      videoUrl: week.videoUrl,
-      keyConcepts: week.keyConcepts,
-      handsOn: week.practical
-    });
-
-    await pool.query(
-      `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 45, 'PUBLISHED', TRUE, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, video_url = EXCLUDED.video_url, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-      [lecId, `${week.weekNum}.1 Concept Lecture: ${week.title.replace(/^Week \d+:\s*/, "")}`, `agent-w${week.weekNum}-lecture`, week.keyConcepts, lecContent, week.videoUrl]
-    );
-
-    // 2. Question Quiz (MCQ)
-    const quizId = `les_agent_w${week.weekNum}_quiz`;
-    const quizContent = JSON.stringify({
-      category: "PRACTICE",
-      type: "quiz",
-      contentType: "QUIZ",
-      curriculumMode: "PRACTICE",
-      practiceType: "MCQ",
-      duration: "20 Mins",
-      questions: week.questions
-    });
-
-    await pool.query(
-      `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NULL, 20, 'PUBLISHED', TRUE, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-      [quizId, `${week.weekNum}.2 Knowledge Check: MCQ Quiz (${week.questions.length} Questions)`, `agent-w${week.weekNum}-quiz`, `Test your understanding of ${week.title}.`, quizContent]
-    );
-
-    // 3. Hands-on Practical Assignment
-    const labId = `les_agent_w${week.weekNum}_lab`;
-    const labContent = JSON.stringify({
-      category: "TEST",
-      type: "assignment",
-      contentType: "ASSIGNMENT",
-      curriculumMode: "TEST",
-      testType: "PROJECT",
-      duration: "90 Mins",
-      maxScore: 100,
-      instructions: week.assignmentDeliverable,
-      practical: week.practical
-    });
-
-    await pool.query(
-      `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NULL, 90, 'PUBLISHED', TRUE, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-      [labId, `${week.weekNum}.3 Hands-on Practical: ${week.practical.split(".")[0]}`, `agent-w${week.weekNum}-lab`, week.assignmentDeliverable, labContent]
-    );
-
-    // 4. Live Interactive Session
-    const liveId = `les_agent_w${week.weekNum}_live`;
-    const liveContent = JSON.stringify({
-      category: "LIVE",
-      type: "live",
-      contentType: "LIVE",
-      curriculumMode: "LIVE",
-      duration: "120 Mins",
-      liveDate: week.liveDate,
-      liveTime: week.liveTime,
-      mentorName: week.mentorName,
-      liveMeetingUrl: "https://meet.google.com/new",
-      instructions: `Agenda for ${week.liveTopic}:\n• 45 Mins: Architecture Deep-dive & Code Walkthrough\n• 45 Mins: Hands-on Lab Implementation\n• 30 Mins: Live Open Q&A & Code Reviews with ${week.mentorName}.`
-    });
-
-    await pool.query(
-      `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NULL, 120, 'PUBLISHED', TRUE, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-      [liveId, `${week.weekNum}.4 ${week.liveTopic}`, `agent-w${week.weekNum}-live`, `Interactive live cohort workshop on ${week.liveDate} at ${week.liveTime}.`, liveContent]
-    );
-
-    // Link lessons to module in module_lessons
-    const lessonLinks = [
-      { id: lecId, pos: 1 },
-      { id: quizId, pos: 2 },
-      { id: labId, pos: 3 },
-      { id: liveId, pos: 4 },
+    // 1. Upsert Pathway entries: 'cs-agentic' and 'course1'
+    const pathwayEntries = [
+      {
+        id: "cs-agentic",
+        title: "AI Agent Engineering",
+        slug: "cs-agentic",
+        shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+        description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+        pricePaise: 299900
+      },
+      {
+        id: "course1",
+        title: "AI Agent Engineering",
+        slug: "course1",
+        shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+        description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+        pricePaise: 299900
+      }
     ];
 
-    for (const lLink of lessonLinks) {
-      const existingML = await pool.query(
-        `SELECT id FROM module_lessons WHERE module_id = $1 AND lesson_id = $2 LIMIT 1`,
-        [moduleId, lLink.id]
+    for (const pwy of pathwayEntries) {
+      await client.query(
+        `INSERT INTO pathways (id, title, slug, short_description, description, price_paise, status, is_active, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'PUBLISHED', TRUE, NOW())
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title,
+             slug = EXCLUDED.slug,
+             short_description = EXCLUDED.short_description,
+             description = EXCLUDED.description,
+             price_paise = EXCLUDED.price_paise,
+             status = 'PUBLISHED',
+             is_active = TRUE,
+             updated_at = NOW()`,
+        [pwy.id, pwy.title, pwy.slug, pwy.shortDescription, pwy.description, pwy.pricePaise]
       );
-      if (existingML.rows && existingML.rows[0]) {
-        await pool.query(
-          `UPDATE module_lessons SET position = $1 WHERE id = $2`,
-          [lLink.pos, existingML.rows[0].id]
-        );
-      } else {
-        await pool.query(
-          `INSERT INTO module_lessons (id, module_id, lesson_id, position, created_at)
-           VALUES ($1, $2, $3, $4, NOW())`,
-          [crypto.randomUUID(), moduleId, lLink.id, lLink.pos]
+    }
+    console.log("[Seed:AI-Agent] Upserted pathways 'cs-agentic' and 'course1'.");
+
+    // 2. Ensure Course entry in 'courses' table: check by slug
+    let courseId: string;
+    const existingCourse = await client.query(
+      `SELECT id FROM courses WHERE slug = 'cs-agentic' OR slug = 'course1' LIMIT 1`
+    );
+
+    if (existingCourse.rows && existingCourse.rows[0]) {
+      courseId = existingCourse.rows[0].id;
+      console.log(`[Seed:AI-Agent] Course already exists (ID: ${courseId}). Updating metadata...`);
+      await client.query(
+        `UPDATE courses 
+         SET title = 'AI Agent Engineering',
+             short_description = '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)',
+             description = 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.',
+             status = 'PUBLISHED',
+             is_active = TRUE,
+             price_paise = 299900,
+             mrp_paise = 999900,
+             metadata = '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [courseId]
+      );
+    } else {
+      courseId = "cs-agentic";
+      console.log(`[Seed:AI-Agent] Creating course 'cs-agentic'...`);
+      await client.query(
+        `INSERT INTO courses (id, title, slug, short_description, description, status, is_active, price_paise, mrp_paise, metadata, created_at, updated_at)
+         VALUES ($1, 'AI Agent Engineering', 'cs-agentic', '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 'PUBLISHED', TRUE, 299900, 999900, '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title, slug = EXCLUDED.slug, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+        [courseId]
+      );
+    }
+    console.log(`[Seed:AI-Agent] Using course ID: ${courseId}`);
+
+    // Link pathway_courses
+    await client.query(
+      `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
+       VALUES ('cs-agentic', $1, 1, NOW())
+       ON CONFLICT (pathway_id, course_id) DO NOTHING`,
+      [courseId]
+    );
+    await client.query(
+      `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
+       VALUES ('course1', $1, 1, NOW())
+       ON CONFLICT (pathway_id, course_id) DO NOTHING`,
+      [courseId]
+    );
+
+    // 3. For each week, create/update Module and 4 Lessons deterministically
+    for (const week of WEEKS_DATA) {
+      const modSlug = `cs-agentic-week-${week.weekNum}`;
+      const moduleId = `mod_agent_w${week.weekNum}`;
+
+      await client.query(
+        `INSERT INTO modules (id, title, slug, description, status, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'PUBLISHED', TRUE, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+        [moduleId, week.title, modSlug, week.keyConcepts]
+      );
+
+      // Link in course_modules for all course aliases
+      const targetCourseIds = Array.from(new Set([courseId, "cs-agentic", "course1"]));
+      for (const cId of targetCourseIds) {
+        await client.query(
+          `INSERT INTO course_modules (course_id, module_id, position, created_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (course_id, module_id) DO UPDATE SET position = EXCLUDED.position`,
+          [cId, moduleId, week.weekNum]
         );
       }
-    }
-  }
 
-  // 4. Ensure ALL users in DB have active enrollment for cs-agentic and course1
-  try {
-    const allUsers = await pool.query(`SELECT id FROM users`);
-    for (const u of allUsers.rows) {
-      for (const pwyId of ["cs-agentic", "course1"]) {
-        const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
-        await pool.query(
-          `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
-           VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
-           ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'`,
-          [enrId, u.id, pwyId]
+      // 4 Lessons per week:
+      // 1. Lecture Video
+      const lecId = `les_agent_w${week.weekNum}_lec`;
+      const lecContent = JSON.stringify({
+        category: "LECTURE",
+        type: "video",
+        contentType: "VIDEO",
+        curriculumMode: "LECTURE",
+        duration: "45 Mins",
+        videoUrl: week.videoUrl,
+        keyConcepts: week.keyConcepts,
+        handsOn: week.practical,
+      });
+
+      await client.query(
+        `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 45, 'PUBLISHED', TRUE, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, video_url = EXCLUDED.video_url, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+        [lecId, `${week.weekNum}.1 Concept Lecture: ${week.title.replace(/^Week \d+:\s*/, "")}`, `agent-w${week.weekNum}-lecture`, week.keyConcepts, lecContent, week.videoUrl]
+      );
+
+      // 2. Knowledge Check Quiz (MCQ)
+      const quizId = `les_agent_w${week.weekNum}_quiz`;
+      const quizContent = JSON.stringify({
+        category: "PRACTICE",
+        type: "quiz",
+        contentType: "QUIZ",
+        curriculumMode: "PRACTICE",
+        practiceType: "MCQ",
+        duration: "20 Mins",
+        quiz: {
+          passingScorePercent: 70,
+          questions: week.questions,
+        },
+        questions: week.questions,
+      });
+
+      await client.query(
+        `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NULL, 20, 'PUBLISHED', TRUE, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+        [quizId, `${week.weekNum}.2 Knowledge Check: MCQ Quiz (${week.questions.length} Questions)`, `agent-w${week.weekNum}-quiz`, `Test your understanding of ${week.title}.`, quizContent]
+      );
+
+      // 3. Hands-on Lab Assignment
+      const labId = `les_agent_w${week.weekNum}_lab`;
+      const labContent = JSON.stringify({
+        category: "PRACTICE",
+        type: "assignment",
+        contentType: "ASSIGNMENT",
+        curriculumMode: "PRACTICE",
+        practiceType: "LAB",
+        duration: "60 Mins",
+        assignment: {
+          instructions: `${week.practical}\n\nDeliverable:\n${week.assignmentDeliverable}`,
+          allowedTypes: ["URL", "GITHUB", "ZIP"],
+          maxPoints: 100,
+        },
+        instructions: `${week.practical}\n\nDeliverable:\n${week.assignmentDeliverable}`,
+      });
+
+      await client.query(
+        `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NULL, 60, 'PUBLISHED', TRUE, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+        [labId, `${week.weekNum}.3 Hands-on Lab: ${week.title.replace(/^Week \d+:\s*/, "")}`, `agent-w${week.weekNum}-lab`, week.practical, labContent]
+      );
+
+      // 4. Live Session / Workshop
+      const liveId = `les_agent_w${week.weekNum}_live`;
+      const liveContent = JSON.stringify({
+        category: "LIVE",
+        type: "live",
+        contentType: "LIVE",
+        curriculumMode: "LIVE",
+        duration: "120 Mins",
+        liveDate: week.liveDate,
+        liveTime: week.liveTime,
+        mentorName: week.mentorName,
+        liveMeetingUrl: "https://meet.google.com/new",
+        instructions: `Agenda for ${week.liveTopic}:\n• 45 Mins: Architecture Deep-dive & Code Walkthrough\n• 45 Mins: Hands-on Lab Implementation\n• 30 Mins: Live Open Q&A & Code Reviews with ${week.mentorName}.`
+      });
+
+      await client.query(
+        `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NULL, 120, 'PUBLISHED', TRUE, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+        [liveId, `${week.weekNum}.4 ${week.liveTopic}`, `agent-w${week.weekNum}-live`, `Interactive live cohort workshop on ${week.liveDate} at ${week.liveTime}.`, liveContent]
+      );
+
+      // Link lessons to module in module_lessons
+      const lessonLinks = [
+        { id: lecId, pos: 1 },
+        { id: quizId, pos: 2 },
+        { id: labId, pos: 3 },
+        { id: liveId, pos: 4 },
+      ];
+
+      for (const lLink of lessonLinks) {
+        const existingML = await client.query(
+          `SELECT id FROM module_lessons WHERE module_id = $1 AND lesson_id = $2 LIMIT 1`,
+          [moduleId, lLink.id]
         );
+        if (existingML.rows && existingML.rows[0]) {
+          await client.query(
+            `UPDATE module_lessons SET position = $1 WHERE id = $2`,
+            [lLink.pos, existingML.rows[0].id]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO module_lessons (id, module_id, lesson_id, position, created_at)
+             VALUES ($1, $2, $3, $4, NOW())`,
+            [crypto.randomUUID(), moduleId, lLink.id, lLink.pos]
+          );
+        }
       }
     }
-    console.log(`[Seed:AI-Agent] Verified active enrollments for ${allUsers.rows?.length || 0} users.`);
-  } catch (enrErr) {
-    console.warn("[Seed:AI-Agent] Note on user auto-enrollment:", enrErr);
-  }
 
-  console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons (Lectures, Quizzes, Labs, Live sessions) into PostgreSQL!`);
+    // 4. Ensure active user enrollment for cs-agentic and course1
+    try {
+      const allUsers = await client.query(`SELECT id FROM users`);
+      for (const u of allUsers.rows || []) {
+        for (const pwyId of ["cs-agentic", "course1"]) {
+          const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
+          await client.query(
+            `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
+             VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
+             ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'`,
+            [enrId, u.id, pwyId]
+          );
+        }
+      }
+      console.log(`[Seed:AI-Agent] Verified active enrollments for ${allUsers.rows?.length || 0} users.`);
+    } catch (enrErr) {
+      console.warn("[Seed:AI-Agent] Note on user auto-enrollment:", enrErr);
+    }
+
+    await client.query("COMMIT");
+    console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons into PostgreSQL in a single transaction!`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[Seed:AI-Agent] Seeding failed, transaction rolled back:", err);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 if (require.main === module) {
