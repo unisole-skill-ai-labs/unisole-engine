@@ -839,6 +839,11 @@ export async function initializeDatabase() {
       DELETE FROM "public"."lessons" WHERE "id" IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
       DELETE FROM "public"."courses" WHERE "slug" NOT IN ('cs-agentic', 'course1') AND "title" NOT ILIKE '%AI Agent%';
 
+      UPDATE "public"."modules"
+      SET "title" = 'Week 1: What is an AI Agent?'
+      WHERE ("title" ILIKE '%What is Agent%' OR "title" ILIKE '%What is an Agent%')
+        AND "title" != 'Week 1: What is an AI Agent?';
+
       INSERT INTO "public"."courses" ("id", "title", "slug", "short_description", "price_paise", "mrp_paise", "status", "metadata", "is_active")
       VALUES 
         ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE)
