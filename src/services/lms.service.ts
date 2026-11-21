@@ -860,19 +860,55 @@ export const lmsService = {
         }
       }
 
+      // Determine last accessed lesson from progress history
+      let lastLessonId: string | null = null;
+      let lastAccessedAt: string | null = null;
+      try {
+        const lastRows = await db
+          .select({
+            lessonId: lessonProgress.lessonId,
+            updatedAt: lessonProgress.updatedAt,
+          })
+          .from(lessonProgress)
+          .where(
+            pathwayId
+              ? and(
+                  sql`${lessonProgress.userId}::text = ${userId}::text`,
+                  or(
+                    sql`${lessonProgress.pathwayId}::text = ${pathwayId}::text`,
+                    sql`${lessonProgress.pathwayId} IS NULL`
+                  )
+                )
+              : sql`${lessonProgress.userId}::text = ${userId}::text`
+          )
+          .orderBy(desc(lessonProgress.updatedAt))
+          .limit(1);
+
+        if (lastRows[0]) {
+          lastLessonId = lastRows[0].lessonId;
+          lastAccessedAt = lastRows[0].updatedAt;
+        }
+      } catch {
+        // Safe fallback
+      }
+
       return {
         userId,
         pathwayId,
         completedLessonIds,
         totalCompleted: completedLessonIds.length,
+        lastLessonId,
+        lastAccessedAt,
       };
     } catch {
       // In-memory fallback
       const completedLessonIds: string[] = [];
+      let lastLessonId: string | null = null;
       for (const key of Object.keys(inMemoryProgress)) {
         if (key.startsWith(`${userId}:`) && inMemoryProgress[key].isCompleted) {
           if (!pathwayId || inMemoryProgress[key].pathwayId === pathwayId) {
             completedLessonIds.push(inMemoryProgress[key].lessonId);
+            lastLessonId = inMemoryProgress[key].lessonId;
           }
         }
       }
@@ -881,6 +917,8 @@ export const lmsService = {
         pathwayId,
         completedLessonIds,
         totalCompleted: completedLessonIds.length,
+        lastLessonId,
+        lastAccessedAt: null,
       };
     }
   },
