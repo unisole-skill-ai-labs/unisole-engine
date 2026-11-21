@@ -609,8 +609,9 @@ export const WEEKS_DATA = [
   }
 ];
 
-export async function seedAiAgentCurriculum() {
-  if (process.env.NODE_ENV === "production" && !process.argv.includes("--force")) {
+export async function seedAiAgentCurriculum(force = false) {
+  const isForce = force || process.argv.includes("--force");
+  if (process.env.NODE_ENV === "production" && !isForce) {
     const errMsg = "[Seed:AI-Agent] ❌ Seeding course content is blocked in production unless --force is passed.";
     console.error(errMsg);
     throw new Error(errMsg);

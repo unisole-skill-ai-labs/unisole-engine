@@ -143,7 +143,7 @@ export const pathwaysService = {
 
     // 4. Seed curriculum modules & lessons into database (idempotent upsert)
     try {
-      await seedAiAgentCurriculum();
+      await seedAiAgentCurriculum(true);
     } catch (seedErr) {
       console.warn("[PATHWAYS-SYNC] Curriculum seed notice:", seedErr);
     }
