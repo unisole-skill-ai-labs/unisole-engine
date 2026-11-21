@@ -219,6 +219,14 @@ export const authService = {
       return this.adminLogin(body);
     }
 
+    const isRoadshowMode =
+      process.env.ROADSHOW_MODE === "true" || process.env.ENABLE_ROADSHOW_LOGIN === "true";
+    if (!isRoadshowMode && !(body as any).internalVerified) {
+      throw new ValidationError(
+        "Direct mobile login without OTP is disabled. Please verify your mobile number with an OTP."
+      );
+    }
+
     const {
       phone,
       name,
@@ -501,7 +509,7 @@ export const authService = {
       throw new ValidationError("Invalid or expired verification code. Please check and try again.");
     }
 
-    return this.login(body);
+    return this.login({ ...body, internalVerified: true } as any);
   },
 
   async refreshToken(body: { refreshToken?: string }) {
