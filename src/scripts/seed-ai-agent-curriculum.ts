@@ -916,10 +916,18 @@ export async function seedAiAgentCurriculum(force = false) {
 
     await client.query("COMMIT");
     console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons into PostgreSQL in a single transaction!`);
+
+    const modCountRes = await client.query(`SELECT count(*) FROM modules`);
+    const courseModCountRes = await client.query(`SELECT count(*) FROM course_modules`);
+    const lesCountRes = await client.query(`SELECT count(*) FROM lessons`);
+
     return {
       courseId,
       targetCourseIds,
       weeksSeeded: WEEKS_DATA.length,
+      modulesInDb: modCountRes.rows[0].count,
+      courseModulesInDb: courseModCountRes.rows[0].count,
+      lessonsInDb: lesCountRes.rows[0].count,
     };
   } catch (err) {
     await client.query("ROLLBACK");
