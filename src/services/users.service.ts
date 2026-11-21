@@ -1,5 +1,7 @@
 import { usersRepository } from "../repositories/users.repository";
-import { User, NewUser } from "../db/schema";
+import { User, NewUser, enrollments, mentorMentees } from "../db/schema";
+import { db } from "../db";
+import { eq, and, sql } from "drizzle-orm";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 import { normalizePhone, toTitleCase } from "../helpers/formatters";
 
@@ -105,6 +107,34 @@ export const usersService = {
     const updated = await usersRepository.update(id, data);
     if (!updated) throw new NotFoundError("User not found");
     return updated;
+  },
+
+  async unenroll(userId: string, courseId?: string): Promise<any> {
+    const whereClauses: any[] = [eq(enrollments.userId, userId)];
+    if (courseId && courseId !== "ALL") {
+      whereClauses.push(sql`(${enrollments.itemId} = ${courseId} OR ${enrollments.pathwayId} = ${courseId})`);
+    }
+
+    const updated = await db
+      .update(enrollments)
+      .set({
+        status: "CANCELLED" as any,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(and(...whereClauses))
+      .returning();
+
+    // Also remove or revoke active mentor mapping for this mentee
+    const mmWhere: any[] = [eq(mentorMentees.menteeId, userId)];
+    if (courseId && courseId !== "ALL") {
+      mmWhere.push(eq(mentorMentees.courseId, courseId));
+    }
+    await db
+      .update(mentorMentees)
+      .set({ status: "REVOKED" as any, updatedAt: new Date().toISOString() })
+      .where(and(...mmWhere));
+
+    return { success: true, count: updated.length };
   },
 
   async remove(id: string): Promise<User> {

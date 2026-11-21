@@ -10,3 +10,4 @@ adminStudentsRouter.get("/:id", usersController.getById);
 adminStudentsRouter.put("/:id", usersController.update);
 adminStudentsRouter.delete("/:id", usersController.delete);
 adminStudentsRouter.post("/:id/deactivate", usersController.deactivate);
+adminStudentsRouter.post("/:id/unenroll", usersController.unenroll);

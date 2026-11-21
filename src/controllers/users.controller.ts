@@ -104,4 +104,8 @@ export const usersController = {
   deactivate: asyncHandler(async (req: Request, res: Response) => {
     res.json(await usersService.deactivate(req.params.id));
   }),
+  unenroll: asyncHandler(async (req: Request, res: Response) => {
+    const { courseId } = req.body || {};
+    res.json(await usersService.unenroll(req.params.id, courseId));
+  }),
 };
