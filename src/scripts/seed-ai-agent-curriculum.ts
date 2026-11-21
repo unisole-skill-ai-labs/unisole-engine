@@ -724,6 +724,12 @@ export async function seedAiAgentCurriculum() {
       const modSlug = `cs-agentic-week-${week.weekNum}`;
       const moduleId = `mod_agent_w${week.weekNum}`;
 
+      // Free slug if an old module with a different ID is holding it
+      await client.query(
+        `UPDATE modules SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
+        [modSlug, moduleId]
+      );
+
       await client.query(
         `INSERT INTO modules (id, title, slug, description, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, 'PUBLISHED', TRUE, NOW(), NOW())
@@ -745,6 +751,7 @@ export async function seedAiAgentCurriculum() {
       // 4 Lessons per week:
       // 1. Lecture Video
       const lecId = `les_agent_w${week.weekNum}_lec`;
+      const lecSlug = `agent-w${week.weekNum}-lecture`;
       const lecContent = JSON.stringify({
         category: "LECTURE",
         type: "video",
@@ -757,15 +764,21 @@ export async function seedAiAgentCurriculum() {
       });
 
       await client.query(
+        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
+        [lecSlug, lecId]
+      );
+
+      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, 45, 'PUBLISHED', TRUE, NOW(), NOW())
          ON CONFLICT (id) DO UPDATE
          SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, video_url = EXCLUDED.video_url, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-        [lecId, `${week.weekNum}.1 Concept Lecture: ${week.title.replace(/^Week \d+:\s*/, "")}`, `agent-w${week.weekNum}-lecture`, week.keyConcepts, lecContent, week.videoUrl]
+        [lecId, `${week.weekNum}.1 Concept Lecture: ${week.title.replace(/^Week \d+:\s*/, "")}`, lecSlug, week.keyConcepts, lecContent, week.videoUrl]
       );
 
       // 2. Knowledge Check Quiz (MCQ)
       const quizId = `les_agent_w${week.weekNum}_quiz`;
+      const quizSlug = `agent-w${week.weekNum}-quiz`;
       const quizContent = JSON.stringify({
         category: "PRACTICE",
         type: "quiz",
@@ -781,15 +794,21 @@ export async function seedAiAgentCurriculum() {
       });
 
       await client.query(
+        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
+        [quizSlug, quizId]
+      );
+
+      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, NULL, 20, 'PUBLISHED', TRUE, NOW(), NOW())
          ON CONFLICT (id) DO UPDATE
          SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-        [quizId, `${week.weekNum}.2 Knowledge Check: MCQ Quiz (${week.questions.length} Questions)`, `agent-w${week.weekNum}-quiz`, `Test your understanding of ${week.title}.`, quizContent]
+        [quizId, `${week.weekNum}.2 Knowledge Check: MCQ Quiz (${week.questions.length} Questions)`, quizSlug, `Test your understanding of ${week.title}.`, quizContent]
       );
 
       // 3. Hands-on Lab Assignment
       const labId = `les_agent_w${week.weekNum}_lab`;
+      const labSlug = `agent-w${week.weekNum}-lab`;
       const labContent = JSON.stringify({
         category: "PRACTICE",
         type: "assignment",
@@ -806,15 +825,21 @@ export async function seedAiAgentCurriculum() {
       });
 
       await client.query(
+        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
+        [labSlug, labId]
+      );
+
+      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, NULL, 60, 'PUBLISHED', TRUE, NOW(), NOW())
          ON CONFLICT (id) DO UPDATE
          SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-        [labId, `${week.weekNum}.3 Hands-on Lab: ${week.title.replace(/^Week \d+:\s*/, "")}`, `agent-w${week.weekNum}-lab`, week.practical, labContent]
+        [labId, `${week.weekNum}.3 Hands-on Lab: ${week.title.replace(/^Week \d+:\s*/, "")}`, labSlug, week.practical, labContent]
       );
 
       // 4. Live Session / Workshop
       const liveId = `les_agent_w${week.weekNum}_live`;
+      const liveSlug = `agent-w${week.weekNum}-live`;
       const liveContent = JSON.stringify({
         category: "LIVE",
         type: "live",
@@ -829,11 +854,16 @@ export async function seedAiAgentCurriculum() {
       });
 
       await client.query(
+        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
+        [liveSlug, liveId]
+      );
+
+      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, NULL, 120, 'PUBLISHED', TRUE, NOW(), NOW())
          ON CONFLICT (id) DO UPDATE
          SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
-        [liveId, `${week.weekNum}.4 ${week.liveTopic}`, `agent-w${week.weekNum}-live`, `Interactive live cohort workshop on ${week.liveDate} at ${week.liveTime}.`, liveContent]
+        [liveId, `${week.weekNum}.4 ${week.liveTopic}`, liveSlug, `Interactive live cohort workshop on ${week.liveDate} at ${week.liveTime}.`, liveContent]
       );
 
       // Link lessons to module in module_lessons
