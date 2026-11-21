@@ -895,7 +895,11 @@ export async function seedAiAgentCurriculum(force = false) {
       }
     }
 
-    // 4. Ensure active user enrollment for cs-agentic and course1
+    // Commit curriculum modules, lessons, course_modules and module_lessons first!
+    await client.query("COMMIT");
+    console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons into PostgreSQL in a single transaction!`);
+
+    // 4. Post-commit user enrollment (isolated so enrollment issues never rollback curriculum)
     try {
       const allUsers = await client.query(`SELECT id FROM users`);
       for (const u of allUsers.rows || []) {
@@ -913,9 +917,6 @@ export async function seedAiAgentCurriculum(force = false) {
     } catch (enrErr) {
       console.warn("[Seed:AI-Agent] Note on user auto-enrollment:", enrErr);
     }
-
-    await client.query("COMMIT");
-    console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons into PostgreSQL in a single transaction!`);
 
     const modCountRes = await client.query(`SELECT count(*) FROM modules`);
     const courseModCountRes = await client.query(`SELECT count(*) FROM course_modules`);
