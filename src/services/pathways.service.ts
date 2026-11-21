@@ -19,6 +19,7 @@ import { NotFoundError, ValidationError, ConflictError } from "../errors";
 import { CANONICAL_SEO_OFFERINGS } from "../constants/offerings";
 import { CANONICAL_GROUPS, getCanonicalPathway } from "../constants/canonical-catalog";
 import { getQuestionsForModule } from "../constants/curriculum-quizzes";
+import { seedAiAgentCurriculum } from "../scripts/seed-ai-agent-curriculum";
 
 export const pathwaysService = {
   /**
@@ -137,8 +138,14 @@ export const pathwaysService = {
         })
         .onConflictDoNothing();
 
-      // Note: Modules and Lessons are authored manually via the Course CMS Studio.
       synced++;
+    }
+
+    // 4. Seed curriculum modules & lessons into database (idempotent upsert)
+    try {
+      await seedAiAgentCurriculum();
+    } catch (seedErr) {
+      console.warn("[PATHWAYS-SYNC] Curriculum seed notice:", seedErr);
     }
 
     return { total: pathwaysToSync.length, synced };
