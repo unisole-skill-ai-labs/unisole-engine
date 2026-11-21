@@ -715,7 +715,12 @@ export async function seedAiAgentCurriculum(force = false) {
     );
 
     // 3. For each week, create/update Module and 4 Lessons deterministically
-    const targetCourseIds = Array.from(new Set([courseId, "cs-agentic", "course1"]));
+    // Only target courses that actually exist in the courses table to satisfy fk_course_modules_course foreign key constraint
+    const dbCourses = await client.query(
+      `SELECT id FROM courses WHERE id IN ('cs-agentic', 'course1', $1) OR slug IN ('cs-agentic', 'course1')`,
+      [courseId]
+    );
+    const targetCourseIds = Array.from(new Set([courseId, ...(dbCourses.rows || []).map((r: any) => r.id)]));
 
     // Clear existing course_modules links for these courses before reseeding cleanly to avoid position conflicts
     await client.query(
