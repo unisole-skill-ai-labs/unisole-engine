@@ -899,36 +899,43 @@ export async function seedAiAgentCurriculum(force = false) {
     await client.query("COMMIT");
     console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons into PostgreSQL in a single transaction!`);
 
-    // 4. Post-commit user enrollment (isolated so enrollment issues never rollback curriculum)
-    try {
-      const allUsers = await client.query(`SELECT id FROM users`);
-      for (const u of allUsers.rows || []) {
-        for (const pwyId of ["cs-agentic", "course1"]) {
-          const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
-          await client.query(
-            `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
-             VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
-             ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'`,
-            [enrId, u.id, pwyId]
-          );
+    // 4. Post-commit user enrollment (idempotent existence check preventing uq_active_user_pathway_enrollment violation)
+    const allUsers = await client.query(
+      `SELECT id FROM users WHERE id NOT LIKE '%unenrolled%' AND username NOT LIKE '%unenrolled%'`
+    );
+    for (const u of allUsers.rows || []) {
+      for (const pwyId of ["cs-agentic", "course1"]) {
+        const existing = await client.query(
+          `SELECT id FROM enrollments WHERE user_id = $1 AND pathway_id = $2 AND status = 'ACTIVE' LIMIT 1`,
+          [u.id, pwyId]
+        );
+        if (existing.rows && existing.rows.length > 0) {
+          continue; // Already actively enrolled
         }
+        const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
+        await client.query(
+          `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
+           VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
+           ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'`,
+          [enrId, u.id, pwyId]
+        );
       }
-      console.log(`[Seed:AI-Agent] Verified active enrollments for ${allUsers.rows?.length || 0} users.`);
-    } catch (enrErr) {
-      console.warn("[Seed:AI-Agent] Note on user auto-enrollment:", enrErr);
     }
+    console.log(`[Seed:AI-Agent] Verified active enrollments for ${allUsers.rows?.length || 0} users without duplicates.`);
 
-    const modCountRes = await client.query(`SELECT count(*) FROM modules`);
-    const courseModCountRes = await client.query(`SELECT count(*) FROM course_modules`);
-    const lesCountRes = await client.query(`SELECT count(*) FROM lessons`);
+    const modCountRes = await client.query(`SELECT count(*) FROM course_modules WHERE course_id = $1`, [courseId]);
+    const lesCountRes = await client.query(
+      `SELECT count(*) FROM module_lessons ml JOIN course_modules cm ON ml.module_id = cm.module_id WHERE cm.course_id = $1`,
+      [courseId]
+    );
 
     return {
       courseId,
       targetCourseIds,
       weeksSeeded: WEEKS_DATA.length,
-      modulesInDb: modCountRes.rows[0].count,
-      courseModulesInDb: courseModCountRes.rows[0].count,
-      lessonsInDb: lesCountRes.rows[0].count,
+      modulesInDb: parseInt(modCountRes.rows[0].count, 10),
+      courseModulesInDb: parseInt(modCountRes.rows[0].count, 10),
+      lessonsInDb: parseInt(lesCountRes.rows[0].count, 10),
     };
   } catch (err) {
     await client.query("ROLLBACK");
