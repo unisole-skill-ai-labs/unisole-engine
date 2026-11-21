@@ -846,22 +846,12 @@ export async function seedAiAgentCurriculum() {
       ];
 
       for (const lLink of lessonLinks) {
-        const existingML = await client.query(
-          `SELECT id FROM module_lessons WHERE module_id = $1 AND lesson_id = $2 LIMIT 1`,
-          [moduleId, lLink.id]
+        await client.query(
+          `INSERT INTO module_lessons (module_id, lesson_id, position, created_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (module_id, lesson_id) DO UPDATE SET position = EXCLUDED.position`,
+          [moduleId, lLink.id, lLink.pos]
         );
-        if (existingML.rows && existingML.rows[0]) {
-          await client.query(
-            `UPDATE module_lessons SET position = $1 WHERE id = $2`,
-            [lLink.pos, existingML.rows[0].id]
-          );
-        } else {
-          await client.query(
-            `INSERT INTO module_lessons (id, module_id, lesson_id, position, created_at)
-             VALUES ($1, $2, $3, $4, NOW())`,
-            [crypto.randomUUID(), moduleId, lLink.id, lLink.pos]
-          );
-        }
       }
     }
 
