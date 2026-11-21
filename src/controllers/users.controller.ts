@@ -6,7 +6,20 @@ import { CustomRequest } from "../middleware/auth";
 export const usersController = {
   list: asyncHandler(async (req: Request, res: Response) => {
     const customReq = req as CustomRequest;
-    const { collegeId, branch, role, search, courseId, enrolledOnly } = req.query as any;
+    const {
+      collegeId,
+      branch,
+      role,
+      search,
+      courseId,
+      enrolledOnly,
+      mentorId,
+      assigned,
+      status,
+      page,
+      limit,
+      paginated,
+    } = req.query as any;
 
     const userRole = customReq.user?.role;
     const userRoles = [
@@ -37,18 +50,43 @@ export const usersController = {
       shouldFilterEnrolledOnly = true;
     }
 
-    res.json(
-      await usersService.list({
-        collegeId: collegeId ? String(collegeId) : undefined,
-        branch: branch ? String(branch) : undefined,
-        role: roleFilter,
-        search: search ? String(search) : undefined,
-        courseId: courseId ? String(courseId) : undefined,
-        enrolledOnly: shouldFilterEnrolledOnly,
-        mentorUserId: mentorUserIdFilter,
-        onlyAssignedMentorship: onlyAssignedMentorshipFilter,
-      })
-    );
+    const pageNum = page ? Math.max(1, parseInt(String(page), 10)) : undefined;
+    const limitNum = limit ? Math.max(1, parseInt(String(limit), 10)) : undefined;
+    const offsetNum = pageNum && limitNum ? (pageNum - 1) * limitNum : undefined;
+
+    const result = await usersService.list({
+      collegeId: collegeId ? String(collegeId) : undefined,
+      branch: branch ? String(branch) : undefined,
+      role: roleFilter,
+      search: search ? String(search) : undefined,
+      courseId: courseId ? String(courseId) : undefined,
+      enrolledOnly: shouldFilterEnrolledOnly,
+      mentorUserId: mentorUserIdFilter,
+      onlyAssignedMentorship: onlyAssignedMentorshipFilter,
+      mentorId: mentorId ? String(mentorId) : undefined,
+      assigned: assigned ? (String(assigned) as any) : undefined,
+      status: status ? (String(status) as any) : undefined,
+      limit: limitNum,
+      offset: offsetNum,
+    });
+
+    if (result && typeof result === "object" && "items" in result) {
+      res.setHeader("X-Total-Count", String(result.total));
+      if (paginated === "true") {
+        res.json({
+          items: result.items,
+          total: result.total,
+          page: pageNum || 1,
+          limit: limitNum || 25,
+          totalPages: limitNum ? Math.ceil(result.total / limitNum) : 1,
+        });
+      } else {
+        res.json(result.items);
+      }
+    } else {
+      res.setHeader("X-Total-Count", String(Array.isArray(result) ? result.length : 0));
+      res.json(result);
+    }
   }),
   getById: asyncHandler(async (req: Request, res: Response) => {
     res.json(await usersService.getById(req.params.id));

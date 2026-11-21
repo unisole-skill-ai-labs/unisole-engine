@@ -15,7 +15,12 @@ export const usersService = {
     courseId?: string;
     mentorUserId?: string;
     onlyAssignedMentorship?: boolean;
-  }): Promise<any[]> {
+    mentorId?: string;
+    assigned?: "ASSIGNED" | "UNASSIGNED";
+    status?: "ON_TRACK" | "AT_RISK" | "INACTIVE";
+    limit?: number;
+    offset?: number;
+  }): Promise<any> {
     return usersRepository.list(filters);
   },
 
