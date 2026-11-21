@@ -63,4 +63,18 @@ export const coursesController = {
       courses: allCourses,
     });
   }),
+  exportCourse: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await coursesService.exportCourse(req.params.id));
+  }),
+  duplicate: asyncHandler(async (req: Request, res: Response) => {
+    res.status(201).json(await coursesService.duplicateCourse(req.params.id, req.body));
+  }),
+  importCourse: asyncHandler(async (req: Request, res: Response) => {
+    const result = await coursesService.importCourse(req.body, req.body.overwrite === true);
+    if (result.conflict) {
+      res.status(409).json(result);
+    } else {
+      res.status(201).json(result);
+    }
+  }),
 };

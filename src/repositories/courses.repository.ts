@@ -11,15 +11,18 @@ import {
 
 export const coursesRepository = {
   async list(): Promise<Course[]> {
+    const deprecatedCourseIds = new Set([
+      "crs_cs-genai", "crs_cs-agentic", "crs_cs-p1", "crs_cs-common",
+      "crs_sci-p1", "crs_sci-p2", "crs_mgmt-p1", "crs_arts-p1",
+      "cs-p2", "cs-p3", "crs_1", "crs_2", "crs_3", "crs_4", "crs_5", "crs_6",
+      "crs_cs_ai", "crs_sci_math", "crs_commerce_mgmt", "crs_humanities_arts",
+      "mgmt-p2", "mgmt-p3", "mgmt-common",
+    ]);
+
     try {
       const rows = await db.select().from(courses);
-      const filtered = rows.filter(
-        (c) =>
-          c.slug === "cs-agentic" ||
-          c.slug === "course1" ||
-          (c.title && c.title.toLowerCase().includes("ai agent"))
-      );
-      if (filtered.length > 0) return filtered;
+      const validRows = rows.filter((c) => !deprecatedCourseIds.has(c.id));
+      if (validRows.length > 0) return validRows;
     } catch {}
 
     return [
@@ -41,18 +44,21 @@ export const coursesRepository = {
   },
 
   async listPublished(): Promise<Course[]> {
+    const deprecatedCourseIds = new Set([
+      "crs_cs-genai", "crs_cs-agentic", "crs_cs-p1", "crs_cs-common",
+      "crs_sci-p1", "crs_sci-p2", "crs_mgmt-p1", "crs_arts-p1",
+      "cs-p2", "cs-p3", "crs_1", "crs_2", "crs_3", "crs_4", "crs_5", "crs_6",
+      "crs_cs_ai", "crs_sci_math", "crs_commerce_mgmt", "crs_humanities_arts",
+      "mgmt-p2", "mgmt-p3", "mgmt-common",
+    ]);
+
     try {
       const rows = await db
         .select()
         .from(courses)
         .where(and(eq(courses.isActive, true), eq(courses.status, "PUBLISHED")));
-      const filtered = rows.filter(
-        (c) =>
-          c.slug === "cs-agentic" ||
-          c.slug === "course1" ||
-          (c.title && c.title.toLowerCase().includes("ai agent"))
-      );
-      if (filtered.length > 0) return filtered;
+      const validRows = rows.filter((c) => !deprecatedCourseIds.has(c.id));
+      if (validRows.length > 0) return validRows;
     } catch {}
     return this.list();
   },
