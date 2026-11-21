@@ -25,7 +25,7 @@ export const pathwaysService = {
   /**
    * Synchronize canonical pathways, syllabus modules, lessons, and pricing into PostgreSQL via Drizzle ORM.
    */
-  async syncCanonicalPathways(): Promise<{ total: number; synced: number; seedError?: string | null }> {
+  async syncCanonicalPathways(): Promise<{ total: number; synced: number; seedError?: string | null; seedStats?: any }> {
     let synced = 0;
 
     // 0. Purge legacy deprecated courses, duplicate crs_ courses, dummy HTML/CSS placeholder modules and lessons, and legacy demo pathways
@@ -143,14 +143,15 @@ export const pathwaysService = {
 
     // 4. Seed curriculum modules & lessons into database (idempotent upsert)
     let seedError: string | null = null;
+    let seedStats: any = null;
     try {
-      await seedAiAgentCurriculum(true);
+      seedStats = await seedAiAgentCurriculum(true);
     } catch (seedErr: any) {
       console.error("[PATHWAYS-SYNC] Curriculum seed failure:", seedErr);
       seedError = seedErr?.message || String(seedErr);
     }
 
-    return { total: pathwaysToSync.length, synced, seedError };
+    return { total: pathwaysToSync.length, synced, seedError, seedStats };
   },
 
   async list(): Promise<Pathway[]> {

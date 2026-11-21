@@ -916,6 +916,11 @@ export async function seedAiAgentCurriculum(force = false) {
 
     await client.query("COMMIT");
     console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons into PostgreSQL in a single transaction!`);
+    return {
+      courseId,
+      targetCourseIds,
+      weeksSeeded: WEEKS_DATA.length,
+    };
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[Seed:AI-Agent] Seeding failed, transaction rolled back:", err);
