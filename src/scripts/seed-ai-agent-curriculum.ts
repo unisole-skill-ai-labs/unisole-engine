@@ -697,17 +697,20 @@ export async function seedAiAgentCurriculum(force = false) {
     }
     console.log(`[Seed:AI-Agent] Using course ID: ${courseId}`);
 
-    // Link pathway_courses
+    // Link pathway_courses cleanly
+    await client.query(
+      `DELETE FROM pathway_courses WHERE pathway_id IN ('cs-agentic', 'course1')`
+    );
     await client.query(
       `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
        VALUES ('cs-agentic', $1, 1, NOW())
-       ON CONFLICT (pathway_id, course_id) DO NOTHING`,
+       ON CONFLICT DO NOTHING`,
       [courseId]
     );
     await client.query(
       `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
        VALUES ('course1', $1, 1, NOW())
-       ON CONFLICT (pathway_id, course_id) DO NOTHING`,
+       ON CONFLICT DO NOTHING`,
       [courseId]
     );
 
