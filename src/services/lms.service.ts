@@ -2884,8 +2884,9 @@ export const lmsService = {
     const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
     const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
     const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
-    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
-      throw new ForbiddenError("Only Course Managers and Admins can create calendar events");
+    const isMentor = upperRoles.includes("MENTOR");
+    if (!isAdmin && !isCourseManager && !isMentor && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers, Admins, and Mentors can create calendar events");
     }
 
     const id = `ev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -2946,8 +2947,9 @@ export const lmsService = {
     const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
     const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
     const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
-    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
-      throw new ForbiddenError("Only Course Managers and Admins can edit calendar events");
+    const isMentor = upperRoles.includes("MENTOR");
+    if (!isAdmin && !isCourseManager && !isMentor && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers, Admins, and Mentors can edit calendar events");
     }
 
     const updatePayload: any = {
@@ -2977,8 +2979,9 @@ export const lmsService = {
     const upperRoles = (callerRoles || []).map((r) => String(r).toUpperCase());
     const isAdmin = upperRoles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
     const isCourseManager = upperRoles.some((r) => ["COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r));
-    if (!isAdmin && !isCourseManager && callerRoles.length > 0) {
-      throw new ForbiddenError("Only Course Managers and Admins can delete calendar events");
+    const isMentor = upperRoles.includes("MENTOR");
+    if (!isAdmin && !isCourseManager && !isMentor && callerRoles.length > 0) {
+      throw new ForbiddenError("Only Course Managers, Admins, and Mentors can delete calendar events");
     }
 
     const idx = inMemoryCalendarEvents.findIndex((e) => e.id === id);
