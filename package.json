@@ -18,10 +18,14 @@
     "db:seed:demo": "node dist/scripts/seed-demo-analytics.js",
     "db:seed:survey": "tsx src/scripts/seed-survey.ts",
     "db:seed:dev": "tsx src/scripts/seed-system.ts",
-    "seed:ai-agent": "tsx src/scripts/seed-ai-agent-curriculum.ts",
-    "db:seed:agent": "tsx src/scripts/seed-ai-agent-curriculum.ts",
-    "db:seed:calendar": "tsx src/scripts/seed-ai-agent-calendar.ts",
-    "db:sync:pathways": "tsx src/scripts/sync-canonical-pathways.ts"
+    "seed:ai-agent": "node dist/scripts/seed-ai-agent-curriculum.js",
+    "seed:ai-agent:dev": "tsx src/scripts/seed-ai-agent-curriculum.ts",
+    "db:seed:agent": "node dist/scripts/seed-ai-agent-curriculum.js",
+    "db:seed:agent:dev": "tsx src/scripts/seed-ai-agent-curriculum.ts",
+    "db:seed:calendar": "node dist/scripts/seed-ai-agent-calendar.js",
+    "db:seed:calendar:dev": "tsx src/scripts/seed-ai-agent-calendar.ts",
+    "db:sync:pathways": "node dist/scripts/sync-canonical-pathways.js",
+    "db:sync:pathways:dev": "tsx src/scripts/sync-canonical-pathways.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",

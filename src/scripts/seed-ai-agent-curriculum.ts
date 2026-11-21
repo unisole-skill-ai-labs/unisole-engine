@@ -711,6 +711,16 @@ export async function seedAiAgentCurriculum() {
     );
 
     // 3. For each week, create/update Module and 4 Lessons deterministically
+    const targetCourseIds = Array.from(new Set([courseId, "cs-agentic", "course1"]));
+
+    // Purge any empty placeholder modules or non-canonical module links from these courses
+    await client.query(
+      `DELETE FROM course_modules
+       WHERE course_id = ANY($1::text[])
+         AND module_id NOT LIKE 'mod_agent_w%'`,
+      [targetCourseIds]
+    );
+
     for (const week of WEEKS_DATA) {
       const modSlug = `cs-agentic-week-${week.weekNum}`;
       const moduleId = `mod_agent_w${week.weekNum}`;
@@ -724,7 +734,6 @@ export async function seedAiAgentCurriculum() {
       );
 
       // Link in course_modules for all course aliases
-      const targetCourseIds = Array.from(new Set([courseId, "cs-agentic", "course1"]));
       for (const cId of targetCourseIds) {
         await client.query(
           `INSERT INTO course_modules (course_id, module_id, position, created_at)
