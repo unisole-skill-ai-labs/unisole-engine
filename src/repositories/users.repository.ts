@@ -129,30 +129,39 @@ export const usersRepository = {
     `);
     const totalCount = Number((countResult.rows || countResult)[0]?.count || 0);
 
-    const paginationSql = filters?.limit
-      ? sql`LIMIT ${filters.limit} OFFSET ${filters.offset || 0}`
+    const paginationLimit = filters?.limit ?? (filters?.offset !== undefined ? 50 : undefined);
+    const paginationSql = paginationLimit
+      ? sql`LIMIT ${paginationLimit} OFFSET ${filters?.offset || 0}`
       : sql``;
 
     const result = await db.execute<any>(sql`
+      WITH paged_users AS (
+        SELECT 
+          u.id,
+          u.name,
+          u.username,
+          u.phone,
+          u.email,
+          u.avatar,
+          u.role,
+          u.college_id as "collegeId",
+          u.college_name as "collegeName",
+          u.branch,
+          u.department_id as "departmentId",
+          u.designation,
+          u.is_active as "isActive",
+          u.signup_source as "signupSource",
+          u.signup_session_code as "signupSessionCode",
+          u.metadata,
+          u.created_at as "createdAt",
+          u.updated_at as "updatedAt"
+        FROM users u
+        ${whereSql}
+        ORDER BY u.created_at DESC
+        ${paginationSql}
+      )
       SELECT 
-        u.id,
-        u.name,
-        u.username,
-        u.phone,
-        u.email,
-        u.avatar,
-        u.role,
-        u.college_id as "collegeId",
-        u.college_name as "collegeName",
-        u.branch,
-        u.department_id as "departmentId",
-        u.designation,
-        u.is_active as "isActive",
-        u.signup_source as "signupSource",
-        u.signup_session_code as "signupSessionCode",
-        u.metadata,
-        u.created_at as "createdAt",
-        u.updated_at as "updatedAt",
+        u.*,
         -- Computed Progress Percent & Counts
         COALESCE(
           (
@@ -179,7 +188,7 @@ export const usersRepository = {
           0
         ) as "overdueCount",
         GREATEST(
-          u.updated_at,
+          u."updatedAt",
           (SELECT MAX(completed_at) FROM lesson_progress WHERE user_id = u.id),
           (SELECT MAX(created_at) FROM submissions WHERE user_id = u.id),
           (SELECT MAX(enrolled_at) FROM enrollments WHERE user_id = u.id)
@@ -251,10 +260,8 @@ export const usersRepository = {
           ),
           '[]'::json
         ) as "assignedMentors"
-      FROM users u
-      ${whereSql}
-      ORDER BY u.created_at DESC
-      ${paginationSql};
+      FROM paged_users u
+      ORDER BY u."createdAt" DESC;
     `);
 
     const now = Date.now();

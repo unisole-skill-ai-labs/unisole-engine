@@ -471,6 +471,7 @@ export const users = pgTable(
     index("idx_users_username").using("btree", table.username.asc().nullsLast()),
     index("idx_users_signup_source").using("btree", table.signupSource.asc().nullsLast()),
     index("idx_users_signup_session").using("btree", table.signupSessionCode.asc().nullsLast()),
+    index("idx_users_role_created").on(table.role, table.createdAt),
     unique("uq_users_phone").on(table.phone),
   ]
 );
@@ -943,6 +944,7 @@ export const enrollments = pgTable(
   (table) => [
     index("idx_enrollments_pathway").using("btree", table.pathwayId.asc().nullsLast()),
     index("idx_enrollments_user").using("btree", table.userId.asc().nullsLast()),
+    index("idx_enrollments_user_pathway").on(table.userId, table.pathwayId),
     index("idx_enrollments_item").using("btree", table.itemType.asc().nullsLast(), table.itemId.asc().nullsLast()),
     index("idx_enrollments_order").using("btree", table.orderId.asc().nullsLast()),
     index("idx_enrollments_user_status").using(
@@ -1952,6 +1954,7 @@ export const lessonProgress = pgTable(
     index("idx_lesson_progress_user").on(table.userId),
     index("idx_lesson_progress_lesson").on(table.lessonId),
     index("idx_lesson_progress_pathway").on(table.pathwayId),
+    index("idx_lesson_progress_user_pathway").on(table.userId, table.pathwayId),
     unique("uq_lesson_progress_user_lesson").on(table.userId, table.lessonId),
     foreignKey({
       columns: [table.userId],
@@ -1995,6 +1998,8 @@ export const submissions = pgTable(
     index("idx_submissions_assignment").on(table.assignmentId),
     index("idx_submissions_mentor").on(table.mentorId),
     index("idx_submissions_pathway").on(table.pathwayId),
+    index("idx_submissions_user_pathway").on(table.userId, table.pathwayId),
+    index("idx_submissions_created_at").on(table.createdAt),
     foreignKey({
       columns: [table.userId],
       foreignColumns: [users.id],

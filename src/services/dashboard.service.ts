@@ -111,9 +111,9 @@ export const dashboardService = {
     const enrolledStudentsCount = Number(enrolledRow.enrolledCount) || 0;
     const activeEnrollmentsCount = Number(enrolledRow.activeEnrollmentsCount) || 0;
 
-    // Submissions in queue
+    // Submissions in queue (using pathway_id column)
     const submissionsScopeSql = courseId
-      ? sql`WHERE (s.course_id = ${courseId} OR s.course_id IN (SELECT slug FROM courses WHERE id = ${courseId}))`
+      ? sql`WHERE (s.pathway_id = ${courseId} OR s.pathway_id IN (SELECT slug FROM courses WHERE id = ${courseId}))`
       : sql``;
 
     const submissionsCountRes = await db.execute<any>(sql`
@@ -204,54 +204,88 @@ export const dashboardService = {
     };
 
     // 5. Learning Velocity (Whole integer counts, date tooltip keys) (A4)
+    // Optimized with CTE aggregations to eliminate Cartesian product join
     let velocityRes: any;
     if (period === "Weekly") {
       velocityRes = await db.execute<any>(sql`
+        WITH daily_prog AS (
+          SELECT DATE(completed_at) as day, COUNT(*)::int as cnt
+          FROM lesson_progress
+          WHERE completed_at >= CURRENT_DATE - 6 * INTERVAL '1 day'
+          GROUP BY DATE(completed_at)
+        ),
+        daily_sub AS (
+          SELECT DATE(created_at) as day, COUNT(*)::int as cnt
+          FROM submissions
+          WHERE created_at >= CURRENT_DATE - 6 * INTERVAL '1 day'
+          GROUP BY DATE(created_at)
+        )
         SELECT 
           TO_CHAR(d.day, 'Mon DD') as "dayLabel",
           TO_CHAR(d.day, 'YYYY-MM-DD') as "dateKey",
-          COALESCE(COUNT(lp.id), 0)::int + COALESCE(COUNT(sub.id), 0)::int as "activityCount"
+          (COALESCE(dp.cnt, 0) + COALESCE(ds.cnt, 0))::int as "activityCount"
         FROM generate_series(
           CURRENT_DATE - 6 * INTERVAL '1 day',
           CURRENT_DATE,
           INTERVAL '1 day'
         ) d(day)
-        LEFT JOIN lesson_progress lp ON DATE(lp.completed_at) = d.day
-        LEFT JOIN submissions sub ON DATE(sub.created_at) = d.day
-        GROUP BY d.day
+        LEFT JOIN daily_prog dp ON dp.day = d.day
+        LEFT JOIN daily_sub ds ON ds.day = d.day
         ORDER BY d.day ASC;
       `);
     } else if (period === "Yearly") {
       velocityRes = await db.execute<any>(sql`
+        WITH monthly_prog AS (
+          SELECT DATE_TRUNC('month', completed_at) as month, COUNT(*)::int as cnt
+          FROM lesson_progress
+          WHERE completed_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months'
+          GROUP BY DATE_TRUNC('month', completed_at)
+        ),
+        monthly_sub AS (
+          SELECT DATE_TRUNC('month', created_at) as month, COUNT(*)::int as cnt
+          FROM submissions
+          WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months'
+          GROUP BY DATE_TRUNC('month', created_at)
+        )
         SELECT 
           TO_CHAR(m.month, 'Mon YY') as "dayLabel",
           TO_CHAR(m.month, 'YYYY-MM') as "dateKey",
-          COALESCE(COUNT(lp.id), 0)::int + COALESCE(COUNT(sub.id), 0)::int as "activityCount"
+          (COALESCE(mp.cnt, 0) + COALESCE(ms.cnt, 0))::int as "activityCount"
         FROM generate_series(
           DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months',
           DATE_TRUNC('month', CURRENT_DATE),
           INTERVAL '1 month'
         ) m(month)
-        LEFT JOIN lesson_progress lp ON DATE_TRUNC('month', lp.completed_at) = m.month
-        LEFT JOIN submissions sub ON DATE_TRUNC('month', sub.created_at) = m.month
-        GROUP BY m.month
+        LEFT JOIN monthly_prog mp ON mp.month = m.month
+        LEFT JOIN monthly_sub ms ON ms.month = m.month
         ORDER BY m.month ASC;
       `);
     } else {
       // Monthly: last 30 days
       velocityRes = await db.execute<any>(sql`
+        WITH daily_prog AS (
+          SELECT DATE(completed_at) as day, COUNT(*)::int as cnt
+          FROM lesson_progress
+          WHERE completed_at >= CURRENT_DATE - 29 * INTERVAL '1 day'
+          GROUP BY DATE(completed_at)
+        ),
+        daily_sub AS (
+          SELECT DATE(created_at) as day, COUNT(*)::int as cnt
+          FROM submissions
+          WHERE created_at >= CURRENT_DATE - 29 * INTERVAL '1 day'
+          GROUP BY DATE(created_at)
+        )
         SELECT 
           TO_CHAR(d.day, 'Mon DD') as "dayLabel",
           TO_CHAR(d.day, 'YYYY-MM-DD') as "dateKey",
-          COALESCE(COUNT(lp.id), 0)::int + COALESCE(COUNT(sub.id), 0)::int as "activityCount"
+          (COALESCE(dp.cnt, 0) + COALESCE(ds.cnt, 0))::int as "activityCount"
         FROM generate_series(
           CURRENT_DATE - 29 * INTERVAL '1 day',
           CURRENT_DATE,
           INTERVAL '1 day'
         ) d(day)
-        LEFT JOIN lesson_progress lp ON DATE(lp.completed_at) = d.day
-        LEFT JOIN submissions sub ON DATE(sub.created_at) = d.day
-        GROUP BY d.day
+        LEFT JOIN daily_prog dp ON dp.day = d.day
+        LEFT JOIN daily_sub ds ON ds.day = d.day
         ORDER BY d.day ASC;
       `);
     }

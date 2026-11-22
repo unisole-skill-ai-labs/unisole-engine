@@ -1030,8 +1030,14 @@ export async function initializeDatabase() {
 
       CREATE INDEX IF NOT EXISTS "idx_lesson_progress_user" ON "public"."lesson_progress" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_lesson_progress_pathway" ON "public"."lesson_progress" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_lesson_progress_user_pathway" ON "public"."lesson_progress" ("user_id", "pathway_id");
       CREATE INDEX IF NOT EXISTS "idx_submissions_user" ON "public"."submissions" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_submissions_pathway" ON "public"."submissions" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_user_pathway" ON "public"."submissions" ("user_id", "pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_created_at" ON "public"."submissions" ("created_at" DESC);
+      CREATE INDEX IF NOT EXISTS "idx_enrollments_user_pathway" ON "public"."enrollments" ("user_id", "pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_users_role_created" ON "public"."users" ("role", "created_at" DESC);
+      CREATE INDEX IF NOT EXISTS "idx_calendar_events_time_range" ON "public"."calendar_events" ("start_time", "end_time");
       CREATE INDEX IF NOT EXISTS "idx_notes_user" ON "public"."notes" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_notes_pathway" ON "public"."notes" ("pathway_id");
 

@@ -2073,8 +2073,10 @@ export const lmsService = {
     search?: string;
     mentorId?: string;
     courseId?: string;
+    limit?: number;
+    offset?: number;
   }) {
-    const { callerUserId, callerRoles, status, search, mentorId, courseId } = options;
+    const { callerUserId, callerRoles, status, search, mentorId, courseId, limit, offset } = options;
     const isAdmin = callerRoles.includes("SUPER_ADMIN") || callerRoles.includes("ADMIN");
     const isMentor = callerRoles.includes("MENTOR") && !isAdmin;
     const isProgramManager = (callerRoles.includes("COURSE_MANAGER") || callerRoles.includes("PROGRAM_MANAGER")) && !isAdmin;
@@ -2180,7 +2182,8 @@ export const lmsService = {
       LEFT JOIN mentors m ON m.id = mm.mentor_id
       LEFT JOIN users u_m ON u_m.id = m.user_id
       ${whereSql}
-      ORDER BY s.created_at DESC;
+      ORDER BY s.created_at DESC
+      LIMIT ${limit || 100} OFFSET ${offset || 0};
     `;
 
     const result = await db.execute<any>(query);
