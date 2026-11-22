@@ -23,6 +23,7 @@ import {
 } from "../db/schema";
 import { ForbiddenError, NotFoundError } from "../errors";
 import { getCanonicalPathway, CANONICAL_GROUPS } from "../constants/canonical-catalog";
+import { appCache } from "../utils/cache";
 
 const PATHWAY_CATALOG: Record<string, { title: string; description: string; duration: string; level: string }> = {
   "cs-agentic": {
@@ -408,6 +409,13 @@ export const lmsService = {
       }
     }
 
+    // B3: Check hierarchy cache
+    const cacheKey = `pathway_hierarchy:${pathway.id}:${isAdmin}:${summaryOnly}`;
+    const cached = appCache.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // Fetch linked courses
     let linkedCourses: any[] = [];
     try {
@@ -690,10 +698,13 @@ export const lmsService = {
       });
     }
 
-    return {
+    const result = {
       pathway,
       courses: courseList,
     };
+    appCache.set(cacheKey, result, 60);
+
+    return result;
   },
 
   /**

@@ -1,6 +1,7 @@
 import http from "http";
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
@@ -44,6 +45,7 @@ const io = new SocketIOServer(server, {
 setupPresentationSocket(io);
 
 app.use(cors());
+app.use(compression({ threshold: 1024 }));
 app.use(
   express.json({
     verify: (req: any, _res, buf) => {
