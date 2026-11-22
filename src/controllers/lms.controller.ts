@@ -20,8 +20,21 @@ export const lmsController = {
     const isStaffOrMentor = userRoles.some((r) =>
       ["ADMIN", "SUPER_ADMIN", "MENTOR", "MEMBER", "COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r)
     );
-    const pathwayContent = await lmsService.getPathwayContent(userId, req.params.id, isStaffOrMentor);
+    const summary = req.query.summary === "true" || req.query.mode === "overview";
+    const pathwayContent = await lmsService.getPathwayContent(userId, req.params.id, isStaffOrMentor, summary);
     res.json(pathwayContent);
+  }),
+
+  getDashboardSummary: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const userRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ].filter(Boolean).map((r) => String(r).toUpperCase());
+    const pathwayId = req.query.pathwayId ? String(req.query.pathwayId) : "cs-agentic";
+    const summary = await lmsService.getDashboardSummary(userId, userRoles, pathwayId);
+    res.json(summary);
   }),
 
   getLessonContent: asyncHandler(async (req: CustomRequest, res: Response) => {

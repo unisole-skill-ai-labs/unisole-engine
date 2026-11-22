@@ -304,7 +304,7 @@ export const lmsService = {
    * Get full hierarchy tree for a pathway (Pathway -> Courses -> Modules -> Lessons)
    * Enforces that student is actively enrolled (or isAdmin is true).
    */
-  async getPathwayContent(userId: string, pathwayId: string, isAdmin = false) {
+  async getPathwayContent(userId: string, pathwayId: string, isAdmin = false, summaryOnly = false) {
     let pathwayRows: any[] = [];
     try {
       pathwayRows = await db
@@ -641,23 +641,25 @@ export const lmsService = {
                     (computedType === "video"
                       ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1"
                       : null)),
-              content: isLesLocked ? null : lesson.content,
+              content: (isLesLocked || summaryOnly) ? null : lesson.content,
               contentType: computedType.toUpperCase(),
               type: computedType,
               category: computedCategory,
               isTest: computedCategory === "TEST",
               folderId: parsedContent?.folderId || null,
-              attachments: isLesLocked ? [] : (parsedContent?.attachments || []),
-              config: isLesLocked
+              attachments: (isLesLocked || summaryOnly) ? [] : (parsedContent?.attachments || []),
+              config: (isLesLocked || summaryOnly)
                 ? null
                 : (parsedContent?.codingTest ||
                     parsedContent?.subjectiveTest ||
                     parsedContent?.videoTest ||
                     parsedContent?.assignment ||
                     parsedContent?.quiz),
-              questions: isLesLocked ? [] : (parsedContent?.quiz?.questions || parsedContent?.questions),
+              questions: (isLesLocked || summaryOnly) ? [] : (parsedContent?.quiz?.questions || parsedContent?.questions),
               instructions: isLesLocked
                 ? "Content is scheduled and locked."
+                : summaryOnly
+                ? null
                 : (parsedContent?.assignment?.instructions ||
                     parsedContent?.instructions ||
                     lesson.description),
@@ -833,21 +835,18 @@ export const lmsService = {
    */
   async getStudentProgress(userId: string, pathwayId?: string) {
     try {
-      const query = db
-        .select()
-        .from(lessonProgress)
-        .where(
-          pathwayId
-            ? and(
-                eq(lessonProgress.userId, userId),
-                eq(lessonProgress.isCompleted, true),
-                eq(lessonProgress.pathwayId, pathwayId)
-              )
-            : and(eq(lessonProgress.userId, userId), eq(lessonProgress.isCompleted, true))
-        );
-
-      const rows = await query;
-      const completedLessonIds = rows.map((r) => r.lessonId);
+      // Single optimized query using idx_lesson_progress_user_pathway
+      const res = await pool.query(
+        `SELECT 
+           COALESCE(ARRAY_AGG(lesson_id ORDER BY updated_at DESC) FILTER (WHERE is_completed = true), ARRAY[]::varchar[]) as completed_ids,
+           (ARRAY_AGG(lesson_id ORDER BY updated_at DESC))[1] as last_lesson_id,
+           (ARRAY_AGG(updated_at ORDER BY updated_at DESC))[1] as last_accessed_at
+         FROM lesson_progress
+         WHERE user_id = $1 AND ($2::text IS NULL OR pathway_id = $2 OR pathway_id IS NULL)`,
+        [userId, pathwayId || null]
+      );
+      const row = res.rows[0] || {};
+      const completedLessonIds = Array.from(new Set((row.completed_ids || []) as string[]));
 
       // Merge any in-memory progress for this user
       for (const key of Object.keys(inMemoryProgress)) {
@@ -860,45 +859,13 @@ export const lmsService = {
         }
       }
 
-      // Determine last accessed lesson from progress history
-      let lastLessonId: string | null = null;
-      let lastAccessedAt: string | null = null;
-      try {
-        const lastRows = await db
-          .select({
-            lessonId: lessonProgress.lessonId,
-            updatedAt: lessonProgress.updatedAt,
-          })
-          .from(lessonProgress)
-          .where(
-            pathwayId
-              ? and(
-                  sql`${lessonProgress.userId}::text = ${userId}::text`,
-                  or(
-                    sql`${lessonProgress.pathwayId}::text = ${pathwayId}::text`,
-                    sql`${lessonProgress.pathwayId} IS NULL`
-                  )
-                )
-              : sql`${lessonProgress.userId}::text = ${userId}::text`
-          )
-          .orderBy(desc(lessonProgress.updatedAt))
-          .limit(1);
-
-        if (lastRows[0]) {
-          lastLessonId = lastRows[0].lessonId;
-          lastAccessedAt = lastRows[0].updatedAt;
-        }
-      } catch {
-        // Safe fallback
-      }
-
       return {
         userId,
         pathwayId,
         completedLessonIds,
         totalCompleted: completedLessonIds.length,
-        lastLessonId,
-        lastAccessedAt,
+        lastLessonId: row.last_lesson_id || null,
+        lastAccessedAt: row.last_accessed_at || null,
       };
     } catch {
       // In-memory fallback
@@ -1041,7 +1008,7 @@ export const lmsService = {
 
       let content: any = null;
       try {
-        content = await this.getPathwayContent(userId, pathwayId, true);
+        content = await this.getPathwayContent(userId, pathwayId, true, true);
       } catch {
         continue;
       }
@@ -1249,6 +1216,30 @@ export const lmsService = {
       upcoming: upcomingList,
       completed: completedList,
       scheduled,
+    };
+  },
+
+  /**
+   * B2: Aggregated Dashboard Summary endpoint for Student LMS.
+   * Consolidates pathway overview, progress, submissions, activities, and calendar events
+   * into ONE fast parallel response, reducing mobile network roundtrips from 5 to 1.
+   */
+  async getDashboardSummary(userId: string, userRoles: string[], pathwayId: string = "cs-agentic") {
+    const [pathwayContent, progress, submissions, activities, calendarEvents] = await Promise.all([
+      this.getPathwayContent(userId, pathwayId, false, true),
+      this.getStudentProgress(userId, pathwayId),
+      this.getStudentSubmissions(userId, pathwayId),
+      this.getStudentActivities(userId),
+      this.getCalendarEvents({ callerUserId: userId, callerRoles: userRoles }),
+    ]);
+
+    return {
+      pathwayId,
+      pathwayContent,
+      progress,
+      submissions,
+      activities,
+      calendarEvents,
     };
   },
 
