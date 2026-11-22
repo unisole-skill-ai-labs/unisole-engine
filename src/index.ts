@@ -139,6 +139,22 @@ async function bootstrap() {
   server.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
   });
+
+  const shutdown = async (signal: string) => {
+    console.log(`[SHUTDOWN] Received ${signal}. Closing HTTP server and DB pool...`);
+    server.close(async () => {
+      try {
+        await pool.end();
+        console.log("[SHUTDOWN] Database pool closed successfully.");
+      } catch (err) {
+        console.error("[SHUTDOWN] Error closing DB pool:", err);
+      }
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 bootstrap();
