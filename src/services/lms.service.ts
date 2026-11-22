@@ -409,8 +409,17 @@ export const lmsService = {
       }
     }
 
-    // B3: Check hierarchy cache
-    const cacheKey = `pathway_hierarchy:${pathway.id}:${isAdmin}:${summaryOnly}`;
+    // B3: Check hierarchy cache with DB revision check to prevent stale cache
+    let cacheVersion = "0";
+    try {
+      const vRes = await db.execute<any>(
+        sql`SELECT GREATEST(COALESCE(MAX(m.updated_at), '1970-01-01'::timestamptz), COALESCE(MAX(c.updated_at), '1970-01-01'::timestamptz)) as v FROM modules m, courses c;`
+      );
+      cacheVersion = (vRes.rows || vRes)[0]?.v ? new Date((vRes.rows || vRes)[0].v).getTime().toString() : "0";
+    } catch {
+      cacheVersion = "0";
+    }
+    const cacheKey = `pathway_hierarchy:${pathway.id}:${isAdmin}:${summaryOnly}:${cacheVersion}`;
     const cached = appCache.get<any>(cacheKey);
     if (cached) {
       return cached;
