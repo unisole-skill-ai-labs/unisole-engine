@@ -1253,6 +1253,163 @@ export const lmsService = {
       this.getCalendarEvents({ callerUserId: userId, callerRoles: userRoles }),
     ]);
 
+    // Compute real progression & current week directly from database state
+    const courses = pathwayContent?.courses || [];
+    const modules: any[] = courses[0]?.modules || [];
+    const completedLessonIds: string[] = Array.from(new Set(progress?.completedLessonIds || []));
+    const now = Date.now();
+
+    let totalCourseActivities = 0;
+    let completedCourseActivities = 0;
+
+    const moduleStats = modules.map((m: any, idx: number) => {
+      const rawItems = m.lessons || m.items || [];
+      const items = rawItems.filter((i: any) => {
+        const cat = (i.category || "").toUpperCase();
+        const type = (i.type || "").toLowerCase();
+        return cat !== "FOLDER" && type !== "folder";
+      });
+
+      const totalItems = items.length;
+      totalCourseActivities += totalItems;
+
+      // Core actionable items (lectures, quizzes, labs)
+      const coreItems = items.filter((i: any) => {
+        const cat = (i.category || "").toUpperCase();
+        const type = (i.type || "").toLowerCase();
+        return cat !== "LIVE" && cat !== "WORKSHOP" && type !== "live" && type !== "workshop";
+      });
+
+      const completedItems = items.filter((i: any) => completedLessonIds.includes(i.id));
+      completedCourseActivities += completedItems.length;
+
+      const isCoreComplete = coreItems.length > 0 && coreItems.every((i: any) => completedLessonIds.includes(i.id));
+      const isAllComplete = totalItems > 0 && completedItems.length >= totalItems;
+      const isCompleted = isAllComplete || isCoreComplete;
+
+      const unlockMs = m.unlockAt ? new Date(m.unlockAt).getTime() : null;
+      const isLocked = !!(m.isLocked || (unlockMs !== null && unlockMs > now));
+
+      const incompleteItems = items.filter((i: any) => !completedLessonIds.includes(i.id));
+
+      return {
+        module: m,
+        moduleIndex: idx,
+        weekNumber: idx + 1,
+        title: m.title,
+        items,
+        totalItems,
+        completedCount: completedItems.length,
+        isCompleted,
+        isLocked,
+        unlockAt: m.unlockAt || null,
+        incompleteItems,
+      };
+    });
+
+    // Determine current week index: first module that is not completed
+    let firstIncompleteIndex = moduleStats.findIndex((m) => !m.isCompleted);
+    let isCourseCompleted = false;
+
+    if (firstIncompleteIndex === -1) {
+      if (moduleStats.length > 0) {
+        firstIncompleteIndex = moduleStats.length - 1;
+        isCourseCompleted = true;
+      } else {
+        firstIncompleteIndex = 0;
+      }
+    }
+
+    const targetModule = moduleStats[firstIncompleteIndex] || null;
+
+    let weekStatus: "In progress" | "Up next" | "Locked" | "Completed" | "Not started" = "Not started";
+
+    if (isCourseCompleted) {
+      weekStatus = "Completed";
+    } else if (targetModule) {
+      if (targetModule.isLocked) {
+        weekStatus = "Up next";
+      } else if (targetModule.completedCount > 0) {
+        weekStatus = "In progress";
+      } else {
+        weekStatus = "Not started";
+      }
+    }
+
+    // Determine next incomplete lesson: prioritize active target module
+    let nextIncompleteItem: any = null;
+    let nextIncompleteWeekNum = targetModule ? targetModule.weekNumber : 1;
+
+    if (targetModule) {
+      // First look for incomplete core lessons (non-live) in active module
+      nextIncompleteItem = targetModule.incompleteItems.find(
+        (item: any) => !item.isLocked && item.type !== "live" && item.category !== "LIVE"
+      ) || targetModule.incompleteItems.find((item: any) => !item.isLocked);
+    }
+
+    // If targetModule has no unlocked incomplete items, search following modules
+    if (!nextIncompleteItem) {
+      for (let i = firstIncompleteIndex + 1; i < moduleStats.length; i++) {
+        const m = moduleStats[i];
+        if (!m.isLocked) {
+          const next = m.incompleteItems.find((item: any) => !item.isLocked);
+          if (next) {
+            nextIncompleteItem = next;
+            nextIncompleteWeekNum = m.weekNumber;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!nextIncompleteItem && targetModule?.items?.[0]) {
+      nextIncompleteItem = targetModule.items[0];
+      nextIncompleteWeekNum = targetModule.weekNumber;
+    }
+
+    const progressPercent =
+      totalCourseActivities > 0
+        ? Math.round((completedCourseActivities / totalCourseActivities) * 100)
+        : 0;
+
+    const currentWeekData = targetModule
+      ? {
+          weekNumber: targetModule.weekNumber,
+          weekIndex: targetModule.moduleIndex,
+          title: targetModule.title,
+          isLocked: targetModule.isLocked,
+          unlockAt: targetModule.unlockAt,
+          status: weekStatus,
+          totalActivities: targetModule.totalItems,
+          completedActivities: targetModule.completedCount,
+          progressPercent: targetModule.totalItems > 0
+            ? Math.round((targetModule.completedCount / targetModule.totalItems) * 100)
+            : 0,
+        }
+      : null;
+
+    const courseProgress = {
+      currentWeekNumber: targetModule ? targetModule.weekNumber : 1,
+      totalWeeks: moduleStats.length || 12,
+      totalActivities: totalCourseActivities,
+      completedActivities: completedCourseActivities,
+      progressPercent,
+      isCompleted: isCourseCompleted,
+    };
+
+    const nextLesson = nextIncompleteItem
+      ? {
+          id: nextIncompleteItem.id,
+          title: nextIncompleteItem.title,
+          type: nextIncompleteItem.type,
+          category: nextIncompleteItem.category,
+          duration: nextIncompleteItem.duration,
+          isLocked: !!nextIncompleteItem.isLocked,
+          unlockAt: nextIncompleteItem.unlockAt || null,
+          weekNumber: nextIncompleteWeekNum,
+        }
+      : null;
+
     return {
       pathwayId,
       pathwayContent,
@@ -1260,6 +1417,9 @@ export const lmsService = {
       submissions,
       activities,
       calendarEvents,
+      currentWeek: currentWeekData,
+      courseProgress,
+      nextLesson,
     };
   },
 
