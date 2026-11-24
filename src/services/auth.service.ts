@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db, pool } from "../db";
 import { users, User, colleges, branches } from "../db/schema";
-import { ValidationError, NotFoundError, UnauthorizedError } from "../errors";
+import { HttpError, ValidationError, NotFoundError, UnauthorizedError } from "../errors";
 import { usersRepository } from "../repositories/users.repository";
 import { leadsRepository } from "../repositories/leads.repository";
 import { collegesRepository } from "../repositories/colleges.repository";
@@ -221,7 +221,8 @@ export const authService = {
     }
 
     const isRoadshowMode =
-      process.env.ROADSHOW_MODE === "true" || process.env.ENABLE_ROADSHOW_LOGIN === "true";
+      process.env.NODE_ENV !== "production" &&
+      (process.env.ROADSHOW_MODE === "true" || process.env.ENABLE_ROADSHOW_LOGIN === "true");
     if (!isRoadshowMode && !(body as any).internalVerified) {
       throw new ValidationError(
         "Direct mobile login without OTP is disabled. Please verify your mobile number with an OTP."
@@ -263,6 +264,9 @@ export const authService = {
         }
       }
     } catch (dbErr: any) {
+      if (process.env.NODE_ENV === "production") {
+        throw new HttpError(503, "Database service is temporarily unavailable. Please try again shortly.");
+      }
       console.warn("[AuthService] Database offline or query issue, serving resilient learner profile:", dbErr?.message || dbErr);
       const isDemoNumber = normalizedPhone.includes("9876543210");
       const fallbackUser: any = {
@@ -554,7 +558,14 @@ export const authService = {
       }
     } catch (e: any) {
       if (e instanceof UnauthorizedError) throw e;
+      if (process.env.NODE_ENV === "production") {
+        throw new NotFoundError("User not found");
+      }
       console.warn("[AuthService] DB query notice in me(), falling back to demo student:", e?.message || e);
+    }
+
+    if (process.env.NODE_ENV === "production") {
+      throw new NotFoundError("User not found");
     }
 
     const fallbackUser: any = {

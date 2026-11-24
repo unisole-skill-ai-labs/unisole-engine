@@ -51,6 +51,10 @@ export const authController = {
   }),
 
   mockDeliveryGateway: asyncHandler(async (req: CustomRequest, res: Response) => {
+    if (process.env.NODE_ENV === "production") {
+      res.status(404).json({ error: "Endpoint not available in production" });
+      return;
+    }
     const { phone, otp, channel, message } = req.body;
     console.log(`[SIMULATED EXTERNAL GATEWAY] Received OTP dispatch request:`, {
       phone,

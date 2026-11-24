@@ -191,8 +191,14 @@ export const lmsService = {
       return slug === "cs-agentic" || slug === "course1" || title.toLowerCase().includes("ai agent");
     });
 
+    const enableAutoEnroll = process.env.ENABLE_AUTO_ENROLL === "true";
+
     if (agenticEnrollments.length === 0) {
-      // Auto-enroll user in the official AI Agent Engineering course
+      if (!enableAutoEnroll) {
+        return [];
+      }
+
+      // Auto-enroll user in the official AI Agent Engineering course (only if enabled via ENABLE_AUTO_ENROLL)
       try {
         await pool.query(
           `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
