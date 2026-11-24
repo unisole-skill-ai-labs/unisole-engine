@@ -104,29 +104,7 @@ export const pathwaysService = {
             syllabusLink: canon?.syllabusLink,
           },
         })
-        .onConflictDoUpdate({
-          target: [courses.id],
-          set: {
-            title: offering.title,
-            slug: offering.slug,
-            shortDescription: offering.description,
-            description: offering.description,
-            pricePaise: offering.pricePaise,
-            mrpPaise: offering.mrpPaise,
-            status: "PUBLISHED",
-            isActive: true,
-            metadata: {
-              group: offering.metadata?.group,
-              pathwayId: pwy.id,
-              badge: offering.metadata?.badge || offering.metadata?.eyebrow,
-              shortName: offering.metadata?.groupTitle || offering.title,
-              duration: canon?.duration || "12 Weeks",
-              level: canon?.level || "Beginner to Advanced",
-              syllabusLink: canon?.syllabusLink,
-            },
-            updatedAt: new Date().toISOString(),
-          },
-        });
+        .onConflictDoNothing();
 
       // 3. Link Pathway -> Course
       await db

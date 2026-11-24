@@ -805,6 +805,10 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."daily_eod_logs" ADD COLUMN IF NOT EXISTS "blockers" text;
     `);
 
+    const isProd = process.env.NODE_ENV === "production";
+    const defaultCourseStatus = isProd ? "DRAFT" : "PUBLISHED";
+    const defaultIsPublic = !isProd;
+
     // 8. Canonical SEO Offerings Seed (offerings_pricing)
     await execSqlSafe("seed_offerings_pricing", `
       DELETE FROM "public"."offerings_pricing" WHERE "item_id" IN ('mgmt-p2', 'mgmt-p3', 'mgmt-common');
@@ -812,16 +816,16 @@ export async function initializeDatabase() {
       INSERT INTO "public"."offerings_pricing" (
         "item_type", "item_id", "title", "description", "price_paise", "mrp_paise", "is_active", "is_public"
       ) VALUES 
-        ('WORKSHOP', 'AI_MASTERCLASS_2026', 'AI Revolution & Agentic Engineering Masterclass', 'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems', 3900, 99900, true, true),
-        ('PATHWAY', 'cs-genai', 'Generative AI Engineering', 'From data handling and backend engineering through classical NLP, sequence models, Transformers, and RAG into LLMOps and Agentic AI systems.', 299900, 999900, true, true),
-        ('PATHWAY', 'cs-agentic', 'AI Agent Engineering', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 299900, 999900, true, true),
-        ('PATHWAY', 'cs-p1', 'Machine Learning in Production: MLOps Engineering', 'Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.', 299900, 999900, true, true),
-        ('PATHWAY', 'cs-common', 'AI Entrepreneurship & Business Innovation', 'Structured incubator track teaching students how to convert AI technical capability into commercial startups.', 59900, 299900, true, true),
-        ('PATHWAY', 'sci-p1', 'Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)', 'Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Physics-Informed Neural Networks.', 299900, 899900, true, true),
-        ('PATHWAY', 'sci-p2', 'Mathematics + AI / Computational Intelligence', 'Mathematics-oriented pathway focusing on optimization theory, statistical learning, and computational algorithms.', 150000, 599900, true, true),
-        ('PATHWAY', 'mgmt-p1', 'Business Analytics & Data Engineering', 'Advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, true, true),
-        ('PATHWAY', 'arts-p1', 'Applied AI for Humanities, Research & Careers', 'Prompt engineering, AI research methods, automated content, executive communication, and career acceleration.', 99900, 399900, true, true)
-      ON CONFLICT ("item_type", "item_id") DO UPDATE SET "title" = EXCLUDED."title", "description" = EXCLUDED."description";
+        ('WORKSHOP', 'AI_MASTERCLASS_2026', 'AI Revolution & Agentic Engineering Masterclass', 'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems', 3900, 99900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-genai', 'Generative AI Engineering', 'From data handling and backend engineering through classical NLP, sequence models, Transformers, and RAG into LLMOps and Agentic AI systems.', 299900, 999900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-agentic', 'AI Agent Engineering', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 299900, 999900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-p1', 'Machine Learning in Production: MLOps Engineering', 'Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.', 299900, 999900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-common', 'AI Entrepreneurship & Business Innovation', 'Structured incubator track teaching students how to convert AI technical capability into commercial startups.', 59900, 299900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'sci-p1', 'Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)', 'Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Physics-Informed Neural Networks.', 299900, 899900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'sci-p2', 'Mathematics + AI / Computational Intelligence', 'Mathematics-oriented pathway focusing on optimization theory, statistical learning, and computational algorithms.', 150000, 599900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'mgmt-p1', 'Business Analytics & Data Engineering', 'Advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'arts-p1', 'Applied AI for Humanities, Research & Careers', 'Prompt engineering, AI research methods, automated content, executive communication, and career acceleration.', 99900, 399900, true, ${defaultIsPublic})
+      ON CONFLICT ("item_type", "item_id") DO NOTHING;
     `);
 
     // 9. Foundational Flagship Courses Sync & Legacy Clean
@@ -844,8 +848,8 @@ export async function initializeDatabase() {
 
       INSERT INTO "public"."courses" ("id", "title", "slug", "short_description", "price_paise", "mrp_paise", "status", "metadata", "is_active")
       VALUES 
-        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE),
-        ('cs-genai', 'Generative AI Engineering', 'cs-genai', 'From Foundations to Agentic AI: Data Engineering, AI Backend Systems, Modern NLP, Transformer Architectures, RAG Systems, and Production Multi-Agent Swarms.', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-genai", "badge": "GROUP 01 • PATHWAY 01", "shortName": "CS & IT: Gen AI"}'::jsonb, TRUE)
+        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, '${defaultCourseStatus}'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE),
+        ('cs-genai', 'Generative AI Engineering', 'cs-genai', 'From Foundations to Agentic AI: Data Engineering, AI Backend Systems, Modern NLP, Transformer Architectures, RAG Systems, and Production Multi-Agent Swarms.', 299900, 999900, '${defaultCourseStatus}'::content_status, '{"group": "group-1", "pathwayId": "cs-genai", "badge": "GROUP 01 • PATHWAY 01", "shortName": "CS & IT: Gen AI"}'::jsonb, TRUE)
       ON CONFLICT ("id") DO NOTHING;
 
       INSERT INTO "public"."coupons" ("code", "description", "discount_type", "discount_value", "min_order_paise", "max_discount_paise", "max_uses", "applicable_item_ids", "is_active")
@@ -1094,11 +1098,16 @@ export async function initializeDatabase() {
     }
 
     // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)
-    try {
-      await seedLmsDemoData();
-      console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
-    } catch (lmsSeedErr) {
-      console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
+    // Strictly skipped in production to ensure mock data never pollutes live environments
+    if (!isProd) {
+      try {
+        await seedLmsDemoData();
+        console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
+      } catch (lmsSeedErr) {
+        console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
+      }
+    } else {
+      console.log("[DB-INIT] Production environment detected: skipped demo user, demo enrollments, and demo submissions.");
     }
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment, LMS, and Survey tables verified successfully.");

@@ -589,18 +589,14 @@ export async function seedSystemData() {
       }
     ];
 
+    const isProd = process.env.NODE_ENV === "production";
     for (const c of foundationalCourses) {
+      // In production, courses are inserted as DRAFT so unvetted content is never automatically published
+      const targetStatus = isProd ? "DRAFT" : c.status;
       await pool.query(
         `INSERT INTO courses (id, title, slug, short_description, price_paise, mrp_paise, status, metadata, is_active)
          VALUES ($1, $2, $3, $4, $5, $6, $7::content_status, $8, TRUE)
-         ON CONFLICT (slug) DO UPDATE
-         SET title = EXCLUDED.title,
-             short_description = EXCLUDED.short_description,
-             price_paise = EXCLUDED.price_paise,
-             mrp_paise = EXCLUDED.mrp_paise,
-             status = EXCLUDED.status,
-             metadata = EXCLUDED.metadata,
-             is_active = TRUE`,
+         ON CONFLICT (slug) DO NOTHING`,
         [
           c.id,
           c.title,
@@ -608,7 +604,7 @@ export async function seedSystemData() {
           c.short_description,
           c.price_paise,
           c.mrp_paise,
-          c.status,
+          targetStatus,
           JSON.stringify(c.metadata)
         ]
       );
