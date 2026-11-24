@@ -850,11 +850,17 @@ export const GENAI_MODULES = [
 
 export async function seedGenaiCurriculum(force = false) {
   const isForce = force || process.argv.includes("--force");
+  // CRITICAL PRODUCTION SAFETY GATE:
+  // Curriculum seeds must NEVER run in production. Dummy/sample curriculum must not pollute live databases.
+  // ENABLE_PRODUCTION_SEEDS is a safety escape hatch that must NEVER be set to true in production.
   const allowProdSeed = process.env.ENABLE_PRODUCTION_SEEDS === "true";
-  if (process.env.NODE_ENV === "production" && !isForce && !allowProdSeed) {
-    const errMsg = "[Seed:GenAI] ❌ Seeding course content is blocked in production unless ENABLE_PRODUCTION_SEEDS=true or --force is passed.";
-    console.error(errMsg);
-    throw new Error(errMsg);
+  if (process.env.NODE_ENV === "production") {
+    if (!allowProdSeed) {
+      const errMsg = "[Seed:GenAI] ❌ Hard-fail: Curriculum seeds are strictly blocked in production. The --force flag is ignored in production. Dummy curriculum must never reach live databases.";
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    console.warn("[Seed:GenAI] ⚠️ WARNING: ENABLE_PRODUCTION_SEEDS=true detected in production. Running seed by explicit override.");
   }
 
   console.log("[Seed:GenAI] Starting official 12-week Generative AI Engineering curriculum database sync...");
@@ -867,15 +873,7 @@ export async function seedGenaiCurriculum(force = false) {
     await client.query(
       `INSERT INTO pathways (id, title, slug, short_description, description, price_paise, status, is_active, updated_at)
        VALUES ('cs-genai', 'Generative AI Engineering', 'cs-genai', 'Foundations to Agentic AI: Data Engineering, AI Backend Systems, Modern NLP, Transformer Architectures, RAG Systems, and Production Multi-Agent Swarms.', 'From fundamentals of machine learning and large language models to building, evaluating, and deploying production-grade Generative AI and Agentic systems.', 299900, 'PUBLISHED', TRUE, NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title,
-           slug = EXCLUDED.slug,
-           short_description = EXCLUDED.short_description,
-           description = EXCLUDED.description,
-           price_paise = EXCLUDED.price_paise,
-           status = 'PUBLISHED',
-           is_active = TRUE,
-           updated_at = NOW()`
+       ON CONFLICT (id) DO NOTHING`
     );
     console.log("[Seed:GenAI] Upserted pathway 'cs-genai'.");
 
@@ -883,48 +881,28 @@ export async function seedGenaiCurriculum(force = false) {
     await client.query(
       `INSERT INTO courses (id, title, slug, short_description, description, status, is_active, price_paise, mrp_paise, metadata, created_at, updated_at)
        VALUES ('cs-genai', 'Generative AI Engineering', 'cs-genai', 'Foundations to Agentic AI: Data Engineering, AI Backend Systems, Modern NLP, Transformer Architectures, RAG Systems, and Production Multi-Agent Swarms.', 'From fundamentals of machine learning and large language models to building, evaluating, and deploying production-grade Generative AI and Agentic systems.', 'PUBLISHED', TRUE, 299900, 999900, '{"duration": "12 Weeks (132 Contact Hours)", "level": "Foundations to Agentic AI", "group": "group-1"}'::jsonb, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title,
-           slug = EXCLUDED.slug,
-           status = 'PUBLISHED',
-           is_active = TRUE,
-           updated_at = NOW()`
+       ON CONFLICT (id) DO NOTHING`
     );
     console.log("[Seed:GenAI] Upserted course 'cs-genai'.");
 
     // 3. Link pathway_courses
-    await client.query(
-      `DELETE FROM pathway_courses WHERE pathway_id = 'cs-genai'`
-    );
     await client.query(
       `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
        VALUES ('cs-genai', 'cs-genai', 1, NOW())
        ON CONFLICT DO NOTHING`
     );
 
-    // 4. Clear course_modules for cs-genai before reseeding
-    await client.query(
-      `DELETE FROM course_modules WHERE course_id = 'cs-genai'`
-    );
-
-    // 5. Seed each module and lessons deterministically
+    // 4. Seed each module and lessons deterministically
     for (let w = 0; w < GENAI_MODULES.length; w++) {
       const weekNum = w + 1;
       const mod = GENAI_MODULES[w];
       const moduleId = `mod_genai_w${weekNum}`;
       const modSlug = `cs-genai-week-${weekNum}`;
 
-      // Free slug if an old module holds it
-      await client.query(
-        `UPDATE modules SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
-        [modSlug, moduleId]
-      );
-
       await client.query(
         `INSERT INTO modules (id, title, slug, description, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, 'PUBLISHED', TRUE, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [moduleId, mod.title, modSlug, mod.meta || "Curriculum Module"]
       );
 
@@ -932,7 +910,7 @@ export async function seedGenaiCurriculum(force = false) {
       await client.query(
         `INSERT INTO course_modules (course_id, module_id, position, created_at)
          VALUES ('cs-genai', $1, $2, NOW())
-         ON CONFLICT (course_id, module_id) DO UPDATE SET position = EXCLUDED.position`,
+         ON CONFLICT (course_id, module_id) DO NOTHING`,
         [moduleId, weekNum]
       );
 
@@ -964,15 +942,9 @@ export async function seedGenaiCurriculum(force = false) {
         });
 
         await client.query(
-          `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
-          [lessonSlug, lessonId]
-        );
-
-        await client.query(
           `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, 'PUBLISHED', TRUE, NOW(), NOW())
-           ON CONFLICT (id) DO UPDATE
-           SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, video_url = EXCLUDED.video_url, duration_minutes = EXCLUDED.duration_minutes, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+           ON CONFLICT (id) DO NOTHING`,
           [lessonId, item.title, lessonSlug, item.description || item.instructions || item.title, lessonContent, item.videoUrl || null, durationMins]
         );
 
@@ -980,14 +952,14 @@ export async function seedGenaiCurriculum(force = false) {
         await client.query(
           `INSERT INTO module_lessons (module_id, lesson_id, position, created_at)
            VALUES ($1, $2, $3, NOW())
-           ON CONFLICT (module_id, lesson_id) DO UPDATE SET position = EXCLUDED.position`,
+           ON CONFLICT (module_id, lesson_id) DO NOTHING`,
           [moduleId, lessonId, pos]
         );
       }
     }
 
     await client.query("COMMIT");
-    console.log(`[Seed:GenAI] ✅ Successfully seeded all 12 weeks with ${GENAI_MODULES.reduce((acc, m) => acc + (m.items?.length || 0), 0)} items into PostgreSQL!`);
+    console.log(`[Seed:GenAI] ✅ Successfully verified all 12 weeks with ${GENAI_MODULES.reduce((acc, m) => acc + (m.items?.length || 0), 0)} items in PostgreSQL!`);
 
     return {
       courseId: "cs-genai",

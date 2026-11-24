@@ -611,11 +611,17 @@ export const WEEKS_DATA = [
 
 export async function seedAiAgentCurriculum(force = false) {
   const isForce = force || process.argv.includes("--force");
+  // CRITICAL PRODUCTION SAFETY GATE:
+  // Curriculum seeds must NEVER run in production. Dummy/sample curriculum must not pollute live databases.
+  // ENABLE_PRODUCTION_SEEDS is a safety escape hatch that must NEVER be set to true in production.
   const allowProdSeed = process.env.ENABLE_PRODUCTION_SEEDS === "true";
-  if (process.env.NODE_ENV === "production" && !isForce && !allowProdSeed) {
-    const errMsg = "[Seed:AI-Agent] ❌ Seeding course content is blocked in production unless ENABLE_PRODUCTION_SEEDS=true or --force is passed.";
-    console.error(errMsg);
-    throw new Error(errMsg);
+  if (process.env.NODE_ENV === "production") {
+    if (!allowProdSeed) {
+      const errMsg = "[Seed:AI-Agent] ❌ Hard-fail: Curriculum seeds are strictly blocked in production. The --force flag is ignored in production. Dummy curriculum must never reach live databases.";
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    console.warn("[Seed:AI-Agent] ⚠️ WARNING: ENABLE_PRODUCTION_SEEDS=true detected in production. Running seed by explicit override.");
   }
 
   console.log("[Seed:AI-Agent] Starting official 12-week AI Agent Engineering curriculum database sync...");
@@ -652,15 +658,7 @@ export async function seedAiAgentCurriculum(force = false) {
       await client.query(
         `INSERT INTO pathways (id, title, slug, short_description, description, price_paise, status, is_active, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title,
-             slug = EXCLUDED.slug,
-             short_description = EXCLUDED.short_description,
-             description = EXCLUDED.description,
-             price_paise = EXCLUDED.price_paise,
-             status = EXCLUDED.status,
-             is_active = EXCLUDED.is_active,
-             updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [pwy.id, pwy.title, pwy.slug, pwy.shortDescription, pwy.description, pwy.pricePaise, pwy.status, pwy.isActive]
       );
     }
@@ -674,38 +672,20 @@ export async function seedAiAgentCurriculum(force = false) {
 
     if (existingCourse.rows && existingCourse.rows[0]) {
       courseId = existingCourse.rows[0].id;
-      console.log(`[Seed:AI-Agent] Course already exists (ID: ${courseId}). Updating metadata...`);
-      await client.query(
-        `UPDATE courses 
-         SET title = 'AI Agent Engineering',
-             short_description = '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)',
-             description = 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.',
-             status = 'PUBLISHED',
-             is_active = TRUE,
-             price_paise = 299900,
-             mrp_paise = 999900,
-             metadata = '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb,
-             updated_at = NOW()
-         WHERE id = $1`,
-        [courseId]
-      );
+      console.log(`[Seed:AI-Agent] Course already exists (ID: ${courseId}). Preserving existing course record and admin edits.`);
     } else {
       courseId = "cs-agentic";
       console.log(`[Seed:AI-Agent] Creating course 'cs-agentic'...`);
       await client.query(
         `INSERT INTO courses (id, title, slug, short_description, description, status, is_active, price_paise, mrp_paise, metadata, created_at, updated_at)
          VALUES ($1, 'AI Agent Engineering', 'cs-agentic', '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 'PUBLISHED', TRUE, 299900, 999900, '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title, slug = EXCLUDED.slug, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [courseId]
       );
     }
     console.log(`[Seed:AI-Agent] Using course ID: ${courseId}`);
 
     // Link pathway_courses cleanly
-    await client.query(
-      `DELETE FROM pathway_courses WHERE pathway_id IN ('cs-agentic', 'course1')`
-    );
     await client.query(
       `INSERT INTO pathway_courses (pathway_id, course_id, position, created_at)
        VALUES ('cs-agentic', $1, 1, NOW())
@@ -727,28 +707,14 @@ export async function seedAiAgentCurriculum(force = false) {
     );
     const targetCourseIds = Array.from(new Set([courseId, ...(dbCourses.rows || []).map((r: any) => r.id)]));
 
-    // Clear existing course_modules links for these courses before reseeding cleanly to avoid position conflicts
-    await client.query(
-      `DELETE FROM course_modules
-       WHERE course_id = ANY($1::text[])`,
-      [targetCourseIds]
-    );
-
     for (const week of WEEKS_DATA) {
       const modSlug = `cs-agentic-week-${week.weekNum}`;
       const moduleId = `mod_agent_w${week.weekNum}`;
 
-      // Free slug if an old module with a different ID is holding it
-      await client.query(
-        `UPDATE modules SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
-        [modSlug, moduleId]
-      );
-
       await client.query(
         `INSERT INTO modules (id, title, slug, description, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, 'PUBLISHED', TRUE, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [moduleId, week.title, modSlug, week.keyConcepts]
       );
 
@@ -757,7 +723,7 @@ export async function seedAiAgentCurriculum(force = false) {
         await client.query(
           `INSERT INTO course_modules (course_id, module_id, position, created_at)
            VALUES ($1, $2, $3, NOW())
-           ON CONFLICT (course_id, module_id) DO UPDATE SET position = EXCLUDED.position`,
+           ON CONFLICT (course_id, module_id) DO NOTHING`,
           [cId, moduleId, week.weekNum]
         );
       }
@@ -778,15 +744,9 @@ export async function seedAiAgentCurriculum(force = false) {
       });
 
       await client.query(
-        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
-        [lecSlug, lecId]
-      );
-
-      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, 45, 'PUBLISHED', TRUE, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, video_url = EXCLUDED.video_url, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [lecId, `${week.weekNum}.1 Concept Lecture: ${week.title.replace(/^Week \d+:\s*/, "")}`, lecSlug, week.keyConcepts, lecContent, week.videoUrl]
       );
 
@@ -808,15 +768,9 @@ export async function seedAiAgentCurriculum(force = false) {
       });
 
       await client.query(
-        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
-        [quizSlug, quizId]
-      );
-
-      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, NULL, 20, 'PUBLISHED', TRUE, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [quizId, `${week.weekNum}.2 Knowledge Check: MCQ Quiz (${week.questions.length} Questions)`, quizSlug, `Test your understanding of ${week.title}.`, quizContent]
       );
 
@@ -839,15 +793,9 @@ export async function seedAiAgentCurriculum(force = false) {
       });
 
       await client.query(
-        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
-        [labSlug, labId]
-      );
-
-      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, NULL, 60, 'PUBLISHED', TRUE, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [labId, `${week.weekNum}.3 Hands-on Lab: ${week.title.replace(/^Week \d+:\s*/, "")}`, labSlug, week.practical, labContent]
       );
 
@@ -868,21 +816,13 @@ export async function seedAiAgentCurriculum(force = false) {
       });
 
       await client.query(
-        `UPDATE lessons SET slug = slug || '-old-' || id WHERE slug = $1 AND id != $2`,
-        [liveSlug, liveId]
-      );
-
-      await client.query(
         `INSERT INTO lessons (id, title, slug, description, content, video_url, duration_minutes, status, is_active, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, NULL, 120, 'PUBLISHED', TRUE, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title, slug = EXCLUDED.slug, description = EXCLUDED.description, content = EXCLUDED.content, status = 'PUBLISHED', is_active = TRUE, updated_at = NOW()`,
+         ON CONFLICT (id) DO NOTHING`,
         [liveId, `${week.weekNum}.4 ${week.liveTopic}`, liveSlug, `Interactive live cohort workshop on ${week.liveDate} at ${week.liveTime}.`, liveContent]
       );
 
       // Link lessons to module in module_lessons
-      await client.query(`DELETE FROM module_lessons WHERE module_id = $1`, [moduleId]);
-
       const lessonLinks = [
         { id: lecId, pos: 1 },
         { id: quizId, pos: 2 },
@@ -894,7 +834,7 @@ export async function seedAiAgentCurriculum(force = false) {
         await client.query(
           `INSERT INTO module_lessons (module_id, lesson_id, position, created_at)
            VALUES ($1, $2, $3, NOW())
-           ON CONFLICT (module_id, lesson_id) DO UPDATE SET position = EXCLUDED.position`,
+           ON CONFLICT (module_id, lesson_id) DO NOTHING`,
           [moduleId, lLink.id, lLink.pos]
         );
       }
@@ -902,31 +842,35 @@ export async function seedAiAgentCurriculum(force = false) {
 
     // Commit curriculum modules, lessons, course_modules and module_lessons first!
     await client.query("COMMIT");
-    console.log(`[Seed:AI-Agent] Successfully seeded all 12 weeks with 48 lessons into PostgreSQL in a single transaction!`);
+    console.log(`[Seed:AI-Agent] Successfully verified all 12 weeks with 48 lessons in PostgreSQL.`);
 
-    // 4. Post-commit user enrollment (idempotent existence check preventing uq_active_user_pathway_enrollment violation)
-    const allUsers = await client.query(
-      `SELECT id FROM users WHERE id NOT LIKE '%unenrolled%' AND username NOT LIKE '%unenrolled%'`
-    );
-    for (const u of allUsers.rows || []) {
-      for (const pwyId of ["cs-agentic"]) {
-        const existing = await client.query(
-          `SELECT id FROM enrollments WHERE user_id = $1 AND pathway_id = $2 AND status = 'ACTIVE' LIMIT 1`,
-          [u.id, pwyId]
-        );
-        if (existing.rows && existing.rows.length > 0) {
-          continue; // Already actively enrolled
+    // 4. Post-commit user enrollment — strictly skipped in production!
+    if (process.env.NODE_ENV !== "production") {
+      const allUsers = await client.query(
+        `SELECT id FROM users WHERE id NOT LIKE '%unenrolled%' AND username NOT LIKE '%unenrolled%'`
+      );
+      for (const u of allUsers.rows || []) {
+        for (const pwyId of ["cs-agentic"]) {
+          const existing = await client.query(
+            `SELECT id FROM enrollments WHERE user_id = $1 AND (pathway_id = $2 OR item_id = $2) AND status = 'ACTIVE' LIMIT 1`,
+            [u.id, pwyId]
+          );
+          if (existing.rows && existing.rows.length > 0) {
+            continue; // Already actively enrolled
+          }
+          const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
+          await client.query(
+            `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
+             VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
+             ON CONFLICT DO NOTHING`,
+            [enrId, u.id, pwyId]
+          );
         }
-        const enrId = "enr_" + crypto.createHash("md5").update(`${u.id}_${pwyId}`).digest("hex");
-        await client.query(
-          `INSERT INTO enrollments (id, user_id, pathway_id, item_type, item_id, status, source, enrolled_at)
-           VALUES ($1, $2, $3, 'PATHWAY', $3, 'ACTIVE', 'CAMPUS_SPONSORED', NOW())
-           ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'`,
-          [enrId, u.id, pwyId]
-        );
       }
+      console.log(`[Seed:AI-Agent] Verified active enrollments for ${allUsers.rows?.length || 0} non-production users without duplicates.`);
+    } else {
+      console.log("[Seed:AI-Agent] Production environment detected: skipped automated user-enrollment loop.");
     }
-    console.log(`[Seed:AI-Agent] Verified active enrollments for ${allUsers.rows?.length || 0} users without duplicates.`);
 
     const modCountRes = await client.query(`SELECT count(*) FROM course_modules WHERE course_id = $1`, [courseId]);
     const lesCountRes = await client.query(

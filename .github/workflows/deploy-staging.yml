@@ -72,7 +72,7 @@ jobs:
 
                     echo "[Deploy] Executing Staging Curriculum Seeding..."
                     docker compose --env-file .env -f docker-compose.staging.yml exec -T api-staging npm run seed:ai-agent -- --force
-                    docker compose --env-file .env -f docker-compose.staging.yml exec -T api-staging npm run seed:genai -- --force || true
+                    docker compose --env-file .env -f docker-compose.staging.yml exec -T api-staging npm run seed:genai -- --force
 
                     echo "[Deploy] Staging deployment successful! Recent logs:"
                     docker compose --env-file .env -f docker-compose.staging.yml logs --tail=20 api-staging

@@ -18,6 +18,11 @@ import { pathwaysService } from "../services/pathways.service";
  * initial completed quiz, lab assignment submission, and course notes.
  */
 export async function seedLmsDemoData() {
+  if (process.env.NODE_ENV === "production") {
+    console.log("[Seed:LMS] Production environment detected: skipping demo student, demo enrollments, and demo submissions.");
+    return { success: true };
+  }
+
   console.log("[Seed:LMS] Starting LMS demo data synchronization...");
 
   try {
