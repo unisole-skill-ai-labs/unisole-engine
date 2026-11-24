@@ -2168,11 +2168,36 @@ export const calendarEvents = pgTable(
   ]
 );
 
+export const ssoCodes = pgTable(
+  "sso_codes",
+  {
+    id: varchar("id", { length: 50 }).primaryKey().notNull(),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("uq_sso_codes_code_hash").on(table.codeHash),
+    index("idx_sso_codes_code_hash").on(table.codeHash),
+    index("idx_sso_codes_user_id").on(table.userId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_sso_codes_user",
+    }).onDelete("cascade"),
+  ]
+);
+
 // ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
 export type User = InferSelectModel<typeof users>;
+export type SsoCode = InferSelectModel<typeof ssoCodes>;
 export type CalendarEvent = InferSelectModel<typeof calendarEvents>;
 export type OtpVerification = InferSelectModel<typeof otpVerifications>;
 export type College = InferSelectModel<typeof colleges>;
@@ -2222,6 +2247,7 @@ export type SurveyResponse = InferSelectModel<typeof surveyResponses>;
 // ============================================================
 
 export type NewUser = InferInsertModel<typeof users>;
+export type NewSsoCode = InferInsertModel<typeof ssoCodes>;
 export type NewOtpVerification = InferInsertModel<typeof otpVerifications>;
 export type NewCollege = InferInsertModel<typeof colleges>;
 export type NewBranch = InferInsertModel<typeof branches>;

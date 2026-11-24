@@ -39,6 +39,17 @@ export const authController = {
     res.json(user);
   }),
 
+  createSsoCode: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const result = await authService.createSsoCode(req.user!.id);
+    res.status(200).json(result);
+  }),
+
+  exchangeSsoCode: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const { code } = req.body;
+    const result = await authService.exchangeSsoCode(code);
+    res.status(200).json(result);
+  }),
+
   mockDeliveryGateway: asyncHandler(async (req: CustomRequest, res: Response) => {
     const { phone, otp, channel, message } = req.body;
     console.log(`[SIMULATED EXTERNAL GATEWAY] Received OTP dispatch request:`, {

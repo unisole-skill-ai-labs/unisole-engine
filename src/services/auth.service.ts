@@ -1,7 +1,8 @@
+import crypto from "crypto";
 import { eq, or, and, ilike, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { users, User, colleges, branches } from "../db/schema";
 import { ValidationError, NotFoundError, UnauthorizedError } from "../errors";
 import { usersRepository } from "../repositories/users.repository";
@@ -582,6 +583,69 @@ export const authService = {
       ...fallbackUser,
       token: tokens.token,
       accessToken: tokens.accessToken,
+    };
+  },
+
+  async createSsoCode(userId: string): Promise<{ code: string }> {
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+      throw new ValidationError("User ID is required");
+    }
+
+    const user = await usersRepository.getById(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedError("Account not found or deactivated");
+    }
+
+    const rawCode = crypto.randomBytes(32).toString("base64url");
+    const codeHash = crypto.createHash("sha256").update(rawCode).digest("hex");
+    const expiresAt = new Date(Date.now() + 60 * 1000).toISOString();
+    const id = `sso_${crypto.randomUUID()}`;
+
+    await pool.query(
+      `INSERT INTO "public"."sso_codes" ("id", "code_hash", "user_id", "expires_at", "created_at")
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [id, codeHash, userId, expiresAt]
+    );
+
+    return { code: rawCode };
+  },
+
+  async exchangeSsoCode(code: string) {
+    if (!code || typeof code !== "string" || code.trim().length === 0) {
+      throw new UnauthorizedError("Invalid or expired login code");
+    }
+
+    const codeHash = crypto.createHash("sha256").update(code.trim()).digest("hex");
+
+    // Atomic update: only marks used if currently unused and not expired
+    const result = await pool.query(
+      `UPDATE "public"."sso_codes"
+       SET "used_at" = NOW()
+       WHERE "code_hash" = $1
+         AND "used_at" IS NULL
+         AND "expires_at" > NOW()
+       RETURNING "user_id"`,
+      [codeHash]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      throw new UnauthorizedError("Invalid or expired login code");
+    }
+
+    const userId = result.rows[0].user_id;
+    const user = await usersRepository.getById(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedError("Invalid or expired login code");
+    }
+
+    // Clean up expired codes asynchronously
+    pool.query(`DELETE FROM "public"."sso_codes" WHERE "expires_at" < NOW() - INTERVAL '1 hour'`)
+      .catch((err) => console.warn("[AuthService] SSO cleanup notice:", err?.message || err));
+
+    const tokens = generateTokens(user);
+    return {
+      ...tokens,
+      user,
     };
   },
 };

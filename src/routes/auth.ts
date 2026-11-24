@@ -52,6 +52,22 @@ const otpVerifyLimiter = createRateLimiter({
   message: "Too many verification attempts, please try again in 10 minutes",
 });
 
+// 5. SSO Code Limiter (authenticated user): 10 requests per 10 minutes per user
+const ssoCreateLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxRequests: 10,
+  keyGenerator: (req: any) => `sso_create:user:${req.user?.id || getClientIp(req)}`,
+  message: "Too many SSO code requests. Please wait a few minutes.",
+});
+
+// 6. SSO Exchange Limiter (public): 30 requests per 10 minutes per IP
+const ssoExchangeLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxRequests: 30,
+  keyGenerator: (req: any) => `sso_exchange:ip:${getClientIp(req)}`,
+  message: "Too many code verification attempts, please try again later",
+});
+
 // Mobile Direct Authentication & User Lookup
 authRouter.post(
   "/check-user",
@@ -95,6 +111,21 @@ authRouter.post(
 );
 
 authRouter.get("/me", authMiddleware, authController.me);
+
+// SSO Cross-Portal Session Handoff
+authRouter.post(
+  "/sso/create",
+  authMiddleware,
+  ssoCreateLimiter,
+  authController.createSsoCode
+);
+
+authRouter.post(
+  "/sso/exchange",
+  ssoExchangeLimiter,
+  validateBody({ required: ["code"] }),
+  authController.exchangeSsoCode
+);
 
 // Simulated External Delivery Gateway (Plug & Play test route)
 authRouter.post(

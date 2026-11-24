@@ -1073,6 +1073,20 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_mentors_user" ON "public"."mentors" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentor" ON "public"."mentor_mentees" ("mentor_id");
       CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentee" ON "public"."mentor_mentees" ("mentee_id");
+
+      -- 19. SSO Codes for single-use secure cross-portal session handoff
+      CREATE TABLE IF NOT EXISTS "public"."sso_codes" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('sso_'::text || gen_random_uuid()),
+        "code_hash" varchar(64) NOT NULL,
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "expires_at" timestamp with time zone NOT NULL,
+        "used_at" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_sso_codes_code_hash" ON "public"."sso_codes" ("code_hash");
+      CREATE INDEX IF NOT EXISTS "idx_sso_codes_user_id" ON "public"."sso_codes" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_sso_codes_expires_at" ON "public"."sso_codes" ("expires_at");
     `);
 
     // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)
