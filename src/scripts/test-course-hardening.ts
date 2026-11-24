@@ -4,6 +4,29 @@ import { seedGenaiCurriculum } from "./seed-genai-curriculum";
 import { seedLmsDemoData } from "./seed-lms-demo";
 import { initializeDatabase } from "../db/init";
 
+// -----------------------------------------------------------------
+// Safety Guard: test-course-hardening must ONLY run in non-production environments against a local database
+// -----------------------------------------------------------------
+if (process.env.NODE_ENV === "production") {
+  console.error("[SAFETY ERROR] test-course-hardening.ts cannot be executed with NODE_ENV=production. Aborting.");
+  process.exit(1);
+}
+
+const dbUrl = process.env.DATABASE_URL || "";
+let dbHost = "";
+try {
+  const parsed = new URL(dbUrl);
+  dbHost = parsed.hostname;
+} catch {
+  dbHost = dbUrl.includes("@") ? dbUrl.split("@")[1].split("/")[0].split(":")[0] : "";
+}
+
+const isLocalDb = dbHost === "localhost" || dbHost === "127.0.0.1";
+if (!isLocalDb) {
+  console.error(`[SAFETY ERROR] test-course-hardening.ts is strictly prohibited from running against non-local databases (host: "${dbHost || "unknown"}"). Aborting.`);
+  process.exit(1);
+}
+
 async function runHardeningVerification() {
   console.log("=================================================");
   console.log("COURSE SEED HARDENING & PERSISTENCE VERIFICATION");
