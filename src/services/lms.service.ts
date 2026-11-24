@@ -526,23 +526,22 @@ export const lmsService = {
         (lm) => lm.module && !lm.module.title.toLowerCase().includes("intro to ai")
       );
 
-      // Hide archived/inactive modules from students
+      // Hide draft, archived, and inactive modules from students
       if (!isAdmin) {
         linkedModules = linkedModules.filter(
-          (lm) => lm.module && lm.module.status !== "ARCHIVED" && (lm.module as any).isActive !== false
+          (lm) => lm.module && lm.module.status === "PUBLISHED" && (lm.module as any).isActive !== false
         );
       }
 
-      // Fallback: If courseModules link wasn't populated or incomplete, check modules directly
-      if (linkedModules.length < 12) {
+      // Fallback: If courseModules link wasn't populated or incomplete, check modules directly for cs-agentic
+      if (linkedModules.length < 12 && (course.id === "cs-agentic" || course.id === "course1")) {
         try {
           const directMods = await pool.query(
-            `SELECT * FROM modules WHERE (course_id = $1::uuid OR course_id::text = $1::text OR title LIKE 'Week %' OR slug LIKE 'cs-agentic-week-%') AND title NOT ILIKE '%Intro to AI%' ORDER BY order_index ASC`,
-            [course.id]
+            `SELECT * FROM modules WHERE (slug LIKE 'cs-agentic-week-%' OR id LIKE 'mod_agent_w%') AND status = 'PUBLISHED' AND is_active = TRUE AND title NOT ILIKE '%Intro to AI%' ORDER BY id ASC`
           );
           if (directMods.rows && directMods.rows.length >= 12) {
-            linkedModules = directMods.rows.map((m: any) => ({
-              position: m.order_index || 1,
+            linkedModules = directMods.rows.map((m: any, mIdx: number) => ({
+              position: mIdx + 1,
               module: m,
             }));
           }
@@ -564,11 +563,11 @@ export const lmsService = {
           .where(sql`${moduleLessons.moduleId}::text = ${mod.id}::text`)
           .orderBy(asc(moduleLessons.position));
 
-        // If lessons were not linked in module_lessons, query by lesson prefix or synthesize 4 lessons
-        if (linkedLessons.length === 0) {
+        // If lessons were not linked in module_lessons for cs-agentic, query by lesson prefix
+        if (linkedLessons.length === 0 && (course.id === "cs-agentic" || course.id === "course1")) {
           try {
             const dbLessons = await pool.query(
-              `SELECT * FROM lessons WHERE id LIKE $1 ORDER BY id ASC`,
+              `SELECT * FROM lessons WHERE id LIKE $1 AND status = 'PUBLISHED' AND is_active = TRUE ORDER BY id ASC`,
               [`les_agent_w${modPos}_%`]
             );
             if (dbLessons.rows && dbLessons.rows.length > 0) {
@@ -580,10 +579,10 @@ export const lmsService = {
           } catch {}
         }
 
-        // Hide archived/inactive lessons from students
+        // Hide draft, archived, and inactive lessons from students
         if (!isAdmin) {
           linkedLessons = linkedLessons.filter(
-            (ll) => ll.lesson && ll.lesson.status !== "ARCHIVED" && (ll.lesson as any).isActive !== false
+            (ll) => ll.lesson && ll.lesson.status === "PUBLISHED" && (ll.lesson as any).isActive !== false
           );
         }
 
