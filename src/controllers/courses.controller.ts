@@ -54,6 +54,13 @@ export const coursesController = {
     res.json(await coursesService.getModules(req.params.id));
   }),
   syncCanonical: asyncHandler(async (_req: Request, res: Response) => {
+    if (process.env.NODE_ENV === "production") {
+      res.status(403).json({
+        success: false,
+        message: "Curriculum sync and re-seeding is strictly disabled in production.",
+      });
+      return;
+    }
     const result = await pathwaysService.syncCanonicalPathways();
     const allCourses = await coursesService.list();
     res.json({
