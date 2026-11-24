@@ -69,12 +69,19 @@ Before switching any course from `DRAFT` to `PUBLISHED` in production, ensure:
 
 ---
 
-## 5. Fallback Behavior for 0-Module Courses
+## 5. Fallback Behavior for 0-Module Courses & Transition Flag
 
-If a course or pathway is published or enrolled before its modules are authored:
+If a course or pathway is published or enrolled before its modules are authored in the database:
 
 - **Frontend LMS Player (`LmsPlayerPage.tsx`)**:
-  - In staging or local dev, fallback static data from `curriculumData.ts` can preview the curriculum layout.
-  - In **production** (`PROD === true` on production domain), all mock fallback data is strictly disabled.
-  - If the database returns 0 modules for a course, the student is presented with a clean, branded **"Content Coming Soon"** state informing them that curriculum resources are being prepared by instructors, with a direct link back to their dashboard.
-- No dummy or mock lessons will ever leak to production users.
+  - In local development and on staging hosts (e.g. `*.stg.unisole.org`), fallback static curriculum from `curriculumData.ts` is allowed automatically.
+  - In **production builds**, fallback is controlled by the environment flag **`VITE_ALLOW_CURRICULUM_FALLBACK`**:
+    - When absent or `"false"`, fallback is **strictly disabled**. If the database returns 0 modules for a course, the student is presented with a clean, branded **"Content Coming Soon"** state informing them that curriculum resources are being prepared by instructors, with a direct link back to `/dashboard`.
+    - When `"true"`, the player falls back to static curriculum data until real database content is authored.
+  - **Precedence Rule**: When the database returns valid modules for a course, the player **always** uses the DB content. The fallback never overrides real database modules.
+
+### Rollout Procedure for Production Content Transition:
+1. **Set `VITE_ALLOW_CURRICULUM_FALLBACK=true` in Vercel Production Environment Variables**: Ensures existing paying students continue seeing baseline learning materials while content is authored in the database.
+2. **Author or Import Real Content**: Use the `/admin` portal or reviewed migration scripts to author complete modules and lessons in the production PostgreSQL database.
+3. **Verify as an Enrolled Student**: Log into the LMS with an enrolled test student account on production to confirm all database modules, lessons, videos, and quizzes load properly.
+4. **Set `VITE_ALLOW_CURRICULUM_FALLBACK=false` in Vercel Production**: Disable the fallback flag. Any future empty courses will show the clean "Content Coming Soon" screen without leaking outdated static mock data.

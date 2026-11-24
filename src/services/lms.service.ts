@@ -485,6 +485,26 @@ export const lmsService = {
           linkedCourses = [{ position: 1, course: directCourse[0] }];
         }
       } catch {}
+
+      // If no course row exists in courses table, synthesize a course container from pathway
+      // so any modules and lessons linked to this pathway ID can still be loaded
+      if (linkedCourses.length === 0 && pathway) {
+        linkedCourses = [{
+          position: 1,
+          course: {
+            id: pathway.id,
+            title: pathway.title,
+            slug: pathway.slug,
+            description: pathway.description,
+            shortDescription: pathway.shortDescription || pathway.description,
+            pricePaise: pathway.pricePaise || 0,
+            status: pathway.status || "PUBLISHED",
+            isActive: pathway.isActive !== false,
+            createdAt: pathway.createdAt,
+            updatedAt: pathway.updatedAt,
+          }
+        }];
+      }
     }
 
     const courseList: any[] = [];
@@ -784,15 +804,20 @@ export const lmsService = {
         }
       }
 
-      // Check if user has active enrollment in this lesson's pathway
+      // Check if user has active enrollment in this lesson's pathway or course
       const accessiblePathways = await db
-        .select({ pathwayId: pathwayCourses.pathwayId })
+        .select({
+          pathwayId: pathwayCourses.pathwayId,
+          courseId: courseModules.courseId,
+        })
         .from(moduleLessons)
         .innerJoin(courseModules, eq(moduleLessons.moduleId, courseModules.moduleId))
-        .innerJoin(pathwayCourses, eq(courseModules.courseId, pathwayCourses.courseId))
+        .leftJoin(pathwayCourses, eq(courseModules.courseId, pathwayCourses.courseId))
         .where(eq(moduleLessons.lessonId, lessonId));
 
-      const pathwayIds = Array.from(new Set(accessiblePathways.map((p) => p.pathwayId)));
+      const pathwayIds = Array.from(new Set(
+        accessiblePathways.flatMap((p) => [p.pathwayId, p.courseId]).filter(Boolean) as string[]
+      ));
 
       if (pathwayIds.length > 0) {
         const userEnrollments = await db
