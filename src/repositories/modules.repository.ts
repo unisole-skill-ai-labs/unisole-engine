@@ -1,11 +1,14 @@
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, ne } from "drizzle-orm";
 import { db } from "../db";
 import {
   modules, Module, NewModule,
   moduleLessons, NewModuleLesson,
   courseModules,
   lessons,
+  lessonProgress,
+  submissions,
 } from "../db/schema";
+import { ConflictError } from "../errors";
 
 export const modulesRepository = {
   async list(): Promise<Module[]> {
@@ -58,24 +61,54 @@ export const modulesRepository = {
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {
-    await db.delete(moduleLessons).where(
-      and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonId))
-    );
+    await db.transaction(async (tx) => {
+      // 1. Guard against deleting lesson with student progress or submissions
+      const progress = await tx
+        .select({ id: lessonProgress.id })
+        .from(lessonProgress)
+        .where(eq(lessonProgress.lessonId, lessonId))
+        .limit(1);
+      const subs = await tx
+        .select({ id: submissions.id })
+        .from(submissions)
+        .where(eq(submissions.lessonId, lessonId))
+        .limit(1);
+      if (progress.length > 0 || subs.length > 0) {
+        throw new ConflictError("This lesson has student activity, archive it instead");
+      }
+
+      // 2. Remove module-lesson relationship
+      await tx.delete(moduleLessons).where(
+        and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonId))
+      );
+
+      // 3. Remove orphan lesson if not attached to any other module
+      const otherLinks = await tx
+        .select({ moduleId: moduleLessons.moduleId })
+        .from(moduleLessons)
+        .where(eq(moduleLessons.lessonId, lessonId))
+        .limit(1);
+      if (otherLinks.length === 0) {
+        await tx.delete(lessons).where(eq(lessons.id, lessonId));
+      }
+    });
   },
 
   async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
-    for (let i = 0; i < lessonIds.length; i++) {
-      await db
-        .update(moduleLessons)
-        .set({ position: i + 1000 })
-        .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
-    }
-    for (let i = 0; i < lessonIds.length; i++) {
-      await db
-        .update(moduleLessons)
-        .set({ position: i + 1 })
-        .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < lessonIds.length; i++) {
+        await tx
+          .update(moduleLessons)
+          .set({ position: i + 1000 })
+          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
+      }
+      for (let i = 0; i < lessonIds.length; i++) {
+        await tx
+          .update(moduleLessons)
+          .set({ position: i + 1 })
+          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
+      }
+    });
   },
 
   async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, targetPosition?: number): Promise<void> {

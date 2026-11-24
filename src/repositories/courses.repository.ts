@@ -1,4 +1,4 @@
-import { eq, and, asc, inArray, sql } from "drizzle-orm";
+import { eq, and, asc, inArray, sql, ne } from "drizzle-orm";
 import { db } from "../db";
 import {
   courses, Course, NewCourse,
@@ -7,7 +7,10 @@ import {
   modules,
   moduleLessons,
   lessons,
+  lessonProgress,
+  submissions,
 } from "../db/schema";
+import { ConflictError } from "../errors";
 
 export const coursesRepository = {
   async list(): Promise<Course[]> {
@@ -124,9 +127,61 @@ export const coursesRepository = {
   },
 
   async detachModule(courseId: string, moduleId: string): Promise<void> {
-    await db.delete(courseModules).where(
-      and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleId))
-    );
+    await db.transaction(async (tx) => {
+      // 1. Find all lessons linked to this module
+      const linkedLessons = await tx
+        .select({ lessonId: moduleLessons.lessonId })
+        .from(moduleLessons)
+        .where(eq(moduleLessons.moduleId, moduleId));
+
+      // 2. Check student activity on any linked lesson
+      if (linkedLessons.length > 0) {
+        const lessonIds = linkedLessons.map((l) => l.lessonId);
+        const hasProgress = await tx
+          .select({ id: lessonProgress.id })
+          .from(lessonProgress)
+          .where(inArray(lessonProgress.lessonId, lessonIds))
+          .limit(1);
+        const hasSubs = await tx
+          .select({ id: submissions.id })
+          .from(submissions)
+          .where(inArray(submissions.lessonId, lessonIds))
+          .limit(1);
+        if (hasProgress.length > 0 || hasSubs.length > 0) {
+          throw new ConflictError("Cannot delete module: one or more lessons have student activity. Archive them instead.");
+        }
+      }
+
+      // 3. Detach module from this course
+      await tx.delete(courseModules).where(
+        and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleId))
+      );
+
+      // 4. If this module is not attached to any other course, clean up orphan lessons and the module
+      const otherCourses = await tx
+        .select({ courseId: courseModules.courseId })
+        .from(courseModules)
+        .where(eq(courseModules.moduleId, moduleId))
+        .limit(1);
+
+      if (otherCourses.length === 0) {
+        for (const { lessonId } of linkedLessons) {
+          const otherModuleLinks = await tx
+            .select({ moduleId: moduleLessons.moduleId })
+            .from(moduleLessons)
+            .where(and(eq(moduleLessons.lessonId, lessonId), ne(moduleLessons.moduleId, moduleId)))
+            .limit(1);
+          if (otherModuleLinks.length === 0) {
+            await tx.delete(moduleLessons).where(
+              and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonId))
+            );
+            await tx.delete(lessons).where(eq(lessons.id, lessonId));
+          }
+        }
+        await tx.delete(moduleLessons).where(eq(moduleLessons.moduleId, moduleId));
+        await tx.delete(modules).where(eq(modules.id, moduleId));
+      }
+    });
   },
 
   async clearModules(courseId: string): Promise<void> {
@@ -169,18 +224,20 @@ export const coursesRepository = {
   },
 
   async reorderModules(courseId: string, moduleIds: string[]): Promise<void> {
-    for (let i = 0; i < moduleIds.length; i++) {
-      await db
-        .update(courseModules)
-        .set({ position: i + 1000 })
-        .where(and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleIds[i])));
-    }
-    for (let i = 0; i < moduleIds.length; i++) {
-      await db
-        .update(courseModules)
-        .set({ position: i + 1 })
-        .where(and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleIds[i])));
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < moduleIds.length; i++) {
+        await tx
+          .update(courseModules)
+          .set({ position: i + 1000 })
+          .where(and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleIds[i])));
+      }
+      for (let i = 0; i < moduleIds.length; i++) {
+        await tx
+          .update(courseModules)
+          .set({ position: i + 1 })
+          .where(and(eq(courseModules.courseId, courseId), eq(courseModules.moduleId, moduleIds[i])));
+      }
+    });
   },
 
   async getModules(courseId: string): Promise<any[]> {
