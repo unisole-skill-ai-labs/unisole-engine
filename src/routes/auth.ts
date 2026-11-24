@@ -19,11 +19,21 @@ function getPhoneOrIpKey(prefix: string) {
   };
 }
 
-// 1. Staff / Admin Username & Password: Strict IP limiter to prevent brute-forcing
-const adminAuthLimiter = createRateLimiter({
+// 1. Staff / Admin Username & Password Limiters (IP and Username based protection)
+const adminAuthIpLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  maxRequests: 20,
-  message: "Too many admin login attempts, please try again in 15 minutes",
+  maxRequests: 30,
+  message: "Too many admin login attempts from this IP, please try again in 15 minutes",
+});
+
+const adminAuthUserLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10,
+  keyGenerator: (req) => {
+    const rawUser = String(req.body?.username || req.body?.phone || "anonymous").trim().toLowerCase();
+    return `admin_auth:user:${rawUser}`;
+  },
+  message: "Too many admin login attempts for this account, please try again in 15 minutes",
 });
 
 // 2. Student Roadshow & Direct Auth Limiter:
@@ -79,7 +89,8 @@ authRouter.post(
 // Staff / Admin Username & Password Authentication
 authRouter.post(
   "/admin-login",
-  adminAuthLimiter,
+  adminAuthIpLimiter,
+  adminAuthUserLimiter,
   authController.adminLogin
 );
 

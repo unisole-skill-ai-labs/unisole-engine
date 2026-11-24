@@ -100,7 +100,7 @@ export const authService = {
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedError("Account has been deactivated. Please contact Super Administrator.");
+      throw new UnauthorizedError("Invalid username or password");
     }
 
     const userRoles = [
@@ -113,7 +113,7 @@ export const authService = {
     );
 
     if (!hasStaffPrivileges) {
-      throw new UnauthorizedError("Access denied. Internal staff privileges required.");
+      throw new UnauthorizedError("Invalid username or password");
     }
 
     let isMatch = false;
