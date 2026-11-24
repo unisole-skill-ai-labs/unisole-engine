@@ -226,38 +226,28 @@ export const pathwaysService = {
 
   async listPublished() {
     const all = await pathwaysRepository.list();
-    let published = all.filter(
+    // Exclude archived legacy alias course1 and ensure published & active
+    const candidatePathways = all.filter(
       (p) =>
         (p.status === "PUBLISHED" || !p.status) &&
         p.isActive !== false &&
-        (p.slug === "cs-agentic" || p.slug === "course1" || (p.title && p.title.toLowerCase().includes("ai agent")))
+        p.id !== "course1" &&
+        p.slug !== "course1"
     );
 
-    if (published.length === 0) {
-      published = [
-        {
-          id: "cs-agentic",
-          title: "AI Agent Engineering",
-          slug: "cs-agentic",
-          shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
-          description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-          pricePaise: 299900,
-          status: "PUBLISHED",
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as Pathway,
-      ];
-    }
-
     const enriched = await Promise.all(
-      published.map(async (pathway) => {
+      candidatePathways.map(async (pathway) => {
         const [categories, colleges, coursesList, pricing] = await Promise.all([
           pathwaysRepository.getCategoriesWithDetails(pathway.id).catch(() => []),
           pathwaysRepository.getCollegesWithDetails(pathway.id).catch(() => []),
           pathwaysRepository.getCoursesWithDetails(pathway.id).catch(() => []),
           pricingRepository.getByItem("PATHWAY" as any, pathway.id).catch(() => null),
         ]);
+
+        // Filter: if an offerings_pricing entry exists and is_public is false, exclude from public listing
+        if (pricing && pricing.isPublic === false) {
+          return null;
+        }
 
         const canon = getCanonicalPathway(pathway.id) || getCanonicalPathway(pathway.slug);
 
@@ -281,7 +271,26 @@ export const pathwaysService = {
       })
     );
 
-    return enriched;
+    const validList = enriched.filter((p): p is NonNullable<typeof p> => p !== null);
+
+    if (validList.length === 0) {
+      return [
+        {
+          id: "cs-agentic",
+          title: "AI Agent Engineering",
+          slug: "cs-agentic",
+          shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+          description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+          pricePaise: 299900,
+          status: "PUBLISHED",
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Pathway,
+      ];
+    }
+
+    return validList;
   },
 
   async getById(id: string) {

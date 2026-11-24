@@ -611,8 +611,9 @@ export const WEEKS_DATA = [
 
 export async function seedAiAgentCurriculum(force = false) {
   const isForce = force || process.argv.includes("--force");
-  if (process.env.NODE_ENV === "production" && !isForce) {
-    const errMsg = "[Seed:AI-Agent] ❌ Seeding course content is blocked in production unless --force is passed.";
+  const allowProdSeed = process.env.ENABLE_PRODUCTION_SEEDS === "true";
+  if (process.env.NODE_ENV === "production" && !isForce && !allowProdSeed) {
+    const errMsg = "[Seed:AI-Agent] ❌ Seeding course content is blocked in production unless ENABLE_PRODUCTION_SEEDS=true or --force is passed.";
     console.error(errMsg);
     throw new Error(errMsg);
   }
@@ -623,7 +624,7 @@ export async function seedAiAgentCurriculum(force = false) {
   try {
     await client.query("BEGIN");
 
-    // 1. Upsert Pathway entries: 'cs-agentic' and 'course1'
+    // 1. Upsert Pathway entries: 'cs-agentic' (active) and 'course1' (archived alias)
     const pathwayEntries = [
       {
         id: "cs-agentic",
@@ -631,35 +632,39 @@ export async function seedAiAgentCurriculum(force = false) {
         slug: "cs-agentic",
         shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
         description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-        pricePaise: 299900
+        pricePaise: 299900,
+        status: "PUBLISHED",
+        isActive: true
       },
       {
         id: "course1",
-        title: "AI Agent Engineering",
+        title: "AI Agent Engineering (Legacy Alias)",
         slug: "course1",
         shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
         description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-        pricePaise: 299900
+        pricePaise: 299900,
+        status: "ARCHIVED",
+        isActive: false
       }
     ];
 
     for (const pwy of pathwayEntries) {
       await client.query(
         `INSERT INTO pathways (id, title, slug, short_description, description, price_paise, status, is_active, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'PUBLISHED', TRUE, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (id) DO UPDATE
          SET title = EXCLUDED.title,
              slug = EXCLUDED.slug,
              short_description = EXCLUDED.short_description,
              description = EXCLUDED.description,
              price_paise = EXCLUDED.price_paise,
-             status = 'PUBLISHED',
-             is_active = TRUE,
+             status = EXCLUDED.status,
+             is_active = EXCLUDED.is_active,
              updated_at = NOW()`,
-        [pwy.id, pwy.title, pwy.slug, pwy.shortDescription, pwy.description, pwy.pricePaise]
+        [pwy.id, pwy.title, pwy.slug, pwy.shortDescription, pwy.description, pwy.pricePaise, pwy.status, pwy.isActive]
       );
     }
-    console.log("[Seed:AI-Agent] Upserted pathways 'cs-agentic' and 'course1'.");
+    console.log("[Seed:AI-Agent] Upserted pathways 'cs-agentic' (active) and 'course1' (archived alias).");
 
     // 2. Ensure Course entry in 'courses' table: check by slug
     let courseId: string;
@@ -904,7 +909,7 @@ export async function seedAiAgentCurriculum(force = false) {
       `SELECT id FROM users WHERE id NOT LIKE '%unenrolled%' AND username NOT LIKE '%unenrolled%'`
     );
     for (const u of allUsers.rows || []) {
-      for (const pwyId of ["cs-agentic", "course1"]) {
+      for (const pwyId of ["cs-agentic"]) {
         const existing = await client.query(
           `SELECT id FROM enrollments WHERE user_id = $1 AND pathway_id = $2 AND status = 'ACTIVE' LIMIT 1`,
           [u.id, pwyId]

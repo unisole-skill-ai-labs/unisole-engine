@@ -837,8 +837,6 @@ export async function initializeDatabase() {
       DELETE FROM "public"."course_modules" WHERE "course_id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1') OR "module_id" IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
       DELETE FROM "public"."module_lessons" WHERE "module_id" IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8') OR "lesson_id" IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
       DELETE FROM "public"."lessons" WHERE "id" IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
-      DELETE FROM "public"."courses" WHERE "slug" NOT IN ('cs-agentic', 'course1') AND "title" NOT ILIKE '%AI Agent%';
-
       UPDATE "public"."modules"
       SET "title" = 'Week 1: What is an AI Agent?'
       WHERE ("title" ILIKE '%What is Agent%' OR "title" ILIKE '%What is an Agent%')
@@ -846,15 +844,9 @@ export async function initializeDatabase() {
 
       INSERT INTO "public"."courses" ("id", "title", "slug", "short_description", "price_paise", "mrp_paise", "status", "metadata", "is_active")
       VALUES 
-        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE)
-      ON CONFLICT ("slug") DO UPDATE SET
-        "title" = EXCLUDED."title",
-        "short_description" = EXCLUDED."short_description",
-        "price_paise" = EXCLUDED."price_paise",
-        "mrp_paise" = EXCLUDED."mrp_paise",
-        "status" = EXCLUDED."status",
-        "metadata" = EXCLUDED."metadata",
-        "is_active" = TRUE;
+        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE),
+        ('cs-genai', 'Generative AI Engineering', 'cs-genai', 'From Foundations to Agentic AI: Data Engineering, AI Backend Systems, Modern NLP, Transformer Architectures, RAG Systems, and Production Multi-Agent Swarms.', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-genai", "badge": "GROUP 01 • PATHWAY 01", "shortName": "CS & IT: Gen AI"}'::jsonb, TRUE)
+      ON CONFLICT ("id") DO NOTHING;
 
       INSERT INTO "public"."coupons" ("code", "description", "discount_type", "discount_value", "min_order_paise", "max_discount_paise", "max_uses", "applicable_item_ids", "is_active")
       VALUES 
@@ -1088,6 +1080,18 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_sso_codes_user_id" ON "public"."sso_codes" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_sso_codes_expires_at" ON "public"."sso_codes" ("expires_at");
     `);
+
+    // 18b. Ensure Partial Unique Index on Active Enrollments (Catches duplicate errors safely without halting boot)
+    try {
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "uq_active_user_course_enrollment" 
+        ON "public"."enrollments" ("user_id", COALESCE("pathway_id", "item_id")) 
+        WHERE "status" = 'ACTIVE'
+      `);
+      console.log("[DB-INIT] ✅ Verified unique active enrollment index (uq_active_user_course_enrollment).");
+    } catch (idxErr) {
+      console.warn("[DB-INIT] ⚠️ Could not create uq_active_user_course_enrollment unique index (likely duplicate active enrollments exist):", idxErr);
+    }
 
     // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)
     try {

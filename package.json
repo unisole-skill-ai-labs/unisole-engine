@@ -20,6 +20,8 @@
     "db:seed:dev": "tsx src/scripts/seed-system.ts",
     "seed:ai-agent": "node dist/scripts/seed-ai-agent-curriculum.js",
     "seed:ai-agent:dev": "tsx src/scripts/seed-ai-agent-curriculum.ts",
+    "seed:genai": "node dist/scripts/seed-genai-curriculum.js",
+    "seed:genai:dev": "tsx src/scripts/seed-genai-curriculum.ts",
     "db:seed:agent": "node dist/scripts/seed-ai-agent-curriculum.js",
     "db:seed:agent:dev": "tsx src/scripts/seed-ai-agent-curriculum.ts",
     "db:seed:calendar": "node dist/scripts/seed-ai-agent-calendar.js",

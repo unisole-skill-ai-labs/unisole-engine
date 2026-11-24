@@ -244,48 +244,30 @@ export const lmsService = {
       ];
     }
 
-    return activeEnrollments.map((enr) => {
+    const mappedEnrollments = activeEnrollments.map((enr) => {
+      let pwyObj: any;
       if (enr.pathway) {
-        return {
-          enrollmentId: enr.enrollmentId,
-          enrolledAt: enr.enrolledAt,
-          expiresAt: enr.expiresAt,
-          status: enr.status,
-          pathway: enr.pathway,
+        pwyObj = { ...enr.pathway };
+      } else if (enr.course) {
+        pwyObj = {
+          id: enr.course.id,
+          title: enr.course.title,
+          description: enr.course.description || enr.course.shortDescription || "Curriculum & Projects",
+          slug: enr.course.slug,
+          duration: "12 Weeks (132 Hours)",
+          level: "Intermediate",
+          isActive: enr.course.isActive,
+          isPublic: true,
+          pricePaise: enr.course.pricePaise || 299900,
+          createdAt: enr.course.createdAt,
+          updatedAt: enr.course.updatedAt,
         };
-      }
-
-      if (enr.course) {
-        return {
-          enrollmentId: enr.enrollmentId,
-          enrolledAt: enr.enrolledAt,
-          expiresAt: enr.expiresAt,
-          status: enr.status,
-          pathway: {
-            id: enr.course.id,
-            title: enr.course.title,
-            description: enr.course.description || enr.course.shortDescription || "Curriculum & Projects",
-            slug: enr.course.slug,
-            duration: "12 Weeks (132 Hours)",
-            level: "Intermediate",
-            isActive: enr.course.isActive,
-            isPublic: true,
-            pricePaise: enr.course.pricePaise || 299900,
-            createdAt: enr.course.createdAt,
-            updatedAt: enr.course.updatedAt,
-          },
-        };
-      }
-
-      const requestedId = enr.itemId || enr.pathwayId || "cs-agentic";
-      const canon = getCanonicalPathway(requestedId);
-      if (canon) {
-        return {
-          enrollmentId: enr.enrollmentId,
-          enrolledAt: enr.enrolledAt,
-          expiresAt: enr.expiresAt,
-          status: enr.status,
-          pathway: {
+      } else {
+        const rawReqId = enr.itemId || enr.pathwayId || "cs-agentic";
+        const requestedId = rawReqId === "course1" ? "cs-agentic" : rawReqId;
+        const canon = getCanonicalPathway(requestedId);
+        if (canon) {
+          pwyObj = {
             id: requestedId,
             title: canon.title,
             description: canon.description,
@@ -297,31 +279,53 @@ export const lmsService = {
             pricePaise: canon.price * 100,
             createdAt: enr.enrolledAt,
             updatedAt: enr.enrolledAt,
-          },
-        };
+          };
+        } else {
+          const cat = PATHWAY_CATALOG[requestedId] || PATHWAY_CATALOG["cs-agentic"];
+          pwyObj = {
+            id: requestedId,
+            title: cat?.title || "Curriculum Track",
+            description: cat?.description || "Structured Academic Track",
+            slug: requestedId,
+            duration: cat?.duration || "12 Weeks",
+            level: cat?.level || "Undergraduate",
+            isActive: true,
+            isPublic: true,
+            pricePaise: 299900,
+            createdAt: enr.enrolledAt,
+            updatedAt: enr.enrolledAt,
+          };
+        }
       }
 
-      const cat = PATHWAY_CATALOG[requestedId] || PATHWAY_CATALOG["cs-agentic"];
+      // Normalize course1 alias to canonical cs-agentic
+      if (pwyObj.id === "course1" || pwyObj.slug === "course1") {
+        pwyObj.id = "cs-agentic";
+        pwyObj.slug = "cs-agentic";
+      }
+
       return {
         enrollmentId: enr.enrollmentId,
         enrolledAt: enr.enrolledAt,
         expiresAt: enr.expiresAt,
         status: enr.status,
-        pathway: {
-          id: requestedId,
-          title: cat?.title || "Curriculum Track",
-          description: cat?.description || "Structured Academic Track",
-          slug: requestedId,
-          duration: cat?.duration || "12 Weeks",
-          level: cat?.level || "Undergraduate",
-          isActive: true,
-          isPublic: true,
-          pricePaise: 299900,
-          createdAt: enr.enrolledAt,
-          updatedAt: enr.enrolledAt,
-        },
+        pathway: pwyObj,
       };
     });
+
+    // Deduplicate array by canonical pathway id
+    const seenPathwayIds = new Set<string>();
+    const deduplicated: typeof mappedEnrollments = [];
+    for (const enrItem of mappedEnrollments) {
+      const pId = enrItem.pathway?.id || enrItem.pathway?.slug;
+      if (pId && seenPathwayIds.has(pId)) {
+        continue;
+      }
+      if (pId) seenPathwayIds.add(pId);
+      deduplicated.push(enrItem);
+    }
+
+    return deduplicated;
   },
 
   /**
@@ -329,12 +333,13 @@ export const lmsService = {
    * Enforces that student is actively enrolled (or isAdmin is true).
    */
   async getPathwayContent(userId: string, pathwayId: string, isAdmin = false, summaryOnly = false) {
+    const canonicalPathwayId = pathwayId === "course1" ? "cs-agentic" : pathwayId;
     let pathwayRows: any[] = [];
     try {
       pathwayRows = await db
         .select()
         .from(pathways)
-        .where(or(eq(pathways.id, pathwayId), eq(pathways.slug, pathwayId)))
+        .where(or(eq(pathways.id, canonicalPathwayId), eq(pathways.slug, canonicalPathwayId)))
         .limit(1);
     } catch (err) {
       console.warn("[LMSService] DB lookup in getPathwayContent notice:", err);
@@ -346,7 +351,7 @@ export const lmsService = {
         const courseRows = await db
           .select()
           .from(courses)
-          .where(or(sql`${courses.id}::text = ${pathwayId}::text`, eq(courses.slug, pathwayId)))
+          .where(or(sql`${courses.id}::text = ${canonicalPathwayId}::text`, eq(courses.slug, canonicalPathwayId)))
           .limit(1);
         if (courseRows[0]) {
           const c = courseRows[0];
@@ -370,12 +375,12 @@ export const lmsService = {
     }
 
     if (!pathway) {
-      const canon = getCanonicalPathway(pathwayId);
+      const canon = getCanonicalPathway(canonicalPathwayId);
       if (canon) {
         pathway = {
-          id: pathwayId,
+          id: canonicalPathwayId,
           title: canon.title,
-          slug: pathwayId,
+          slug: canonicalPathwayId,
           description: canon.description,
           duration: canon.duration,
           level: canon.level,
@@ -401,12 +406,14 @@ export const lmsService = {
               sql`${enrollments.userId}::text = ${userId}::text`,
               eq(enrollments.status, "ACTIVE"),
               or(
-                sql`${enrollments.pathwayId}::text = ${pathwayId}::text`,
-                sql`${enrollments.itemId}::text = ${pathwayId}::text`,
+                sql`${enrollments.pathwayId}::text = ${canonicalPathwayId}::text`,
+                sql`${enrollments.itemId}::text = ${canonicalPathwayId}::text`,
                 sql`${enrollments.pathwayId}::text = ${pathway.id}::text`,
                 sql`${enrollments.itemId}::text = ${pathway.id}::text`,
                 sql`${enrollments.pathwayId}::text = ${pathway.slug}::text`,
-                sql`${enrollments.itemId}::text = ${pathway.slug}::text`
+                sql`${enrollments.itemId}::text = ${pathway.slug}::text`,
+                sql`${enrollments.pathwayId}::text = 'course1'`,
+                sql`${enrollments.itemId}::text = 'course1'`
               )
             )
           )
