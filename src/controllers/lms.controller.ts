@@ -32,7 +32,7 @@ export const lmsController = {
       ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
       ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
     ].filter(Boolean).map((r) => String(r).toUpperCase());
-    const pathwayId = req.query.pathwayId ? String(req.query.pathwayId) : "cs-agentic";
+    const pathwayId = req.query.pathwayId ? String(req.query.pathwayId) : undefined;
     const summary = await lmsService.getDashboardSummary(userId, userRoles, pathwayId);
     res.json(summary);
   }),

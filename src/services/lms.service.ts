@@ -184,16 +184,9 @@ export const lmsService = {
       console.warn("[LMSService] DB offline or query issue in getAccessiblePathways, using fallback enrollments:", dbErr);
     }
 
-    // Filter active enrollments to ONLY AI Agent Engineering
-    const agenticEnrollments = activeEnrollments.filter((enr) => {
-      const slug = enr.course?.slug || enr.pathway?.slug || enr.itemId || enr.pathwayId || "";
-      const title = enr.course?.title || enr.pathway?.title || "";
-      return slug === "cs-agentic" || slug === "course1" || title.toLowerCase().includes("ai agent");
-    });
-
     const enableAutoEnroll = process.env.ENABLE_AUTO_ENROLL === "true";
 
-    if (agenticEnrollments.length === 0) {
+    if (activeEnrollments.length === 0) {
       if (!enableAutoEnroll) {
         return [];
       }
@@ -251,29 +244,7 @@ export const lmsService = {
       ];
     }
 
-    return agenticEnrollments.map((enr) => {
-      if (enr.course) {
-        return {
-          enrollmentId: enr.enrollmentId,
-          enrolledAt: enr.enrolledAt,
-          expiresAt: enr.expiresAt,
-          status: enr.status,
-          pathway: {
-            id: enr.course.id,
-            title: enr.course.title,
-            description: enr.course.description || enr.course.shortDescription || "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
-            slug: enr.course.slug,
-            duration: "12 Weeks (132 Hours)",
-            level: "Production AI Agent Engineering",
-            isActive: enr.course.isActive,
-            isPublic: true,
-            pricePaise: enr.course.pricePaise || 299900,
-            createdAt: enr.course.createdAt,
-            updatedAt: enr.course.updatedAt,
-          },
-        };
-      }
-
+    return activeEnrollments.map((enr) => {
       if (enr.pathway) {
         return {
           enrollmentId: enr.enrollmentId,
@@ -284,19 +255,65 @@ export const lmsService = {
         };
       }
 
-      const cat = PATHWAY_CATALOG["cs-agentic"];
+      if (enr.course) {
+        return {
+          enrollmentId: enr.enrollmentId,
+          enrolledAt: enr.enrolledAt,
+          expiresAt: enr.expiresAt,
+          status: enr.status,
+          pathway: {
+            id: enr.course.id,
+            title: enr.course.title,
+            description: enr.course.description || enr.course.shortDescription || "Curriculum & Projects",
+            slug: enr.course.slug,
+            duration: "12 Weeks (132 Hours)",
+            level: "Intermediate",
+            isActive: enr.course.isActive,
+            isPublic: true,
+            pricePaise: enr.course.pricePaise || 299900,
+            createdAt: enr.course.createdAt,
+            updatedAt: enr.course.updatedAt,
+          },
+        };
+      }
+
+      const requestedId = enr.itemId || enr.pathwayId || "cs-agentic";
+      const canon = getCanonicalPathway(requestedId);
+      if (canon) {
+        return {
+          enrollmentId: enr.enrollmentId,
+          enrolledAt: enr.enrolledAt,
+          expiresAt: enr.expiresAt,
+          status: enr.status,
+          pathway: {
+            id: requestedId,
+            title: canon.title,
+            description: canon.description,
+            slug: requestedId,
+            duration: canon.duration,
+            level: canon.level,
+            isActive: true,
+            isPublic: true,
+            pricePaise: canon.price * 100,
+            createdAt: enr.enrolledAt,
+            updatedAt: enr.enrolledAt,
+          },
+        };
+      }
+
+      const cat = PATHWAY_CATALOG[requestedId] || PATHWAY_CATALOG["cs-agentic"];
       return {
         enrollmentId: enr.enrollmentId,
         enrolledAt: enr.enrolledAt,
         expiresAt: enr.expiresAt,
         status: enr.status,
         pathway: {
-          id: "cs-agentic",
-          title: cat.title,
-          description: cat.description,
-          slug: "cs-agentic",
-          duration: cat.duration,
-          level: cat.level,
+          id: requestedId,
+          title: cat?.title || "Curriculum Track",
+          description: cat?.description || "Structured Academic Track",
+          slug: requestedId,
+          duration: cat?.duration || "12 Weeks",
+          level: cat?.level || "Undergraduate",
           isActive: true,
           isPublic: true,
           pricePaise: 299900,
@@ -399,19 +416,7 @@ export const lmsService = {
       }
 
       if (activeEnrollment.length === 0) {
-        // Auto-enroll user into AI Agent Engineering pathway so every LMS user has immediate access
-        try {
-          await db.insert(enrollments).values({
-            userId,
-            itemType: "PATHWAY",
-            itemId: pathway.id,
-            pathwayId: pathway.id,
-            status: "ACTIVE",
-            enrolledAt: new Date().toISOString(),
-          }).onConflictDoNothing();
-        } catch (autoErr) {
-          console.warn("[LMS] Auto-enrollment info:", autoErr);
-        }
+        throw new ForbiddenError("You're not enrolled in this course");
       }
     }
 
@@ -1251,10 +1256,22 @@ export const lmsService = {
    * into ONE fast parallel response, reducing mobile network roundtrips from 5 to 1.
    */
   async getDashboardSummary(userId: string, userRoles: string[], pathwayId: string = "cs-agentic") {
+    let effectivePathwayId = pathwayId;
+    try {
+      const userEnrs = await db
+        .select({ pathwayId: enrollments.pathwayId, itemId: enrollments.itemId })
+        .from(enrollments)
+        .where(and(eq(enrollments.userId, userId), eq(enrollments.status, "ACTIVE")));
+      const enrolledIds = userEnrs.map((e) => e.pathwayId || e.itemId).filter(Boolean);
+      if (enrolledIds.length > 0 && !enrolledIds.includes(effectivePathwayId)) {
+        effectivePathwayId = enrolledIds[0] as string;
+      }
+    } catch {}
+
     const [pathwayContent, progress, submissions, activities, calendarEvents] = await Promise.all([
-      this.getPathwayContent(userId, pathwayId, false, true),
-      this.getStudentProgress(userId, pathwayId),
-      this.getStudentSubmissions(userId, pathwayId),
+      this.getPathwayContent(userId, effectivePathwayId, false, true),
+      this.getStudentProgress(userId, effectivePathwayId),
+      this.getStudentSubmissions(userId, effectivePathwayId),
       this.getStudentActivities(userId),
       this.getCalendarEvents({ callerUserId: userId, callerRoles: userRoles }),
     ]);
