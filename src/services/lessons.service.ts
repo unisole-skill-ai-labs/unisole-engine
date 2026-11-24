@@ -17,6 +17,12 @@ export const lessonsService = {
     const { title, slug, description, content, videoUrl, durationMinutes, unlockAt, lockAt } = body as any;
     if (!title || !slug) throw new ValidationError("title and slug are required");
 
+    const unlockDate = unlockAt ? new Date(unlockAt) : null;
+    const lockDate = lockAt ? new Date(lockAt) : null;
+    if (unlockDate && lockDate && lockDate.getTime() <= unlockDate.getTime()) {
+      throw new ValidationError("lockAt must be strictly after unlockAt");
+    }
+
     const existing = await lessonsRepository.getBySlug(slug);
     if (existing) throw new ConflictError("A lesson with this slug already exists");
 
@@ -27,8 +33,8 @@ export const lessonsService = {
       content: content || null,
       videoUrl: videoUrl || null,
       durationMinutes: durationMinutes ? Number(durationMinutes) : null,
-      unlockAt: unlockAt ? new Date(unlockAt).toISOString() : null,
-      lockAt: lockAt ? new Date(lockAt).toISOString() : null,
+      unlockAt: unlockDate ? unlockDate.toISOString() : null,
+      lockAt: lockDate ? lockDate.toISOString() : null,
       status: "DRAFT",
     });
   },
@@ -46,6 +52,18 @@ export const lessonsService = {
     if (body.durationMinutes !== undefined) data.durationMinutes = Number(body.durationMinutes);
     if (body.unlockAt !== undefined) data.unlockAt = body.unlockAt ? new Date(body.unlockAt as string).toISOString() : null;
     if (body.lockAt !== undefined) data.lockAt = body.lockAt ? new Date(body.lockAt as string).toISOString() : null;
+
+    // Server-side validation: lockAt must be strictly after unlockAt
+    const effectiveUnlockStr = data.unlockAt !== undefined ? data.unlockAt : existing.unlockAt;
+    const effectiveLockStr = data.lockAt !== undefined ? data.lockAt : existing.lockAt;
+    if (effectiveUnlockStr && effectiveLockStr) {
+      const unlockMs = new Date(effectiveUnlockStr).getTime();
+      const lockMs = new Date(effectiveLockStr).getTime();
+      if (!isNaN(unlockMs) && !isNaN(lockMs) && lockMs <= unlockMs) {
+        throw new ValidationError("lockAt must be strictly after unlockAt");
+      }
+    }
+
     if (body.status !== undefined) {
       const status = body.status as string;
       if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");

@@ -526,6 +526,13 @@ export const lmsService = {
         (lm) => lm.module && !lm.module.title.toLowerCase().includes("intro to ai")
       );
 
+      // Hide archived/inactive modules from students
+      if (!isAdmin) {
+        linkedModules = linkedModules.filter(
+          (lm) => lm.module && lm.module.status !== "ARCHIVED" && (lm.module as any).isActive !== false
+        );
+      }
+
       // Fallback: If courseModules link wasn't populated or incomplete, check modules directly
       if (linkedModules.length < 12) {
         try {
@@ -571,6 +578,13 @@ export const lmsService = {
               }));
             }
           } catch {}
+        }
+
+        // Hide archived/inactive lessons from students
+        if (!isAdmin) {
+          linkedLessons = linkedLessons.filter(
+            (ll) => ll.lesson && ll.lesson.status !== "ARCHIVED" && (ll.lesson as any).isActive !== false
+          );
         }
 
         const modUnlockMs = mod.unlockAt ? new Date(mod.unlockAt).getTime() : null;
@@ -771,6 +785,11 @@ export const lmsService = {
         return lesson;
       }
 
+      // Check if lesson or module is archived
+      if (lesson.status === "ARCHIVED" || lesson.isActive === false) {
+        throw new ForbiddenError("This activity has been archived and is not available.");
+      }
+
       // Time lock enforcement for students
       const nowMs = Date.now();
       if (lesson.unlockAt && new Date(lesson.unlockAt).getTime() > nowMs) {
@@ -784,14 +803,22 @@ export const lmsService = {
         );
       }
 
-      // Check parent module time lock
+      // Check parent module time lock & archive status
       const parentModules = await db
-        .select({ unlockAt: modules.unlockAt, lockAt: modules.lockAt })
+        .select({
+          status: modules.status,
+          isActive: modules.isActive,
+          unlockAt: modules.unlockAt,
+          lockAt: modules.lockAt,
+        })
         .from(moduleLessons)
         .innerJoin(modules, sql`${moduleLessons.moduleId}::text = ${modules.id}::text`)
         .where(sql`${moduleLessons.lessonId}::text = ${lessonId}::text`);
 
       for (const pm of parentModules) {
+        if (pm.status === "ARCHIVED" || pm.isActive === false) {
+          throw new ForbiddenError("This module has been archived and is not available.");
+        }
         if (pm.unlockAt && new Date(pm.unlockAt).getTime() > nowMs) {
           throw new ForbiddenError(
             `This module is scheduled and locked until ${new Date(pm.unlockAt).toLocaleString()}`
@@ -850,6 +877,16 @@ export const lmsService = {
    * Mark lesson progress (completed / in-progress)
    */
   async markLessonProgress(userId: string, data: { lessonId: string; pathwayId?: string; isCompleted?: boolean }) {
+    const lesRows = await db
+      .select({ status: lessons.status, isActive: lessons.isActive })
+      .from(lessons)
+      .where(eq(lessons.id, data.lessonId))
+      .limit(1);
+
+    if (lesRows.length > 0 && (lesRows[0].status === "ARCHIVED" || lesRows[0].isActive === false)) {
+      throw new ForbiddenError("Cannot record progress on an archived lesson.");
+    }
+
     const isCompleted = data.isCompleted !== false;
     const now = new Date().toISOString();
     const id = `prog_${userId}_${data.lessonId}`;
@@ -970,6 +1007,16 @@ export const lmsService = {
       status?: string;
     }
   ) {
+    const lesRows = await db
+      .select({ status: lessons.status, isActive: lessons.isActive })
+      .from(lessons)
+      .where(eq(lessons.id, data.lessonId))
+      .limit(1);
+
+    if (lesRows.length > 0 && (lesRows[0].status === "ARCHIVED" || lesRows[0].isActive === false)) {
+      throw new ForbiddenError("Cannot submit to an archived activity.");
+    }
+
     const id = `sub_${userId}_${data.lessonId}_${Date.now()}`;
     const now = new Date().toISOString();
     const type = data.type || (data.score !== undefined ? "quiz" : "assignment");
