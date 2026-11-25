@@ -520,16 +520,38 @@ export const lmsService = {
     const courseList: any[] = [];
 
     for (const { position: coursePos, course } of linkedCourses) {
+      // Match Admin courses.repository.ts candidate IDs so modules attached via courseId/slug/alias all appear
+      const candidateSet = new Set<string>([String(course.id)]);
+      if (course.slug) candidateSet.add(String(course.slug));
+      if (
+        canonicalPathwayId === "cs-agentic" ||
+        course.id === "cs-agentic" ||
+        course.id === "course1" ||
+        course.slug === "cs-agentic"
+      ) {
+        candidateSet.add("cs-agentic");
+        candidateSet.add("course1");
+      }
+      const candidateList = Array.from(candidateSet);
+
       // Fetch linked modules for this course
-      let linkedModules = await db
+      const rawLinkedModules = await db
         .select({
           position: courseModules.position,
           module: modules,
         })
         .from(courseModules)
         .innerJoin(modules, sql`${courseModules.moduleId}::text = ${modules.id}::text`)
-        .where(sql`${courseModules.courseId}::text = ${course.id}::text`)
+        .where(inArray(courseModules.courseId, candidateList))
         .orderBy(asc(courseModules.position));
+
+      // Deduplicate by module.id in case a module was linked under multiple alias course IDs
+      const seenModuleIds = new Set<string>();
+      let linkedModules = rawLinkedModules.filter((lm) => {
+        if (!lm.module || seenModuleIds.has(lm.module.id)) return false;
+        seenModuleIds.add(lm.module.id);
+        return true;
+      });
 
       // Filter out any obsolete dummy modules like "Intro to AI Agents"
       linkedModules = linkedModules.filter(
@@ -543,17 +565,24 @@ export const lmsService = {
         );
       }
 
-      // Fallback: If courseModules link wasn't populated or incomplete, check modules directly for cs-agentic
-      if (linkedModules.length < 12 && (course.id === "cs-agentic" || course.id === "course1")) {
+      // Fallback: Merge (do not overwrite) seeded cs-agentic week modules if fewer than 12 are linked
+      if (
+        linkedModules.length < 12 &&
+        (course.id === "cs-agentic" || course.id === "course1" || course.slug === "cs-agentic")
+      ) {
         try {
           const directMods = await pool.query(
             `SELECT * FROM modules WHERE (slug LIKE 'cs-agentic-week-%' OR id LIKE 'mod_agent_w%') AND status = 'PUBLISHED' AND is_active = TRUE AND title NOT ILIKE '%Intro to AI%' ORDER BY id ASC`
           );
-          if (directMods.rows && directMods.rows.length >= 12) {
-            linkedModules = directMods.rows.map((m: any, mIdx: number) => ({
-              position: mIdx + 1,
-              module: m,
-            }));
+          if (directMods.rows && directMods.rows.length > 0) {
+            const existingIds = new Set(linkedModules.map((lm) => lm.module.id));
+            let nextPos = linkedModules.reduce((max, lm) => Math.max(max, lm.position || 0), 0) + 1;
+            for (const m of directMods.rows) {
+              if (!existingIds.has(m.id)) {
+                linkedModules.push({ position: nextPos++, module: m });
+                existingIds.add(m.id);
+              }
+            }
           }
         } catch {}
       }
