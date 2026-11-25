@@ -1,4 +1,6 @@
 import { modulesRepository } from "../repositories/modules.repository";
+import { lessonsRepository } from "../repositories/lessons.repository";
+import { buildValidatedNewLesson } from "./lessons.service";
 import { Module, NewModule } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 
@@ -17,6 +19,12 @@ export const modulesService = {
     const { title, slug, description, unlockAt, lockAt } = body as any;
     if (!title || !slug) throw new ValidationError("title and slug are required");
 
+    const unlockDate = unlockAt ? new Date(unlockAt) : null;
+    const lockDate = lockAt ? new Date(lockAt) : null;
+    if (unlockDate && lockDate && lockDate.getTime() <= unlockDate.getTime()) {
+      throw new ValidationError("lockAt must be strictly after unlockAt");
+    }
+
     const existing = await modulesRepository.getBySlug(slug);
     if (existing) throw new ConflictError("A module with this slug already exists");
 
@@ -24,8 +32,8 @@ export const modulesService = {
       title,
       slug,
       description: description || null,
-      unlockAt: unlockAt ? new Date(unlockAt).toISOString() : null,
-      lockAt: lockAt ? new Date(lockAt).toISOString() : null,
+      unlockAt: unlockDate ? unlockDate.toISOString() : null,
+      lockAt: lockDate ? lockDate.toISOString() : null,
       status: "DRAFT",
     });
   },
@@ -40,6 +48,18 @@ export const modulesService = {
     if (body.description !== undefined) data.description = body.description as string;
     if (body.unlockAt !== undefined) data.unlockAt = body.unlockAt ? new Date(body.unlockAt as string).toISOString() : null;
     if (body.lockAt !== undefined) data.lockAt = body.lockAt ? new Date(body.lockAt as string).toISOString() : null;
+
+    // Server-side validation: lockAt must be strictly after unlockAt
+    const effectiveUnlockStr = data.unlockAt !== undefined ? data.unlockAt : existing.unlockAt;
+    const effectiveLockStr = data.lockAt !== undefined ? data.lockAt : existing.lockAt;
+    if (effectiveUnlockStr && effectiveLockStr) {
+      const unlockMs = new Date(effectiveUnlockStr).getTime();
+      const lockMs = new Date(effectiveLockStr).getTime();
+      if (!isNaN(unlockMs) && !isNaN(lockMs) && lockMs <= unlockMs) {
+        throw new ValidationError("lockAt must be strictly after unlockAt");
+      }
+    }
+
     if (body.status !== undefined) {
       const status = body.status as string;
       if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");
@@ -54,8 +74,16 @@ export const modulesService = {
     return updated;
   },
 
-  async attachLesson(moduleId: string, lessonId: string, position: number): Promise<void> {
-    await modulesRepository.attachLesson({ moduleId, lessonId, position });
+  async createAndAttachLesson(moduleId: string, body: Record<string, unknown>) {
+    const newLesson = buildValidatedNewLesson(body);
+    const existing = await lessonsRepository.getBySlug(newLesson.slug);
+    if (existing) throw new ConflictError("A lesson with this slug already exists");
+
+    return modulesRepository.createAndAttachLesson(moduleId, newLesson);
+  },
+
+  async attachLesson(moduleId: string, lessonId: string, position?: number) {
+    return modulesRepository.attachLesson({ moduleId, lessonId, position });
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {

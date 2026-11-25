@@ -22,32 +22,42 @@ export async function seedSystemData() {
 
   try {
     // 0. Ensure Girish Super Admin exists with secure hashed credentials
+    const isProd = process.env.NODE_ENV === "production";
     const adminPasswordRaw =
       process.env.SUPERADMIN_PASSWORD ||
       process.env.SUPERADMIN_INITIAL_PASSWORD;
 
-    const girishCheck = await pool.query(
-      "SELECT id, password FROM users WHERE LOWER(username) = 'girish' OR phone = '+910000000000' OR phone = '0000000000' LIMIT 1"
-    );
-
-    if (adminPasswordRaw) {
-      const hashedPassword = await bcrypt.hash(adminPasswordRaw, 10);
-      if (girishCheck.rows && girishCheck.rows[0]) {
-        await pool.query(
-          "UPDATE users SET username = 'girish', password = $1, name = 'Girish Gaurav Sharma', role = 'SUPER_ADMIN', designation = 'Super Administrator', is_active = TRUE WHERE id = $2",
-          [hashedPassword, girishCheck.rows[0].id]
-        );
-      } else {
-        await pool.query(
-          "INSERT INTO users (username, password, phone, name, role, designation, is_active) VALUES ('girish', $1, '+910000000000', 'Girish Gaurav Sharma', 'SUPER_ADMIN', 'Super Administrator', TRUE)",
-          [hashedPassword]
+    if (isProd && !adminPasswordRaw) {
+      console.warn("[Seed:System] ⚠️ WARNING: SUPERADMIN_PASSWORD environment variable is unset in production. Skipping Super Admin user creation and password update.");
+    } else {
+      let girishCheck = await pool.query(
+        "SELECT id, password FROM users WHERE LOWER(username) = 'girish' LIMIT 1"
+      );
+      if (!girishCheck.rows || girishCheck.rows.length === 0) {
+        girishCheck = await pool.query(
+          "SELECT id, password FROM users WHERE phone IN ('+910000000000', '0000000000') LIMIT 1"
         );
       }
-      console.log("[Seed:System] Synchronized Super Admin account (girish) with secure hashed credentials.");
-    } else if (girishCheck.rows && girishCheck.rows[0]) {
-      console.log("[Seed:System] Synchronized Super Admin profile (existing password preserved).");
-    } else {
-      console.warn("[Seed:System] ⚠️ SUPERADMIN_PASSWORD environment variable not set. Please set SUPERADMIN_PASSWORD in .env.");
+
+      if (adminPasswordRaw) {
+        const hashedPassword = await bcrypt.hash(adminPasswordRaw, 10);
+        if (girishCheck.rows && girishCheck.rows[0]) {
+          await pool.query(
+            "UPDATE users SET username = 'girish', password = $1, name = 'Girish Gaurav Sharma', role = 'SUPER_ADMIN', designation = 'Super Administrator', is_active = TRUE WHERE id = $2",
+            [hashedPassword, girishCheck.rows[0].id]
+          );
+        } else {
+          await pool.query(
+            "INSERT INTO users (username, password, phone, name, role, designation, is_active) VALUES ('girish', $1, '+910000000000', 'Girish Gaurav Sharma', 'SUPER_ADMIN', 'Super Administrator', TRUE)",
+            [hashedPassword]
+          );
+        }
+        console.log("[Seed:System] Synchronized Super Admin account (girish) with secure hashed credentials.");
+      } else if (girishCheck.rows && girishCheck.rows[0]) {
+        console.log("[Seed:System] Synchronized Super Admin profile (existing password preserved).");
+      } else {
+        console.warn("[Seed:System] ⚠️ SUPERADMIN_PASSWORD environment variable not set. Please set SUPERADMIN_PASSWORD in .env.");
+      }
     }
 
     // 1. Sync Government Degree College Theog (gdc-theog)
@@ -377,25 +387,103 @@ export async function seedSystemData() {
     );
     console.log(`[Seed:System] Synchronized flagship deck: AI Campus Deck (${UNISOLE_AI_CAMPUS_DECK_SLIDES.length} slides)`);
 
-    // 4. Seed / Sync Foundational Courses (8 Canonical Academic Pathways + 1 AI Masterclass)
-    // First, clean any legacy or old placeholder IDs, courses, modules, lessons, and old demo pathways
-    await pool.query(`
-      -- Clean legacy demo pathways (pwy_1, pwy_2, pwy_3)
-      DELETE FROM pathway_categories WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
-      DELETE FROM pathway_colleges WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
-      DELETE FROM pathway_courses WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
-      UPDATE enrollments SET pathway_id = NULL WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
-      UPDATE payments SET pathway_id = NULL WHERE pathway_id IN ('pwy_1', 'pwy_2', 'pwy_3');
-      DELETE FROM pathways WHERE id IN ('pwy_1', 'pwy_2', 'pwy_3');
+    // 4. Safe cleanup of legacy or old placeholder IDs, courses, modules, lessons, and old demo pathways
+    // Ensures: never nulls out pathway_id on enrollments or payments, and skips deleting any row referenced by enrollments, order_items or payments
+    const deprecatedPathwayIds = ["pwy_1", "pwy_2", "pwy_3"];
+    const deprecatedCourseIds = [
+      "crs_1", "crs_2", "crs_3", "crs_4", "crs_5", "crs_6", "crs_cs_ai",
+      "crs_sci_math", "crs_commerce_mgmt", "crs_humanities_arts",
+      "mgmt-p2", "mgmt-p3", "mgmt-common", "cs-p2", "cs-p3",
+      "crs_cs-genai", "crs_cs-agentic", "crs_cs-p1", "crs_cs-common",
+      "crs_sci-p1", "crs_sci-p2", "crs_mgmt-p1", "crs_arts-p1"
+    ];
+    const dummyModuleIds = ["mod_1", "mod_2", "mod_3", "mod_4", "mod_5", "mod_6", "mod_7", "mod_8"];
+    const dummyLessonIds = ["les_1", "les_2", "les_3", "les_4", "les_5", "les_6", "les_7", "les_8"];
 
-      -- Clean deprecated courses, modules, and lessons
-      DELETE FROM pathway_courses WHERE course_id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1');
-      DELETE FROM course_modules WHERE course_id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1') OR module_id IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
-      DELETE FROM module_lessons WHERE module_id IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8') OR lesson_id IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
-      DELETE FROM lessons WHERE id IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
-      DELETE FROM modules WHERE id IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
-      DELETE FROM courses WHERE id IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1');
-    `);
+    // 4a. Check referenced pathways
+    const referencedPathways = await pool.query(
+      `SELECT id FROM pathways p
+       WHERE p.id = ANY($1::text[])
+         AND (
+           EXISTS (SELECT 1 FROM enrollments e WHERE e.pathway_id = p.id OR e.item_id = p.id)
+           OR EXISTS (SELECT 1 FROM order_items oi WHERE oi.item_id = p.id)
+           OR EXISTS (SELECT 1 FROM payments pay WHERE pay.pathway_id = p.id)
+         )`,
+      [deprecatedPathwayIds]
+    );
+    const skippedPathwayIds = referencedPathways.rows.map((r: any) => r.id);
+    if (skippedPathwayIds.length > 0) {
+      console.log(`[Seed:System] Skipped purging referenced legacy pathways: ${skippedPathwayIds.join(", ")}`);
+    }
+
+    // 4b. Check referenced courses
+    const referencedCourses = await pool.query(
+      `SELECT id FROM courses c
+       WHERE c.id = ANY($1::text[])
+         AND (
+           EXISTS (SELECT 1 FROM enrollments e WHERE e.item_id = c.id OR e.pathway_id = c.id)
+           OR EXISTS (SELECT 1 FROM order_items oi WHERE oi.item_id = c.id)
+           OR EXISTS (SELECT 1 FROM payments pay WHERE pay.pathway_id = c.id)
+         )`,
+      [deprecatedCourseIds]
+    );
+    const skippedCourseIds = referencedCourses.rows.map((r: any) => r.id);
+    if (skippedCourseIds.length > 0) {
+      console.log(`[Seed:System] Skipped purging referenced legacy courses: ${skippedCourseIds.join(", ")}`);
+    }
+
+    // 4c. Delete unreferenced pathways and link rows
+    await pool.query(
+      `DELETE FROM pathway_categories WHERE pathway_id = ANY($1::text[]) AND pathway_id != ALL($2::text[])`,
+      [deprecatedPathwayIds, skippedPathwayIds]
+    );
+    await pool.query(
+      `DELETE FROM pathway_colleges WHERE pathway_id = ANY($1::text[]) AND pathway_id != ALL($2::text[])`,
+      [deprecatedPathwayIds, skippedPathwayIds]
+    );
+    await pool.query(
+      `DELETE FROM pathway_courses WHERE pathway_id = ANY($1::text[]) AND pathway_id != ALL($2::text[])`,
+      [deprecatedPathwayIds, skippedPathwayIds]
+    );
+    await pool.query(
+      `DELETE FROM pathways WHERE id = ANY($1::text[]) AND id != ALL($2::text[])`,
+      [deprecatedPathwayIds, skippedPathwayIds]
+    );
+
+    // 4d. Delete unreferenced courses and link rows
+    await pool.query(
+      `DELETE FROM pathway_courses WHERE course_id = ANY($1::text[]) AND course_id != ALL($2::text[])`,
+      [deprecatedCourseIds, skippedCourseIds]
+    );
+    await pool.query(
+      `DELETE FROM course_modules WHERE course_id = ANY($1::text[]) AND course_id != ALL($2::text[])`,
+      [deprecatedCourseIds, skippedCourseIds]
+    );
+    await pool.query(
+      `DELETE FROM courses WHERE id = ANY($1::text[]) AND id != ALL($2::text[])`,
+      [deprecatedCourseIds, skippedCourseIds]
+    );
+
+    // 4e. Delete dummy modules and lessons (if unreferenced)
+    await pool.query(
+      `DELETE FROM course_modules WHERE module_id = ANY($1::text[])`,
+      [dummyModuleIds]
+    );
+    await pool.query(
+      `DELETE FROM module_lessons WHERE module_id = ANY($1::text[]) OR lesson_id = ANY($2::text[])`,
+      [dummyModuleIds, dummyLessonIds]
+    );
+    await pool.query(
+      `DELETE FROM lessons WHERE id = ANY($1::text[]) 
+         AND NOT EXISTS (SELECT 1 FROM lesson_progress lp WHERE lp.lesson_id = lessons.id)
+         AND NOT EXISTS (SELECT 1 FROM submissions sub WHERE sub.lesson_id = lessons.id)`,
+      [dummyLessonIds]
+    );
+    await pool.query(
+      `DELETE FROM modules WHERE id = ANY($1::text[])
+         AND NOT EXISTS (SELECT 1 FROM course_modules cm WHERE cm.module_id = modules.id)`,
+      [dummyModuleIds]
+    );
 
     const foundationalCourses = [
       // --- GROUP 01: Computer Science & IT (4 Courses) ---
@@ -590,17 +678,12 @@ export async function seedSystemData() {
     ];
 
     for (const c of foundationalCourses) {
+      // In production, courses are inserted as DRAFT so unvetted content is never automatically published
+      const targetStatus = isProd ? "DRAFT" : c.status;
       await pool.query(
         `INSERT INTO courses (id, title, slug, short_description, price_paise, mrp_paise, status, metadata, is_active)
          VALUES ($1, $2, $3, $4, $5, $6, $7::content_status, $8, TRUE)
-         ON CONFLICT (slug) DO UPDATE
-         SET title = EXCLUDED.title,
-             short_description = EXCLUDED.short_description,
-             price_paise = EXCLUDED.price_paise,
-             mrp_paise = EXCLUDED.mrp_paise,
-             status = EXCLUDED.status,
-             metadata = EXCLUDED.metadata,
-             is_active = TRUE`,
+         ON CONFLICT (slug) DO NOTHING`,
         [
           c.id,
           c.title,
@@ -608,7 +691,7 @@ export async function seedSystemData() {
           c.short_description,
           c.price_paise,
           c.mrp_paise,
-          c.status,
+          targetStatus,
           JSON.stringify(c.metadata)
         ]
       );
@@ -649,15 +732,7 @@ export async function seedSystemData() {
       await pool.query(
         `INSERT INTO coupons (code, description, discount_type, discount_value, min_order_paise, max_discount_paise, max_uses, applicable_item_ids, is_active)
          VALUES ($1, $2, $3::discount_type, $4, $5, $6, $7, $8, TRUE)
-         ON CONFLICT (code) DO UPDATE
-         SET description = EXCLUDED.description,
-             discount_type = EXCLUDED.discount_type,
-             discount_value = EXCLUDED.discount_value,
-             min_order_paise = EXCLUDED.min_order_paise,
-             max_discount_paise = EXCLUDED.max_discount_paise,
-             max_uses = EXCLUDED.max_uses,
-             applicable_item_ids = EXCLUDED.applicable_item_ids,
-             is_active = TRUE`,
+         ON CONFLICT (code) DO NOTHING`,
         [
           cp.code,
           cp.description,

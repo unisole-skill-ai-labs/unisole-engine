@@ -4,7 +4,6 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
 import { pricingService } from "../services/pricing.service";
 import { seedLmsDemoData } from "../scripts/seed-lms-demo";
-import { seedAiAgentCurriculum } from "../scripts/seed-ai-agent-curriculum";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -338,7 +337,54 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "lesson_id" varchar(50);
       ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "position" integer;
       ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      CREATE INDEX IF NOT EXISTS "idx_module_lessons_lesson" ON "public"."module_lessons" USING btree ("lesson_id");
     `);
+
+    // 4b. Reconcile module_lessons constraints safely (additive, idempotent, non-blocking)
+    const ensureModuleLessonsConstraint = async (
+      constraintName: string,
+      violationCheckSql: string,
+      addConstraintSql: string
+    ) => {
+      try {
+        const existsRes = await pool.query(
+          `SELECT 1 FROM pg_constraint WHERE conname = $1 AND conrelid = 'public.module_lessons'::regclass LIMIT 1`,
+          [constraintName]
+        );
+        if (existsRes.rows.length > 0) return;
+
+        const violRes = await pool.query(violationCheckSql);
+        if (violRes.rows.length > 0) {
+          console.warn(`[DB-INIT] ⚠️ Skipping constraint "${constraintName}" on module_lessons: existing rows violate it.`);
+          return;
+        }
+        await pool.query(addConstraintSql);
+        console.log(`[DB-INIT] ✅ Applied missing constraint "${constraintName}" on module_lessons.`);
+      } catch (err: any) {
+        console.warn(`[DB-INIT] ⚠️ Could not apply constraint "${constraintName}" on module_lessons:`, err.message);
+      }
+    };
+
+    await ensureModuleLessonsConstraint(
+      "uq_module_lessons_position",
+      `SELECT 1 FROM public.module_lessons GROUP BY module_id, position HAVING count(*) > 1 OR position IS NULL LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "uq_module_lessons_position" UNIQUE ("module_id", "position")`
+    );
+    await ensureModuleLessonsConstraint(
+      "chk_module_lessons_position",
+      `SELECT 1 FROM public.module_lessons WHERE position IS NULL OR position <= 0 LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "chk_module_lessons_position" CHECK ("position" > 0)`
+    );
+    await ensureModuleLessonsConstraint(
+      "fk_module_lessons_module",
+      `SELECT 1 FROM public.module_lessons ml LEFT JOIN public.modules m ON m.id = ml.module_id WHERE m.id IS NULL LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "fk_module_lessons_module" FOREIGN KEY ("module_id") REFERENCES "public"."modules"("id") ON DELETE CASCADE`
+    );
+    await ensureModuleLessonsConstraint(
+      "fk_module_lessons_lesson",
+      `SELECT 1 FROM public.module_lessons ml LEFT JOIN public.lessons l ON l.id = ml.lesson_id WHERE l.id IS NULL LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "fk_module_lessons_lesson" FOREIGN KEY ("lesson_id") REFERENCES "public"."lessons"("id") ON DELETE RESTRICT`
+    );
 
     // 5. Commercial Orders, Pricing Catalog & Coupons Tables
     await execSqlSafe("orders_tables", `
@@ -806,6 +852,10 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."daily_eod_logs" ADD COLUMN IF NOT EXISTS "blockers" text;
     `);
 
+    const isProd = process.env.NODE_ENV === "production";
+    const defaultCourseStatus = isProd ? "DRAFT" : "PUBLISHED";
+    const defaultIsPublic = !isProd;
+
     // 8. Canonical SEO Offerings Seed (offerings_pricing)
     await execSqlSafe("seed_offerings_pricing", `
       DELETE FROM "public"."offerings_pricing" WHERE "item_id" IN ('mgmt-p2', 'mgmt-p3', 'mgmt-common');
@@ -813,16 +863,16 @@ export async function initializeDatabase() {
       INSERT INTO "public"."offerings_pricing" (
         "item_type", "item_id", "title", "description", "price_paise", "mrp_paise", "is_active", "is_public"
       ) VALUES 
-        ('WORKSHOP', 'AI_MASTERCLASS_2026', 'AI Revolution & Agentic Engineering Masterclass', 'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems', 3900, 99900, true, true),
-        ('PATHWAY', 'cs-genai', 'Generative AI Engineering', 'From data handling and backend engineering through classical NLP, sequence models, Transformers, and RAG into LLMOps and Agentic AI systems.', 299900, 999900, true, true),
-        ('PATHWAY', 'cs-agentic', 'AI Agent Engineering', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 299900, 999900, true, true),
-        ('PATHWAY', 'cs-p1', 'Machine Learning in Production: MLOps Engineering', 'Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.', 299900, 999900, true, true),
-        ('PATHWAY', 'cs-common', 'AI Entrepreneurship & Business Innovation', 'Structured incubator track teaching students how to convert AI technical capability into commercial startups.', 59900, 299900, true, true),
-        ('PATHWAY', 'sci-p1', 'Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)', 'Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Physics-Informed Neural Networks.', 299900, 899900, true, true),
-        ('PATHWAY', 'sci-p2', 'Mathematics + AI / Computational Intelligence', 'Mathematics-oriented pathway focusing on optimization theory, statistical learning, and computational algorithms.', 150000, 599900, true, true),
-        ('PATHWAY', 'mgmt-p1', 'Business Analytics & Data Engineering', 'Advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, true, true),
-        ('PATHWAY', 'arts-p1', 'Applied AI for Humanities, Research & Careers', 'Prompt engineering, AI research methods, automated content, executive communication, and career acceleration.', 99900, 399900, true, true)
-      ON CONFLICT ("item_type", "item_id") DO UPDATE SET "title" = EXCLUDED."title", "description" = EXCLUDED."description";
+        ('WORKSHOP', 'AI_MASTERCLASS_2026', 'AI Revolution & Agentic Engineering Masterclass', 'Comprehensive workshop on AI Agents, Deep Learning & Autonomous systems', 3900, 99900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-genai', 'Generative AI Engineering', 'From data handling and backend engineering through classical NLP, sequence models, Transformers, and RAG into LLMOps and Agentic AI systems.', 299900, 999900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-agentic', 'AI Agent Engineering', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 299900, 999900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-p1', 'Machine Learning in Production: MLOps Engineering', 'Production ML pipelines, PyTorch deep learning, FastAPI model serving, Docker MLOps, and Generative AI/RAG.', 299900, 999900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'cs-common', 'AI Entrepreneurship & Business Innovation', 'Structured incubator track teaching students how to convert AI technical capability into commercial startups.', 59900, 299900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'sci-p1', 'Scientific Machine Learning for Basic Sciences (BSc Physics | BSc Maths)', 'Core progression: Mathematics → Python → Scientific Computing → Machine Learning → Deep Learning → Scientific AI → Capstone. Physics-Informed Neural Networks.', 299900, 899900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'sci-p2', 'Mathematics + AI / Computational Intelligence', 'Mathematics-oriented pathway focusing on optimization theory, statistical learning, and computational algorithms.', 150000, 599900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'mgmt-p1', 'Business Analytics & Data Engineering', 'Advanced Excel, SQL, modern data engineering (ETL, Parquet, DuckDB), Power BI, and Generative AI.', 200000, 699900, true, ${defaultIsPublic}),
+        ('PATHWAY', 'arts-p1', 'Applied AI for Humanities, Research & Careers', 'Prompt engineering, AI research methods, automated content, executive communication, and career acceleration.', 99900, 399900, true, ${defaultIsPublic})
+      ON CONFLICT ("item_type", "item_id") DO NOTHING;
     `);
 
     // 9. Foundational Flagship Courses Sync & Legacy Clean
@@ -838,30 +888,22 @@ export async function initializeDatabase() {
       DELETE FROM "public"."course_modules" WHERE "course_id" IN ('crs_1', 'crs_2', 'crs_3', 'crs_4', 'crs_5', 'crs_6', 'crs_cs_ai', 'crs_sci_math', 'crs_commerce_mgmt', 'crs_humanities_arts', 'mgmt-p2', 'mgmt-p3', 'mgmt-common', 'cs-p2', 'cs-p3', 'crs_cs-genai', 'crs_cs-agentic', 'crs_cs-p1', 'crs_cs-common', 'crs_sci-p1', 'crs_sci-p2', 'crs_mgmt-p1', 'crs_arts-p1') OR "module_id" IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8');
       DELETE FROM "public"."module_lessons" WHERE "module_id" IN ('mod_1', 'mod_2', 'mod_3', 'mod_4', 'mod_5', 'mod_6', 'mod_7', 'mod_8') OR "lesson_id" IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
       DELETE FROM "public"."lessons" WHERE "id" IN ('les_1', 'les_2', 'les_3', 'les_4', 'les_5', 'les_6', 'les_7', 'les_8');
-      DELETE FROM "public"."courses" WHERE "slug" NOT IN ('cs-agentic', 'course1') AND "title" NOT ILIKE '%AI Agent%';
+      UPDATE "public"."modules"
+      SET "title" = 'Week 1: What is an AI Agent?'
+      WHERE ("title" ILIKE '%What is Agent%' OR "title" ILIKE '%What is an Agent%')
+        AND "title" != 'Week 1: What is an AI Agent?';
 
       INSERT INTO "public"."courses" ("id", "title", "slug", "short_description", "price_paise", "mrp_paise", "status", "metadata", "is_active")
       VALUES 
-        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, 'PUBLISHED'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE)
-      ON CONFLICT ("slug") DO UPDATE SET
-        "title" = EXCLUDED."title",
-        "short_description" = EXCLUDED."short_description",
-        "price_paise" = EXCLUDED."price_paise",
-        "mrp_paise" = EXCLUDED."mrp_paise",
-        "status" = EXCLUDED."status",
-        "metadata" = EXCLUDED."metadata",
-        "is_active" = TRUE;
+        ('cs-agentic', 'AI Agent Engineering', 'cs-agentic', 'Design and deploy autonomous AI agents with reasoning loops, dynamic tool calling, stateful graphs in LangGraph, multi-agent swarms with CrewAI, and Model Context Protocol (MCP).', 299900, 999900, '${defaultCourseStatus}'::content_status, '{"group": "group-1", "pathwayId": "cs-agentic", "badge": "GROUP 01 • PATHWAY 02", "shortName": "CS & IT: Agentic AI"}'::jsonb, TRUE),
+        ('cs-genai', 'Generative AI Engineering', 'cs-genai', 'From Foundations to Agentic AI: Data Engineering, AI Backend Systems, Modern NLP, Transformer Architectures, RAG Systems, and Production Multi-Agent Swarms.', 299900, 999900, '${defaultCourseStatus}'::content_status, '{"group": "group-1", "pathwayId": "cs-genai", "badge": "GROUP 01 • PATHWAY 01", "shortName": "CS & IT: Gen AI"}'::jsonb, TRUE)
+      ON CONFLICT ("id") DO NOTHING;
 
       INSERT INTO "public"."coupons" ("code", "description", "discount_type", "discount_value", "min_order_paise", "max_discount_paise", "max_uses", "applicable_item_ids", "is_active")
       VALUES 
         ('UNISOLE20', 'Official Campus Launch 20% Discount (All Courses)', 'PERCENTAGE'::discount_type, 20, 0, 200000, 1000, '[]'::jsonb, TRUE),
         ('EARLYBIRD500', 'Early Bird Flat ₹500 Discount on Flagship Engineering & Analytics Tracks', 'FLAT'::discount_type, 50000, 100000, NULL, 500, '["cs-p1", "cs-p2", "cs-p3", "mgmt-p1", "mgmt-p3"]'::jsonb, TRUE)
-      ON CONFLICT ("code") DO UPDATE SET
-        "description" = EXCLUDED."description",
-        "discount_type" = EXCLUDED."discount_type",
-        "discount_value" = EXCLUDED."discount_value",
-        "applicable_item_ids" = EXCLUDED."applicable_item_ids",
-        "is_active" = TRUE;
+      ON CONFLICT ("code") DO NOTHING;
     `);
 
     // 14. Surveys and Survey Responses
@@ -1026,8 +1068,14 @@ export async function initializeDatabase() {
 
       CREATE INDEX IF NOT EXISTS "idx_lesson_progress_user" ON "public"."lesson_progress" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_lesson_progress_pathway" ON "public"."lesson_progress" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_lesson_progress_user_pathway" ON "public"."lesson_progress" ("user_id", "pathway_id");
       CREATE INDEX IF NOT EXISTS "idx_submissions_user" ON "public"."submissions" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_submissions_pathway" ON "public"."submissions" ("pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_user_pathway" ON "public"."submissions" ("user_id", "pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_submissions_created_at" ON "public"."submissions" ("created_at" DESC);
+      CREATE INDEX IF NOT EXISTS "idx_enrollments_user_pathway" ON "public"."enrollments" ("user_id", "pathway_id");
+      CREATE INDEX IF NOT EXISTS "idx_users_role_created" ON "public"."users" ("role", "created_at" DESC);
+      CREATE INDEX IF NOT EXISTS "idx_calendar_events_time_range" ON "public"."calendar_events" ("start_time", "end_time");
       CREATE INDEX IF NOT EXISTS "idx_notes_user" ON "public"."notes" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_notes_pathway" ON "public"."notes" ("pathway_id");
 
@@ -1063,22 +1111,45 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_mentors_user" ON "public"."mentors" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentor" ON "public"."mentor_mentees" ("mentor_id");
       CREATE INDEX IF NOT EXISTS "idx_mentor_mentees_mentee" ON "public"."mentor_mentees" ("mentee_id");
+
+      -- 19. SSO Codes for single-use secure cross-portal session handoff
+      CREATE TABLE IF NOT EXISTS "public"."sso_codes" (
+        "id" varchar(50) PRIMARY KEY DEFAULT ('sso_'::text || gen_random_uuid()),
+        "code_hash" varchar(64) NOT NULL,
+        "user_id" varchar(50) NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
+        "expires_at" timestamp with time zone NOT NULL,
+        "used_at" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_sso_codes_code_hash" ON "public"."sso_codes" ("code_hash");
+      CREATE INDEX IF NOT EXISTS "idx_sso_codes_user_id" ON "public"."sso_codes" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_sso_codes_expires_at" ON "public"."sso_codes" ("expires_at");
     `);
 
-    // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)
+    // 18b. Ensure Partial Unique Index on Active Enrollments (Catches duplicate errors safely without halting boot)
     try {
-      await seedLmsDemoData();
-      console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
-    } catch (lmsSeedErr) {
-      console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "uq_active_user_course_enrollment" 
+        ON "public"."enrollments" ("user_id", COALESCE("pathway_id", "item_id")) 
+        WHERE "status" = 'ACTIVE'
+      `);
+      console.log("[DB-INIT] ✅ Verified unique active enrollment index (uq_active_user_course_enrollment).");
+    } catch (idxErr) {
+      console.warn("[DB-INIT] ⚠️ Could not create uq_active_user_course_enrollment unique index (likely duplicate active enrollments exist):", idxErr);
     }
 
-    // 20. Seed AI Agent Curriculum (12 weeks, 48 lessons, quizzes, labs, live workshops)
-    try {
-      await seedAiAgentCurriculum();
-      console.log("[DB-INIT] ✅ Seeded official 12-week AI Agent Engineering curriculum.");
-    } catch (aiSeedErr) {
-      console.warn("[DB-INIT] Warning running seedAiAgentCurriculum:", aiSeedErr);
+    // 19. Seed LMS Demo Data (categories, demo user Aarav Sharma, progress, submissions)
+    // Strictly skipped in production to ensure mock data never pollutes live environments
+    if (!isProd) {
+      try {
+        await seedLmsDemoData();
+        console.log("[DB-INIT] ✅ Seeded LMS demo records (categories, Aarav Sharma student account, enrollments, quiz & lab submissions).");
+      } catch (lmsSeedErr) {
+        console.warn("[DB-INIT] Warning running seedLmsDemoData:", lmsSeedErr);
+      }
+    } else {
+      console.log("[DB-INIT] Production environment detected: skipped demo user, demo enrollments, and demo submissions.");
     }
 
     console.log("[DB-INIT] ✅ WorkSole, CRM, Orders, Dynamic Pricing, Canonical SEO Courses, Promotional Coupons, Polymorphic Enrollment, LMS, and Survey tables verified successfully.");

@@ -18,6 +18,10 @@ lmsRouter.use(authMiddleware);
 lmsRouter.get("/me", authController.me);
 lmsRouter.put("/me", lmsController.updateProfile);
 
+// Dashboard Aggregation (B2)
+lmsRouter.get("/dashboard/summary", lmsController.getDashboardSummary);
+lmsRouter.get("/dashboard", lmsController.getDashboardSummary);
+
 // Pathways & Content
 lmsRouter.get("/pathways", lmsController.getMyPathways);
 lmsRouter.get("/pathways/:id", lmsController.getPathwayContent);

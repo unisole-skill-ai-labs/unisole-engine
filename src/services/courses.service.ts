@@ -1,5 +1,9 @@
+import { and, eq } from "drizzle-orm";
+import { db } from "../db";
 import { coursesRepository } from "../repositories/courses.repository";
-import { Course, NewCourse } from "../db/schema";
+import { modulesRepository } from "../repositories/modules.repository";
+import { lessonsRepository } from "../repositories/lessons.repository";
+import { Course, NewCourse, courseAssignments } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 
 export const coursesService = {
@@ -100,5 +104,260 @@ export const coursesService = {
 
   async getModules(courseId: string) {
     return coursesRepository.getModules(courseId);
+  },
+
+  async exportCourse(courseId: string) {
+    const course = await this.getById(courseId);
+    const modulesList: any[] = [];
+    try {
+      const rawModules = await this.getModules(courseId);
+      for (const mod of rawModules) {
+        let lessonRows: any[] = [];
+        try {
+          lessonRows = await modulesRepository.getLessons(mod.moduleId || mod.id);
+        } catch {}
+
+        let assignmentsList: any[] = [];
+        try {
+          const assignRows = await db
+            .select()
+            .from(courseAssignments)
+            .where(
+              and(
+                eq(courseAssignments.courseId, courseId),
+                eq(courseAssignments.moduleId, mod.moduleId || mod.id)
+              )
+            );
+          assignmentsList = assignRows.map((a) => ({
+            title: a.title,
+            slug: a.slug,
+            category: a.category,
+            type: a.type,
+            maxScore: a.maxScore,
+            config: a.config,
+          }));
+        } catch {}
+
+        modulesList.push({
+          title: mod.title,
+          slug: mod.slug,
+          description: mod.description,
+          position: mod.position,
+          unlockAt: mod.unlockAt,
+          lockAt: mod.lockAt,
+          lessons: lessonRows.map((l) => ({
+            title: l.title,
+            slug: l.slug,
+            description: l.description,
+            content: l.content,
+            videoUrl: l.videoUrl,
+            durationMinutes: l.durationMinutes,
+            position: l.position,
+          })),
+          assignments: assignmentsList,
+        });
+      }
+    } catch {}
+
+    return {
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      course: {
+        title: course.title,
+        slug: course.slug,
+        shortDescription: course.shortDescription,
+        description: course.description,
+        pricePaise: course.pricePaise,
+        mrpPaise: course.mrpPaise,
+        metadata: course.metadata,
+        status: course.status,
+      },
+      modules: modulesList,
+    };
+  },
+
+  async duplicateCourse(courseId: string, options?: { title?: string; slug?: string }) {
+    const original = await this.getById(courseId);
+    const title = options?.title || `${original.title} (Copy)`;
+    let slug = options?.slug;
+    if (!slug) {
+      slug = `${original.slug}-copy`;
+      let counter = 1;
+      while (await coursesRepository.getBySlug(slug)) {
+        counter++;
+        slug = `${original.slug}-copy-${counter}`;
+      }
+    } else {
+      const existing = await coursesRepository.getBySlug(slug);
+      if (existing) throw new ConflictError(`Course with slug "${slug}" already exists`);
+    }
+
+    const duplicatedCourse = await coursesRepository.create({
+      title,
+      slug,
+      shortDescription: original.shortDescription,
+      description: original.description,
+      pricePaise: original.pricePaise,
+      mrpPaise: original.mrpPaise,
+      metadata: { ...(original.metadata as any), duplicatedFrom: original.id },
+      status: "DRAFT",
+      isActive: true,
+    });
+
+    try {
+      const rawModules = await this.getModules(courseId);
+      for (const mod of rawModules) {
+        const modSlug = `${mod.slug}-${duplicatedCourse.id.slice(-4)}`;
+        const newMod = await modulesRepository.create({
+          title: mod.title,
+          slug: modSlug,
+          description: mod.description,
+          status: "DRAFT",
+          isActive: true,
+          unlockAt: mod.unlockAt,
+          lockAt: mod.lockAt,
+        });
+
+        await coursesRepository.attachModule({
+          courseId: duplicatedCourse.id,
+          moduleId: newMod.id,
+          position: mod.position,
+        });
+
+        const lessonRows = await modulesRepository.getLessons(mod.moduleId || mod.id);
+        for (const les of lessonRows) {
+          const lesSlug = `${les.slug}-${duplicatedCourse.id.slice(-4)}`;
+          const newLes = await lessonsRepository.create({
+            title: les.title,
+            slug: lesSlug,
+            description: les.description,
+            content: les.content,
+            videoUrl: les.videoUrl,
+            durationMinutes: les.durationMinutes,
+            status: "DRAFT",
+            isActive: true,
+            unlockAt: les.unlockAt,
+            lockAt: les.lockAt,
+          });
+
+          await modulesRepository.attachLesson({
+            moduleId: newMod.id,
+            lessonId: newLes.id,
+            position: les.position,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Notice: full module cloning encountered an exception, proceeding with course copy:", e);
+    }
+
+    return duplicatedCourse;
+  },
+
+  async importCourse(payload: any, overwrite?: boolean) {
+    const courseData = payload.course || payload;
+    const { title, slug, shortDescription, description, pricePaise, mrpPaise, metadata } = courseData;
+    if (!title || !slug) throw new ValidationError("Course title and slug are required");
+
+    const existing = await coursesRepository.getBySlug(slug);
+    if (existing && !overwrite) {
+      return {
+        conflict: true,
+        existingCourse: {
+          id: existing.id,
+          title: existing.title,
+          slug: existing.slug,
+        },
+      };
+    }
+
+    let targetCourse: Course;
+    if (existing && overwrite) {
+      targetCourse = (await coursesRepository.update(existing.id, {
+        title,
+        shortDescription: shortDescription || null,
+        description: description || null,
+        pricePaise: Number(pricePaise) || 0,
+        mrpPaise: Number(mrpPaise) || 0,
+        metadata: metadata || {},
+        status: "DRAFT",
+      }))!;
+      await coursesRepository.clearModules(targetCourse.id);
+    } else {
+      targetCourse = await coursesRepository.create({
+        title,
+        slug,
+        shortDescription: shortDescription || null,
+        description: description || null,
+        pricePaise: Number(pricePaise) || 0,
+        mrpPaise: Number(mrpPaise) || 0,
+        metadata: metadata || {},
+        status: "DRAFT",
+        isActive: true,
+      });
+    }
+
+    const rawModules = Array.isArray(payload.modules) ? payload.modules : [];
+    for (let mIdx = 0; mIdx < rawModules.length; mIdx++) {
+      const mod = rawModules[mIdx];
+      const baseModSlug = mod.slug || `mod-${mIdx + 1}`;
+      let modSlug = `${baseModSlug}-${targetCourse.id.slice(-4)}`;
+      const existingMod = await modulesRepository.getBySlug(modSlug);
+      if (existingMod) {
+        modSlug = `${modSlug}-${Date.now().toString(36).slice(-4)}`;
+      }
+
+      const newMod = await modulesRepository.create({
+        title: mod.title || `Module ${mIdx + 1}`,
+        slug: modSlug,
+        description: mod.description || null,
+        status: "DRAFT",
+        isActive: true,
+        unlockAt: mod.unlockAt ? new Date(mod.unlockAt).toISOString() : null,
+        lockAt: mod.lockAt ? new Date(mod.lockAt).toISOString() : null,
+      });
+
+      await coursesRepository.attachModule({
+        courseId: targetCourse.id,
+        moduleId: newMod.id,
+        position: mod.position ?? mIdx + 1,
+      });
+
+      const rawLessons = Array.isArray(mod.lessons) ? mod.lessons : [];
+      for (let lIdx = 0; lIdx < rawLessons.length; lIdx++) {
+        const les = rawLessons[lIdx];
+        const baseLesSlug = les.slug || `les-${mIdx + 1}-${lIdx + 1}`;
+        let lesSlug = `${baseLesSlug}-${targetCourse.id.slice(-4)}`;
+        const existingLes = await lessonsRepository.getBySlug(lesSlug);
+        if (existingLes) {
+          lesSlug = `${lesSlug}-${Date.now().toString(36).slice(-4)}`;
+        }
+
+        const newLes = await lessonsRepository.create({
+          title: les.title || `Lesson ${lIdx + 1}`,
+          slug: lesSlug,
+          description: les.description || null,
+          content: les.content || null,
+          videoUrl: les.videoUrl || null,
+          durationMinutes: les.durationMinutes ? Number(les.durationMinutes) : null,
+          status: "DRAFT",
+          isActive: true,
+          unlockAt: les.unlockAt ? new Date(les.unlockAt).toISOString() : null,
+          lockAt: les.lockAt ? new Date(les.lockAt).toISOString() : null,
+        });
+
+        await modulesRepository.attachLesson({
+          moduleId: newMod.id,
+          lessonId: newLes.id,
+          position: les.position ?? lIdx + 1,
+        });
+      }
+    }
+
+    return {
+      conflict: false,
+      course: targetCourse,
+      importedModulesCount: rawModules.length,
+    };
   },
 };

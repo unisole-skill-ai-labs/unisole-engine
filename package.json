@@ -18,13 +18,21 @@
     "db:seed:demo": "node dist/scripts/seed-demo-analytics.js",
     "db:seed:survey": "tsx src/scripts/seed-survey.ts",
     "db:seed:dev": "tsx src/scripts/seed-system.ts",
-    "db:seed:agent": "tsx src/scripts/seed-ai-agent-curriculum.ts",
-    "db:seed:calendar": "tsx src/scripts/seed-ai-agent-calendar.ts",
-    "db:sync:pathways": "tsx src/scripts/sync-canonical-pathways.ts"
+    "seed:ai-agent": "node dist/scripts/seed-ai-agent-curriculum.js",
+    "seed:ai-agent:dev": "tsx src/scripts/seed-ai-agent-curriculum.ts",
+    "seed:genai": "node dist/scripts/seed-genai-curriculum.js",
+    "seed:genai:dev": "tsx src/scripts/seed-genai-curriculum.ts",
+    "db:seed:agent": "node dist/scripts/seed-ai-agent-curriculum.js",
+    "db:seed:agent:dev": "tsx src/scripts/seed-ai-agent-curriculum.ts",
+    "db:seed:calendar": "node dist/scripts/seed-ai-agent-calendar.js",
+    "db:seed:calendar:dev": "tsx src/scripts/seed-ai-agent-calendar.ts",
+    "db:sync:pathways": "node dist/scripts/sync-canonical-pathways.js",
+    "db:sync:pathways:dev": "tsx src/scripts/sync-canonical-pathways.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.45.2",
@@ -37,6 +45,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",

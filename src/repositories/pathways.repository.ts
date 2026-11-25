@@ -33,20 +33,8 @@ export const pathwaysRepository = {
       const rows = await db.insert(pathways).values(data).returning();
       return rows[0];
     }
-    const rows = await db
-      .update(pathways)
-      .set({
-        title: data.title,
-        shortDescription: data.shortDescription,
-        description: data.description,
-        pricePaise: data.pricePaise,
-        status: data.status,
-        isActive: data.isActive,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(pathways.id, existing.id))
-      .returning();
-    return rows[0];
+    // Admin edits survive sync: do NOT overwrite existing pathway title, descriptions, or status
+    return existing;
   },
 
   async update(id: string, data: Partial<Omit<NewPathway, "id">>): Promise<Pathway | null> {

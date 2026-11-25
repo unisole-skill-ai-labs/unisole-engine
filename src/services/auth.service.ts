@@ -1,9 +1,10 @@
+import crypto from "crypto";
 import { eq, or, and, ilike, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { users, User, colleges, branches } from "../db/schema";
-import { ValidationError, NotFoundError, UnauthorizedError } from "../errors";
+import { HttpError, ValidationError, NotFoundError, UnauthorizedError } from "../errors";
 import { usersRepository } from "../repositories/users.repository";
 import { leadsRepository } from "../repositories/leads.repository";
 import { collegesRepository } from "../repositories/colleges.repository";
@@ -99,7 +100,7 @@ export const authService = {
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedError("Account has been deactivated. Please contact Super Administrator.");
+      throw new UnauthorizedError("Invalid username or password");
     }
 
     const userRoles = [
@@ -112,7 +113,7 @@ export const authService = {
     );
 
     if (!hasStaffPrivileges) {
-      throw new UnauthorizedError("Access denied. Internal staff privileges required.");
+      throw new UnauthorizedError("Invalid username or password");
     }
 
     let isMatch = false;
@@ -150,7 +151,11 @@ export const authService = {
       throw new ValidationError("Please provide a valid 10-digit mobile number");
     }
 
-    const user = await usersRepository.getByPhone(normalizedPhone);
+    const clean10Digit = normalizedPhone.slice(-10);
+    let user = await usersRepository.getByPhone(normalizedPhone);
+    if (!user) {
+      user = await usersRepository.getByPhone(clean10Digit);
+    }
     if (!user) {
       return { exists: false };
     }
@@ -215,6 +220,15 @@ export const authService = {
       return this.adminLogin(body);
     }
 
+    const isRoadshowMode =
+      process.env.NODE_ENV !== "production" &&
+      (process.env.ROADSHOW_MODE === "true" || process.env.ENABLE_ROADSHOW_LOGIN === "true");
+    if (!isRoadshowMode && !(body as any).internalVerified) {
+      throw new ValidationError(
+        "Direct mobile login without OTP is disabled. Please verify your mobile number with an OTP."
+      );
+    }
+
     const {
       phone,
       name,
@@ -250,6 +264,9 @@ export const authService = {
         }
       }
     } catch (dbErr: any) {
+      if (process.env.NODE_ENV === "production") {
+        throw new HttpError(503, "Database service is temporarily unavailable. Please try again shortly.");
+      }
       console.warn("[AuthService] Database offline or query issue, serving resilient learner profile:", dbErr?.message || dbErr);
       const isDemoNumber = normalizedPhone.includes("9876543210");
       const fallbackUser: any = {
@@ -497,7 +514,7 @@ export const authService = {
       throw new ValidationError("Invalid or expired verification code. Please check and try again.");
     }
 
-    return this.login(body);
+    return this.login({ ...body, internalVerified: true } as any);
   },
 
   async refreshToken(body: { refreshToken?: string }) {
@@ -541,7 +558,14 @@ export const authService = {
       }
     } catch (e: any) {
       if (e instanceof UnauthorizedError) throw e;
+      if (process.env.NODE_ENV === "production") {
+        throw new NotFoundError("User not found");
+      }
       console.warn("[AuthService] DB query notice in me(), falling back to demo student:", e?.message || e);
+    }
+
+    if (process.env.NODE_ENV === "production") {
+      throw new NotFoundError("User not found");
     }
 
     const fallbackUser: any = {
@@ -570,6 +594,69 @@ export const authService = {
       ...fallbackUser,
       token: tokens.token,
       accessToken: tokens.accessToken,
+    };
+  },
+
+  async createSsoCode(userId: string): Promise<{ code: string }> {
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+      throw new ValidationError("User ID is required");
+    }
+
+    const user = await usersRepository.getById(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedError("Account not found or deactivated");
+    }
+
+    const rawCode = crypto.randomBytes(32).toString("base64url");
+    const codeHash = crypto.createHash("sha256").update(rawCode).digest("hex");
+    const expiresAt = new Date(Date.now() + 60 * 1000).toISOString();
+    const id = `sso_${crypto.randomUUID()}`;
+
+    await pool.query(
+      `INSERT INTO "public"."sso_codes" ("id", "code_hash", "user_id", "expires_at", "created_at")
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [id, codeHash, userId, expiresAt]
+    );
+
+    return { code: rawCode };
+  },
+
+  async exchangeSsoCode(code: string) {
+    if (!code || typeof code !== "string" || code.trim().length === 0) {
+      throw new UnauthorizedError("Invalid or expired login code");
+    }
+
+    const codeHash = crypto.createHash("sha256").update(code.trim()).digest("hex");
+
+    // Atomic update: only marks used if currently unused and not expired
+    const result = await pool.query(
+      `UPDATE "public"."sso_codes"
+       SET "used_at" = NOW()
+       WHERE "code_hash" = $1
+         AND "used_at" IS NULL
+         AND "expires_at" > NOW()
+       RETURNING "user_id"`,
+      [codeHash]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      throw new UnauthorizedError("Invalid or expired login code");
+    }
+
+    const userId = result.rows[0].user_id;
+    const user = await usersRepository.getById(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedError("Invalid or expired login code");
+    }
+
+    // Clean up expired codes asynchronously
+    pool.query(`DELETE FROM "public"."sso_codes" WHERE "expires_at" < NOW() - INTERVAL '1 hour'`)
+      .catch((err) => console.warn("[AuthService] SSO cleanup notice:", err?.message || err));
+
+    const tokens = generateTokens(user);
+    return {
+      ...tokens,
+      user,
     };
   },
 };

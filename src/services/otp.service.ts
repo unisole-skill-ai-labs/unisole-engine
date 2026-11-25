@@ -33,12 +33,13 @@ export const otpService = {
       throw new Error("Invalid mobile number. Please enter a valid 10-digit number.");
     }
 
+    const isProd = process.env.NODE_ENV === "production";
     const hasFast2sms = !!process.env.FAST2SMS_API_KEY;
     const isMock =
-      !hasFast2sms &&
-      (!process.env.OTP_PROVIDER ||
-        process.env.OTP_PROVIDER.toUpperCase() === "MOCK" ||
-        process.env.NODE_ENV !== "production");
+      !isProd &&
+      (!hasFast2sms &&
+        (!process.env.OTP_PROVIDER ||
+          process.env.OTP_PROVIDER.toUpperCase() === "MOCK"));
 
     // Generate real 4-digit numeric verification code (e.g. 1234 or random code)
     const otp = isMock
@@ -89,14 +90,16 @@ export const otpService = {
 
     const trimmedInput = inputOtp.trim();
 
+    const isProd = process.env.NODE_ENV === "production";
     const hasFast2sms = !!process.env.FAST2SMS_API_KEY;
     const isMock =
-      !hasFast2sms &&
-      (!process.env.OTP_PROVIDER ||
-        process.env.OTP_PROVIDER.toUpperCase() === "MOCK");
+      !isProd &&
+      (!hasFast2sms &&
+        (!process.env.OTP_PROVIDER ||
+          process.env.OTP_PROVIDER.toUpperCase() === "MOCK"));
 
-    // If default OTP (1234) is entered when mock mode is active
-    if (isMock && trimmedInput === DEFAULT_OTP) {
+    // If default OTP (1234) is entered when mock mode is active (strictly disabled in production)
+    if (!isProd && isMock && trimmedInput === DEFAULT_OTP) {
       const record = await otpRepository.findLatestPendingByPhone(phone);
       if (record) {
         await otpRepository.markVerified(record.id);

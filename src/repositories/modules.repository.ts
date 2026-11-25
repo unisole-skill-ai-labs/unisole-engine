@@ -1,12 +1,57 @@
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   modules, Module, NewModule,
   moduleLessons, NewModuleLesson,
   courseModules,
-  lessons,
+  lessons, Lesson, NewLesson,
+  lessonProgress,
+  submissions,
 } from "../db/schema";
-import { WEEKS_DATA } from "../scripts/seed-ai-agent-curriculum";
+import { ConflictError, NotFoundError } from "../errors";
+import { generateLessonId } from "./lessons.repository";
+
+async function lockModuleTx(tx: any, moduleId: string): Promise<void> {
+  const res = await tx.execute(sql`SELECT id FROM modules WHERE id = ${moduleId} FOR UPDATE`);
+  if (!res.rows || res.rows.length === 0) {
+    throw new NotFoundError("Module not found");
+  }
+}
+
+async function getNextModuleLessonPositionTx(tx: any, moduleId: string): Promise<number> {
+  const res = await tx.execute(
+    sql`SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM module_lessons WHERE module_id = ${moduleId}`
+  );
+  return Number((res.rows?.[0] as any)?.next_pos) || 1;
+}
+
+async function renumberModuleLessonsTx(tx: any, moduleId: string): Promise<void> {
+  const rows = await tx
+    .select({ lessonId: moduleLessons.lessonId, position: moduleLessons.position })
+    .from(moduleLessons)
+    .where(eq(moduleLessons.moduleId, moduleId))
+    .orderBy(asc(moduleLessons.position), asc(moduleLessons.createdAt), asc(moduleLessons.lessonId));
+
+  if (rows.length === 0) return;
+
+  const needsRenumber = rows.some((r: any, idx: number) => r.position !== idx + 1);
+  if (!needsRenumber) return;
+
+  // Two-step update through temporary high positive positions (> 0 satisfies chk_module_lessons_position
+  // and avoids uq_module_lessons_position collisions during renumbering)
+  for (let i = 0; i < rows.length; i++) {
+    await tx
+      .update(moduleLessons)
+      .set({ position: 100000 + i + 1 })
+      .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, rows[i].lessonId)));
+  }
+  for (let i = 0; i < rows.length; i++) {
+    await tx
+      .update(moduleLessons)
+      .set({ position: i + 1 })
+      .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, rows[i].lessonId)));
+  }
+}
 
 export const modulesRepository = {
   async list(): Promise<Module[]> {
@@ -43,61 +88,190 @@ export const modulesRepository = {
   },
 
   // --- Lesson relationships ---
-  async attachLesson(data: NewModuleLesson): Promise<void> {
-    const existing = await db
-      .select({ position: moduleLessons.position })
-      .from(moduleLessons)
-      .where(eq(moduleLessons.moduleId, data.moduleId));
-    const maxPos = existing.reduce((max, r) => Math.max(max, r.position), 0);
-    const pos =
-      data.position && !existing.some((e) => e.position === data.position)
-        ? data.position
-        : maxPos + 1;
+  async createAndAttachLesson(
+    moduleId: string,
+    lessonData: Omit<NewLesson, "id">
+  ): Promise<Lesson & { position: number; moduleId: string; lessonId: string }> {
+    return db.transaction(async (tx) => {
+      await lockModuleTx(tx, moduleId);
+      const nextPosition = await getNextModuleLessonPositionTx(tx, moduleId);
 
-    await db.insert(moduleLessons).values({
-      ...data,
-      position: pos,
+      const lessonId = generateLessonId();
+      const [created] = await tx
+        .insert(lessons)
+        .values({ ...lessonData, id: lessonId })
+        .returning();
+
+      await tx.insert(moduleLessons).values({
+        moduleId,
+        lessonId: created.id,
+        position: nextPosition,
+      });
+
+      return {
+        ...created,
+        position: nextPosition,
+        moduleId,
+        lessonId: created.id,
+      };
+    });
+  },
+
+  async attachLesson(
+    data: Omit<NewModuleLesson, "position"> & { position?: number }
+  ): Promise<{ moduleId: string; lessonId: string; position: number; alreadyAttached: boolean }> {
+    return db.transaction(async (tx) => {
+      await lockModuleTx(tx, data.moduleId);
+
+      const lessonCheck = await tx
+        .select({ id: lessons.id })
+        .from(lessons)
+        .where(eq(lessons.id, data.lessonId))
+        .limit(1);
+      if (lessonCheck.length === 0) {
+        throw new NotFoundError("Lesson not found");
+      }
+
+      const existingLink = await tx
+        .select({
+          moduleId: moduleLessons.moduleId,
+          lessonId: moduleLessons.lessonId,
+          position: moduleLessons.position,
+        })
+        .from(moduleLessons)
+        .where(
+          and(
+            eq(moduleLessons.moduleId, data.moduleId),
+            eq(moduleLessons.lessonId, data.lessonId)
+          )
+        )
+        .limit(1);
+
+      if (existingLink.length > 0) {
+        return {
+          moduleId: existingLink[0].moduleId,
+          lessonId: existingLink[0].lessonId,
+          position: existingLink[0].position,
+          alreadyAttached: true,
+        };
+      }
+
+      const nextPosition = await getNextModuleLessonPositionTx(tx, data.moduleId);
+
+      await tx.insert(moduleLessons).values({
+        moduleId: data.moduleId,
+        lessonId: data.lessonId,
+        position: nextPosition,
+      });
+
+      return {
+        moduleId: data.moduleId,
+        lessonId: data.lessonId,
+        position: nextPosition,
+        alreadyAttached: false,
+      };
     });
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {
-    await db.delete(moduleLessons).where(
-      and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonId))
-    );
+    await db.transaction(async (tx) => {
+      await lockModuleTx(tx, moduleId);
+
+      // 1. Guard against deleting lesson with student progress or submissions
+      const progress = await tx
+        .select({ id: lessonProgress.id })
+        .from(lessonProgress)
+        .where(eq(lessonProgress.lessonId, lessonId))
+        .limit(1);
+      const subs = await tx
+        .select({ id: submissions.id })
+        .from(submissions)
+        .where(eq(submissions.lessonId, lessonId))
+        .limit(1);
+      if (progress.length > 0 || subs.length > 0) {
+        throw new ConflictError("This lesson has student activity, archive it instead");
+      }
+
+      // 2. Remove module-lesson relationship and renumber remaining items atomically
+      await tx.delete(moduleLessons).where(
+        and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonId))
+      );
+      await renumberModuleLessonsTx(tx, moduleId);
+
+      // 3. Remove orphan lesson if not attached to any other module
+      const otherLinks = await tx
+        .select({ moduleId: moduleLessons.moduleId })
+        .from(moduleLessons)
+        .where(eq(moduleLessons.lessonId, lessonId))
+        .limit(1);
+      if (otherLinks.length === 0) {
+        await tx.delete(lessons).where(eq(lessons.id, lessonId));
+      }
+    });
   },
 
   async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
-    for (let i = 0; i < lessonIds.length; i++) {
-      await db
-        .update(moduleLessons)
-        .set({ position: i + 1000 })
-        .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
-    }
-    for (let i = 0; i < lessonIds.length; i++) {
-      await db
-        .update(moduleLessons)
-        .set({ position: i + 1 })
-        .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
-    }
+    await db.transaction(async (tx) => {
+      await lockModuleTx(tx, moduleId);
+
+      const currentRows = await tx
+        .select({ lessonId: moduleLessons.lessonId })
+        .from(moduleLessons)
+        .where(eq(moduleLessons.moduleId, moduleId))
+        .orderBy(asc(moduleLessons.position), asc(moduleLessons.createdAt));
+
+      const currentSet = new Set(currentRows.map((r: any) => r.lessonId));
+      const orderedIds = lessonIds.filter((id) => currentSet.has(id));
+      for (const r of currentRows) {
+        if (!orderedIds.includes(r.lessonId)) {
+          orderedIds.push(r.lessonId);
+        }
+      }
+
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx
+          .update(moduleLessons)
+          .set({ position: 100000 + i + 1 })
+          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, orderedIds[i])));
+      }
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx
+          .update(moduleLessons)
+          .set({ position: i + 1 })
+          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, orderedIds[i])));
+      }
+    });
   },
 
-  async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, targetPosition?: number): Promise<void> {
-    await db.delete(moduleLessons).where(
-      and(eq(moduleLessons.moduleId, sourceModuleId), eq(moduleLessons.lessonId, lessonId))
-    );
-    
-    const existing = await db
-      .select({ position: moduleLessons.position })
-      .from(moduleLessons)
-      .where(eq(moduleLessons.moduleId, targetModuleId))
-      .orderBy(asc(moduleLessons.position));
-    
-    const nextPos = targetPosition || (existing.length + 1);
+  async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, _targetPosition?: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      const lockOrder = sourceModuleId <= targetModuleId
+        ? [sourceModuleId, targetModuleId]
+        : [targetModuleId, sourceModuleId];
+      await lockModuleTx(tx, lockOrder[0]);
+      if (lockOrder[1] !== lockOrder[0]) {
+        await lockModuleTx(tx, lockOrder[1]);
+      }
 
-    await db.insert(moduleLessons).values({
-      moduleId: targetModuleId,
-      lessonId,
-      position: nextPos,
+      await tx.delete(moduleLessons).where(
+        and(eq(moduleLessons.moduleId, sourceModuleId), eq(moduleLessons.lessonId, lessonId))
+      );
+      await renumberModuleLessonsTx(tx, sourceModuleId);
+
+      const existingInTarget = await tx
+        .select({ lessonId: moduleLessons.lessonId })
+        .from(moduleLessons)
+        .where(and(eq(moduleLessons.moduleId, targetModuleId), eq(moduleLessons.lessonId, lessonId)))
+        .limit(1);
+
+      if (existingInTarget.length === 0) {
+        const nextPos = await getNextModuleLessonPositionTx(tx, targetModuleId);
+        await tx.insert(moduleLessons).values({
+          moduleId: targetModuleId,
+          lessonId,
+          position: nextPos,
+        });
+      }
     });
   },
 
@@ -124,128 +298,7 @@ export const modulesRepository = {
         .orderBy(asc(moduleLessons.position));
     } catch {}
 
-    if (rows && rows.length > 0) {
-      return rows;
-    }
-
-    // Determine week number from moduleId or module record
-    let weekNum = 1;
-    const match = moduleId.match(/w(?:eek[-_ ]?)?(\d+)/i);
-    if (match) {
-      weekNum = parseInt(match[1], 10);
-    } else {
-      try {
-        const mod = await db.select().from(modules).where(eq(modules.id, moduleId)).limit(1);
-        if (mod && mod[0]) {
-          const modMatch = (mod[0].title + " " + mod[0].slug).match(/w(?:eek[-_ ]?)?(\d+)/i);
-          if (modMatch) {
-            weekNum = parseInt(modMatch[1], 10);
-          }
-        }
-      } catch {}
-    }
-
-    const week = WEEKS_DATA[weekNum - 1] || WEEKS_DATA[0];
-
-    return [
-      {
-        lessonId: `les_agent_w${week.weekNum}_lec`,
-        position: 1,
-        title: `${week.weekNum}.1 Concept Lecture: ${week.title.replace(/^Week \d+:\s*/, "")}`,
-        slug: `agent-w${week.weekNum}-lecture`,
-        videoUrl: week.videoUrl,
-        durationMinutes: 45,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "LECTURE",
-          type: "video",
-          contentType: "VIDEO",
-          curriculumMode: "LECTURE",
-          duration: "45 Mins",
-          videoUrl: week.videoUrl,
-          keyConcepts: week.keyConcepts,
-          handsOn: week.practical,
-        }),
-        description: week.keyConcepts,
-      },
-      {
-        lessonId: `les_agent_w${week.weekNum}_quiz`,
-        position: 2,
-        title: `${week.weekNum}.2 Knowledge Check: MCQ Quiz (${week.questions.length} Questions)`,
-        slug: `agent-w${week.weekNum}-quiz`,
-        videoUrl: null,
-        durationMinutes: 20,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "PRACTICE",
-          type: "quiz",
-          contentType: "QUIZ",
-          curriculumMode: "PRACTICE",
-          practiceType: "MCQ",
-          duration: "20 Mins",
-          quiz: {
-            passingScorePercent: 70,
-            questions: week.questions,
-          },
-          questions: week.questions,
-        }),
-        description: `Test your understanding of ${week.title}.`,
-      },
-      {
-        lessonId: `les_agent_w${week.weekNum}_lab`,
-        position: 3,
-        title: `${week.weekNum}.3 Hands-on Lab & Project Deliverable`,
-        slug: `agent-w${week.weekNum}-lab`,
-        videoUrl: null,
-        durationMinutes: 60,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "PRACTICE",
-          type: "project",
-          contentType: "PROJECT",
-          curriculumMode: "PRACTICE",
-          practiceType: "PROJECT",
-          duration: "60 Mins",
-          assignment: {
-            instructions: week.assignmentDeliverable,
-            allowedTypes: ["URL", "GITHUB"],
-            maxPoints: 100,
-          },
-          handsOn: week.practical,
-        }),
-        description: week.assignmentDeliverable,
-      },
-      {
-        lessonId: `les_agent_w${week.weekNum}_live`,
-        position: 4,
-        title: `${week.weekNum}.4 Live Workshop: ${week.liveTopic}`,
-        slug: `agent-w${week.weekNum}-live`,
-        videoUrl: null,
-        durationMinutes: 120,
-        status: "PUBLISHED",
-        unlockAt: null,
-        lockAt: null,
-        content: JSON.stringify({
-          category: "LIVE",
-          type: "live",
-          contentType: "LIVE",
-          curriculumMode: "LIVE",
-          duration: "120 Mins",
-          liveDate: week.liveDate,
-          liveTime: week.liveTime,
-          mentorName: week.mentorName,
-          liveMeetingUrl: "https://meet.google.com/new",
-          instructions: `Agenda for ${week.liveTopic}:\n• 45 Mins: Architecture Deep-dive & Code Walkthrough\n• 45 Mins: Hands-on Lab Implementation\n• 30 Mins: Live Open Q&A & Code Reviews with ${week.mentorName}.`,
-        }),
-        description: `Interactive live cohort workshop on ${week.liveDate} at ${week.liveTime}.`,
-      },
-    ];
+    return rows || [];
   },
 
   // --- Usage lookups ---

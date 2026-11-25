@@ -471,6 +471,7 @@ export const users = pgTable(
     index("idx_users_username").using("btree", table.username.asc().nullsLast()),
     index("idx_users_signup_source").using("btree", table.signupSource.asc().nullsLast()),
     index("idx_users_signup_session").using("btree", table.signupSessionCode.asc().nullsLast()),
+    index("idx_users_role_created").on(table.role, table.createdAt),
     unique("uq_users_phone").on(table.phone),
   ]
 );
@@ -943,6 +944,7 @@ export const enrollments = pgTable(
   (table) => [
     index("idx_enrollments_pathway").using("btree", table.pathwayId.asc().nullsLast()),
     index("idx_enrollments_user").using("btree", table.userId.asc().nullsLast()),
+    index("idx_enrollments_user_pathway").on(table.userId, table.pathwayId),
     index("idx_enrollments_item").using("btree", table.itemType.asc().nullsLast(), table.itemId.asc().nullsLast()),
     index("idx_enrollments_order").using("btree", table.orderId.asc().nullsLast()),
     index("idx_enrollments_user_status").using(
@@ -1952,6 +1954,7 @@ export const lessonProgress = pgTable(
     index("idx_lesson_progress_user").on(table.userId),
     index("idx_lesson_progress_lesson").on(table.lessonId),
     index("idx_lesson_progress_pathway").on(table.pathwayId),
+    index("idx_lesson_progress_user_pathway").on(table.userId, table.pathwayId),
     unique("uq_lesson_progress_user_lesson").on(table.userId, table.lessonId),
     foreignKey({
       columns: [table.userId],
@@ -1995,6 +1998,8 @@ export const submissions = pgTable(
     index("idx_submissions_assignment").on(table.assignmentId),
     index("idx_submissions_mentor").on(table.mentorId),
     index("idx_submissions_pathway").on(table.pathwayId),
+    index("idx_submissions_user_pathway").on(table.userId, table.pathwayId),
+    index("idx_submissions_created_at").on(table.createdAt),
     foreignKey({
       columns: [table.userId],
       foreignColumns: [users.id],
@@ -2163,11 +2168,36 @@ export const calendarEvents = pgTable(
   ]
 );
 
+export const ssoCodes = pgTable(
+  "sso_codes",
+  {
+    id: varchar("id", { length: 50 }).primaryKey().notNull(),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    userId: varchar("user_id", { length: 50 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("uq_sso_codes_code_hash").on(table.codeHash),
+    index("idx_sso_codes_code_hash").on(table.codeHash),
+    index("idx_sso_codes_user_id").on(table.userId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_sso_codes_user",
+    }).onDelete("cascade"),
+  ]
+);
+
 // ============================================================
 // SELECT TYPES (read from DB)
 // ============================================================
 
 export type User = InferSelectModel<typeof users>;
+export type SsoCode = InferSelectModel<typeof ssoCodes>;
 export type CalendarEvent = InferSelectModel<typeof calendarEvents>;
 export type OtpVerification = InferSelectModel<typeof otpVerifications>;
 export type College = InferSelectModel<typeof colleges>;
@@ -2217,6 +2247,7 @@ export type SurveyResponse = InferSelectModel<typeof surveyResponses>;
 // ============================================================
 
 export type NewUser = InferInsertModel<typeof users>;
+export type NewSsoCode = InferInsertModel<typeof ssoCodes>;
 export type NewOtpVerification = InferInsertModel<typeof otpVerifications>;
 export type NewCollege = InferInsertModel<typeof colleges>;
 export type NewBranch = InferInsertModel<typeof branches>;

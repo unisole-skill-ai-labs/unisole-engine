@@ -2,9 +2,36 @@ import { lessonsRepository } from "../repositories/lessons.repository";
 import { Lesson, NewLesson } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 
+export function buildValidatedNewLesson(body: Record<string, unknown>): Omit<NewLesson, "id"> {
+  const { title, slug, description, content, videoUrl, durationMinutes, unlockAt, lockAt } = body as any;
+  if (!title || !slug) throw new ValidationError("title and slug are required");
+
+  const unlockDate = unlockAt ? new Date(unlockAt) : null;
+  const lockDate = lockAt ? new Date(lockAt) : null;
+  if (unlockDate && lockDate && lockDate.getTime() <= unlockDate.getTime()) {
+    throw new ValidationError("lockAt must be strictly after unlockAt");
+  }
+
+  return {
+    title,
+    slug,
+    description: description || null,
+    content: content || null,
+    videoUrl: videoUrl || null,
+    durationMinutes: durationMinutes ? Number(durationMinutes) : null,
+    unlockAt: unlockDate ? unlockDate.toISOString() : null,
+    lockAt: lockDate ? lockDate.toISOString() : null,
+    status: "DRAFT",
+  };
+}
+
 export const lessonsService = {
   async list(): Promise<Lesson[]> {
     return lessonsRepository.list();
+  },
+
+  async listOrphans(): Promise<any[]> {
+    return lessonsRepository.listOrphans();
   },
 
   async getById(id: string): Promise<Lesson> {
@@ -14,23 +41,11 @@ export const lessonsService = {
   },
 
   async create(body: Record<string, unknown>): Promise<Lesson> {
-    const { title, slug, description, content, videoUrl, durationMinutes, unlockAt, lockAt } = body as any;
-    if (!title || !slug) throw new ValidationError("title and slug are required");
-
-    const existing = await lessonsRepository.getBySlug(slug);
+    const newLesson = buildValidatedNewLesson(body);
+    const existing = await lessonsRepository.getBySlug(newLesson.slug);
     if (existing) throw new ConflictError("A lesson with this slug already exists");
 
-    return lessonsRepository.create({
-      title,
-      slug,
-      description: description || null,
-      content: content || null,
-      videoUrl: videoUrl || null,
-      durationMinutes: durationMinutes ? Number(durationMinutes) : null,
-      unlockAt: unlockAt ? new Date(unlockAt).toISOString() : null,
-      lockAt: lockAt ? new Date(lockAt).toISOString() : null,
-      status: "DRAFT",
-    });
+    return lessonsRepository.create(newLesson);
   },
 
   async update(id: string, body: Record<string, unknown>): Promise<Lesson> {
@@ -46,6 +61,18 @@ export const lessonsService = {
     if (body.durationMinutes !== undefined) data.durationMinutes = Number(body.durationMinutes);
     if (body.unlockAt !== undefined) data.unlockAt = body.unlockAt ? new Date(body.unlockAt as string).toISOString() : null;
     if (body.lockAt !== undefined) data.lockAt = body.lockAt ? new Date(body.lockAt as string).toISOString() : null;
+
+    // Server-side validation: lockAt must be strictly after unlockAt
+    const effectiveUnlockStr = data.unlockAt !== undefined ? data.unlockAt : existing.unlockAt;
+    const effectiveLockStr = data.lockAt !== undefined ? data.lockAt : existing.lockAt;
+    if (effectiveUnlockStr && effectiveLockStr) {
+      const unlockMs = new Date(effectiveUnlockStr).getTime();
+      const lockMs = new Date(effectiveLockStr).getTime();
+      if (!isNaN(unlockMs) && !isNaN(lockMs) && lockMs <= unlockMs) {
+        throw new ValidationError("lockAt must be strictly after unlockAt");
+      }
+    }
+
     if (body.status !== undefined) {
       const status = body.status as string;
       if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");

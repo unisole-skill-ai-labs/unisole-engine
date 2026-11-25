@@ -1,6 +1,7 @@
 import http from "http";
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
@@ -44,6 +45,7 @@ const io = new SocketIOServer(server, {
 setupPresentationSocket(io);
 
 app.use(cors());
+app.use(compression({ threshold: 1024 }));
 app.use(
   express.json({
     verify: (req: any, _res, buf) => {
@@ -122,11 +124,13 @@ async function bootstrap() {
       console.warn("[BOOTSTRAP] Note on dummy curriculum cleanup:", purgeErr?.message || purgeErr);
     }
 
-    // 5. Auto-sync any manual/grant enrollments that lack complimentary orders
-    try {
-      await enrollmentsService.syncOrphanedEnrollments();
-    } catch (syncErr: any) {
-      console.warn("[BOOTSTRAP] Warning during enrollments order sync:", syncErr);
+    // 5. Auto-sync any orphaned PURCHASE enrollments in non-production environments
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        await enrollmentsService.syncOrphanedEnrollments();
+      } catch (syncErr: any) {
+        console.warn("[BOOTSTRAP] Warning during enrollments order sync:", syncErr);
+      }
     }
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);
@@ -137,6 +141,22 @@ async function bootstrap() {
   server.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
   });
+
+  const shutdown = async (signal: string) => {
+    console.log(`[SHUTDOWN] Received ${signal}. Closing HTTP server and DB pool...`);
+    server.close(async () => {
+      try {
+        await pool.end();
+        console.log("[SHUTDOWN] Database pool closed successfully.");
+      } catch (err) {
+        console.error("[SHUTDOWN] Error closing DB pool:", err);
+      }
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 bootstrap();

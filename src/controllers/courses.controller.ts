@@ -54,6 +54,13 @@ export const coursesController = {
     res.json(await coursesService.getModules(req.params.id));
   }),
   syncCanonical: asyncHandler(async (_req: Request, res: Response) => {
+    if (process.env.NODE_ENV === "production") {
+      res.status(403).json({
+        success: false,
+        message: "Curriculum sync and re-seeding is strictly disabled in production.",
+      });
+      return;
+    }
     const result = await pathwaysService.syncCanonicalPathways();
     const allCourses = await coursesService.list();
     res.json({
@@ -62,5 +69,19 @@ export const coursesController = {
       result,
       courses: allCourses,
     });
+  }),
+  exportCourse: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await coursesService.exportCourse(req.params.id));
+  }),
+  duplicate: asyncHandler(async (req: Request, res: Response) => {
+    res.status(201).json(await coursesService.duplicateCourse(req.params.id, req.body));
+  }),
+  importCourse: asyncHandler(async (req: Request, res: Response) => {
+    const result = await coursesService.importCourse(req.body, req.body.overwrite === true);
+    if (result.conflict) {
+      res.status(409).json(result);
+    } else {
+      res.status(201).json(result);
+    }
   }),
 };

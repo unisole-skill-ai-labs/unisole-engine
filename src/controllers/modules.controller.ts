@@ -16,9 +16,13 @@ export const modulesController = {
   update: asyncHandler(async (req: Request, res: Response) => {
     res.json(await modulesService.update(req.params.id, req.body));
   }),
+  createAndAttachLesson: asyncHandler(async (req: Request, res: Response) => {
+    const created = await modulesService.createAndAttachLesson(req.params.id, req.body);
+    res.status(201).json(created);
+  }),
   attachLesson: asyncHandler(async (req: Request, res: Response) => {
-    await modulesService.attachLesson(req.params.id, req.body.lessonId, req.body.position);
-    res.json({ ok: true });
+    const link = await modulesService.attachLesson(req.params.id, req.body.lessonId, req.body.position);
+    res.json({ ok: true, ...link });
   }),
   detachLesson: asyncHandler(async (req: Request, res: Response) => {
     await modulesService.detachLesson(req.params.id, req.params.lessonId);

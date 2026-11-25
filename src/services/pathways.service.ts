@@ -19,12 +19,13 @@ import { NotFoundError, ValidationError, ConflictError } from "../errors";
 import { CANONICAL_SEO_OFFERINGS } from "../constants/offerings";
 import { CANONICAL_GROUPS, getCanonicalPathway } from "../constants/canonical-catalog";
 import { getQuestionsForModule } from "../constants/curriculum-quizzes";
+import { seedAiAgentCurriculum } from "../scripts/seed-ai-agent-curriculum";
 
 export const pathwaysService = {
   /**
    * Synchronize canonical pathways, syllabus modules, lessons, and pricing into PostgreSQL via Drizzle ORM.
    */
-  async syncCanonicalPathways(): Promise<{ total: number; synced: number }> {
+  async syncCanonicalPathways(): Promise<{ total: number; synced: number; seedError?: string | null; seedStats?: any }> {
     let synced = 0;
 
     // 0. Purge legacy deprecated courses, duplicate crs_ courses, dummy HTML/CSS placeholder modules and lessons, and legacy demo pathways
@@ -103,29 +104,7 @@ export const pathwaysService = {
             syllabusLink: canon?.syllabusLink,
           },
         })
-        .onConflictDoUpdate({
-          target: [courses.id],
-          set: {
-            title: offering.title,
-            slug: offering.slug,
-            shortDescription: offering.description,
-            description: offering.description,
-            pricePaise: offering.pricePaise,
-            mrpPaise: offering.mrpPaise,
-            status: "PUBLISHED",
-            isActive: true,
-            metadata: {
-              group: offering.metadata?.group,
-              pathwayId: pwy.id,
-              badge: offering.metadata?.badge || offering.metadata?.eyebrow,
-              shortName: offering.metadata?.groupTitle || offering.title,
-              duration: canon?.duration || "12 Weeks",
-              level: canon?.level || "Beginner to Advanced",
-              syllabusLink: canon?.syllabusLink,
-            },
-            updatedAt: new Date().toISOString(),
-          },
-        });
+        .onConflictDoNothing();
 
       // 3. Link Pathway -> Course
       await db
@@ -137,11 +116,20 @@ export const pathwaysService = {
         })
         .onConflictDoNothing();
 
-      // Note: Modules and Lessons are authored manually via the Course CMS Studio.
       synced++;
     }
 
-    return { total: pathwaysToSync.length, synced };
+    // 4. Seed curriculum modules & lessons into database (idempotent upsert)
+    let seedError: string | null = null;
+    let seedStats: any = null;
+    try {
+      seedStats = await seedAiAgentCurriculum(true);
+    } catch (seedErr: any) {
+      console.error("[PATHWAYS-SYNC] Curriculum seed failure:", seedErr);
+      seedError = seedErr?.message || String(seedErr);
+    }
+
+    return { total: pathwaysToSync.length, synced, seedError, seedStats };
   },
 
   async list(): Promise<Pathway[]> {
@@ -216,38 +204,28 @@ export const pathwaysService = {
 
   async listPublished() {
     const all = await pathwaysRepository.list();
-    let published = all.filter(
+    // Exclude archived legacy alias course1 and ensure published & active
+    const candidatePathways = all.filter(
       (p) =>
         (p.status === "PUBLISHED" || !p.status) &&
         p.isActive !== false &&
-        (p.slug === "cs-agentic" || p.slug === "course1" || (p.title && p.title.toLowerCase().includes("ai agent")))
+        p.id !== "course1" &&
+        p.slug !== "course1"
     );
 
-    if (published.length === 0) {
-      published = [
-        {
-          id: "cs-agentic",
-          title: "AI Agent Engineering",
-          slug: "cs-agentic",
-          shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
-          description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-          pricePaise: 299900,
-          status: "PUBLISHED",
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as Pathway,
-      ];
-    }
-
     const enriched = await Promise.all(
-      published.map(async (pathway) => {
+      candidatePathways.map(async (pathway) => {
         const [categories, colleges, coursesList, pricing] = await Promise.all([
           pathwaysRepository.getCategoriesWithDetails(pathway.id).catch(() => []),
           pathwaysRepository.getCollegesWithDetails(pathway.id).catch(() => []),
           pathwaysRepository.getCoursesWithDetails(pathway.id).catch(() => []),
           pricingRepository.getByItem("PATHWAY" as any, pathway.id).catch(() => null),
         ]);
+
+        // Filter: if an offerings_pricing entry exists and is_public is false, exclude from public listing
+        if (pricing && pricing.isPublic === false) {
+          return null;
+        }
 
         const canon = getCanonicalPathway(pathway.id) || getCanonicalPathway(pathway.slug);
 
@@ -271,7 +249,26 @@ export const pathwaysService = {
       })
     );
 
-    return enriched;
+    const validList = enriched.filter((p): p is NonNullable<typeof p> => p !== null);
+
+    if (validList.length === 0) {
+      return [
+        {
+          id: "cs-agentic",
+          title: "AI Agent Engineering",
+          slug: "cs-agentic",
+          shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+          description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
+          pricePaise: 299900,
+          status: "PUBLISHED",
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Pathway,
+      ];
+    }
+
+    return validList;
   },
 
   async getById(id: string) {

@@ -267,9 +267,13 @@ export const enrollmentsService = {
    * lacking an orderId (e.g. previous manual grants or imports) so they immediately appear in SEO profile.
    */
   async syncOrphanedEnrollments(userId?: string): Promise<number> {
+    if (process.env.NODE_ENV === "production") {
+      return 0;
+    }
     try {
       const conditions = [
         eq(enrollments.status, "ACTIVE"),
+        eq(enrollments.source, "PURCHASE"),
         isNull(enrollments.orderId),
       ];
       if (userId) {

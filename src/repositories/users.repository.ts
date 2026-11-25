@@ -1,6 +1,6 @@
-import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
 import { db } from "../db";
 import { users, User, NewUser } from "../db/schema";
+import { eq, sql } from "drizzle-orm";
 
 export const usersRepository = {
   async list(filters?: {
@@ -14,49 +14,72 @@ export const usersRepository = {
     courseId?: string;
     mentorUserId?: string;
     onlyAssignedMentorship?: boolean;
-  }): Promise<any[]> {
+    mentorId?: string;
+    assigned?: "ASSIGNED" | "UNASSIGNED";
+    status?: "ON_TRACK" | "AT_RISK" | "INACTIVE";
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: any[]; total: number } | any[]> {
     const whereClauses: any[] = [];
 
     if (filters?.collegeId) {
       whereClauses.push(sql`u.college_id = ${filters.collegeId}`);
     }
+
     if (filters?.branch) {
-      whereClauses.push(sql`(u.branch = ${filters.branch} OR u.branch ILIKE ${`%${filters.branch}%`})`);
+      whereClauses.push(sql`u.branch = ${filters.branch}`);
     }
+
     if (filters?.role) {
       whereClauses.push(sql`u.role::text = ${filters.role}`);
     }
+
     if (filters?.signupSource) {
       whereClauses.push(sql`u.signup_source = ${filters.signupSource}`);
     }
+
     if (filters?.signupSessionCode) {
       whereClauses.push(sql`u.signup_session_code = ${filters.signupSessionCode}`);
     }
+
     if (filters?.search) {
-      const q = `%${filters.search}%`;
+      const searchTerm = `%${filters.search}%`;
       whereClauses.push(sql`(
-        u.name ILIKE ${q} OR 
-        u.phone ILIKE ${q} OR 
-        u.email ILIKE ${q} OR 
-        u.branch ILIKE ${q} OR 
-        u.college_name ILIKE ${q} OR
-        u.signup_source ILIKE ${q} OR
-        u.signup_session_code ILIKE ${q}
+        u.name ILIKE ${searchTerm} OR 
+        u.phone ILIKE ${searchTerm} OR 
+        u.email ILIKE ${searchTerm} OR 
+        u.username ILIKE ${searchTerm} OR
+        EXISTS (
+          SELECT 1 FROM mentor_mentees mm_s
+          JOIN mentors m_s ON m_s.id = mm_s.mentor_id
+          JOIN users um_s ON um_s.id = m_s.user_id
+          WHERE mm_s.mentee_id = u.id AND mm_s.status = 'ACTIVE' AND um_s.name ILIKE ${searchTerm}
+        ) OR
+        EXISTS (
+          SELECT 1 FROM enrollments e_s
+          LEFT JOIN courses c_s ON (e_s.item_id = c_s.id OR e_s.pathway_id = c_s.id)
+          WHERE e_s.user_id = u.id AND (c_s.title ILIKE ${searchTerm} OR e_s.item_id ILIKE ${searchTerm})
+        )
       )`);
     }
 
     if (filters?.enrolledOnly) {
       whereClauses.push(sql`EXISTS (
         SELECT 1 FROM enrollments e 
-        WHERE e.user_id = u.id AND e.status::text IN ('ACTIVE', 'PENDING', 'COMPLETED')
+        WHERE e.user_id = u.id AND e.status::text IN ('ACTIVE', 'COMPLETED')
       )`);
     }
 
-    if (filters?.courseId) {
+    if (filters?.courseId && filters.courseId !== "ALL") {
       whereClauses.push(sql`EXISTS (
         SELECT 1 FROM enrollments e 
         WHERE e.user_id = u.id 
-          AND (e.item_id = ${filters.courseId} OR e.pathway_id = ${filters.courseId})
+          AND (
+            e.item_id = ${filters.courseId} OR 
+            e.pathway_id = ${filters.courseId} OR 
+            e.item_id IN (SELECT slug FROM courses WHERE id = ${filters.courseId}) OR
+            e.pathway_id IN (SELECT slug FROM courses WHERE id = ${filters.courseId})
+          )
       )`);
     }
 
@@ -70,6 +93,27 @@ export const usersRepository = {
       )`);
     }
 
+    if (filters?.mentorId && filters.mentorId !== "ALL") {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        WHERE mm.mentee_id = u.id 
+          AND (mm.mentor_id = ${filters.mentorId} OR mm.mentor_id IN (SELECT id FROM mentors WHERE user_id = ${filters.mentorId}))
+          AND mm.status = 'ACTIVE'
+      )`);
+    }
+
+    if (filters?.assigned === "ASSIGNED") {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
+      )`);
+    } else if (filters?.assigned === "UNASSIGNED") {
+      whereClauses.push(sql`NOT EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        WHERE mm.mentee_id = u.id AND mm.status = 'ACTIVE'
+      )`);
+    }
+
     if (filters?.onlyAssignedMentorship) {
       whereClauses.push(sql`EXISTS (
         SELECT 1 FROM mentor_mentees mm
@@ -79,25 +123,76 @@ export const usersRepository = {
 
     const whereSql = whereClauses.length > 0 ? sql`WHERE ${sql.join(whereClauses, sql` AND `)}` : sql``;
 
+    // Get total count matching filters
+    const countResult = await db.execute<any>(sql`
+      SELECT COUNT(*)::int as count FROM users u ${whereSql}
+    `);
+    const totalCount = Number((countResult.rows || countResult)[0]?.count || 0);
+
+    const paginationLimit = filters?.limit ?? (filters?.offset !== undefined ? 50 : undefined);
+    const paginationSql = paginationLimit
+      ? sql`LIMIT ${paginationLimit} OFFSET ${filters?.offset || 0}`
+      : sql``;
+
     const result = await db.execute<any>(sql`
+      WITH paged_users AS (
+        SELECT 
+          u.id,
+          u.name,
+          u.username,
+          u.phone,
+          u.email,
+          u.avatar,
+          u.role,
+          u.college_id as "collegeId",
+          u.college_name as "collegeName",
+          u.branch,
+          u.department_id as "departmentId",
+          u.designation,
+          u.is_active as "isActive",
+          u.signup_source as "signupSource",
+          u.signup_session_code as "signupSessionCode",
+          u.metadata,
+          u.created_at as "createdAt",
+          u.updated_at as "updatedAt"
+        FROM users u
+        ${whereSql}
+        ORDER BY u.created_at DESC
+        ${paginationSql}
+      )
       SELECT 
-        u.id,
-        u.name,
-        u.username,
-        u.phone,
-        u.email,
-        u.role,
-        u.college_id as "collegeId",
-        u.college_name as "collegeName",
-        u.branch,
-        u.department_id as "departmentId",
-        u.designation,
-        u.is_active as "isActive",
-        u.signup_source as "signupSource",
-        u.signup_session_code as "signupSessionCode",
-        u.metadata,
-        u.created_at as "createdAt",
-        u.updated_at as "updatedAt",
+        u.*,
+        -- Computed Progress Percent & Counts
+        COALESCE(
+          (
+            SELECT COUNT(DISTINCT lp.lesson_id)::int
+            FROM lesson_progress lp
+            WHERE lp.user_id = u.id
+          ),
+          0
+        ) as "completedLessonsCount",
+        COALESCE(
+          (
+            SELECT COUNT(DISTINCT s.id)::int
+            FROM submissions s
+            WHERE s.user_id = u.id
+          ),
+          0
+        ) as "submissionsCount",
+        COALESCE(
+          (
+            SELECT COUNT(*)::int
+            FROM submissions s
+            WHERE s.user_id = u.id AND s.status IN ('SUBMITTED', 'UNDER_REVIEW')
+          ),
+          0
+        ) as "overdueCount",
+        GREATEST(
+          u."updatedAt",
+          (SELECT MAX(completed_at) FROM lesson_progress WHERE user_id = u.id),
+          (SELECT MAX(created_at) FROM submissions WHERE user_id = u.id),
+          (SELECT MAX(enrolled_at) FROM enrollments WHERE user_id = u.id)
+        ) as "lastActiveAt",
         COALESCE(
           (
             SELECT JSON_AGG(
@@ -127,7 +222,15 @@ export const usersRepository = {
             'mentorEmail', u_m.email,
             'specialization', m.specialization,
             'courseId', mm.course_id,
-            'assignedAt', mm.assigned_at
+            'assignedAt', mm.assigned_at,
+            'activeMenteesCount', COALESCE(
+              (
+                SELECT COUNT(DISTINCT mm_c.mentee_id)::int
+                FROM mentor_mentees mm_c
+                WHERE mm_c.mentor_id = m.id AND mm_c.status = 'ACTIVE'
+              ),
+              0
+            )
           )
           FROM mentor_mentees mm
           JOIN mentors m ON m.id = mm.mentor_id
@@ -157,16 +260,60 @@ export const usersRepository = {
           ),
           '[]'::json
         ) as "assignedMentors"
-      FROM users u
-      ${whereSql}
-      ORDER BY u.created_at DESC;
+      FROM paged_users u
+      ORDER BY u."createdAt" DESC;
     `);
 
-    return (result.rows || result).map((r: any) => ({
-      ...r,
-      enrolledCourses: Array.isArray(r.enrolledCourses) ? r.enrolledCourses : [],
-      assignedMentors: Array.isArray(r.assignedMentors) ? r.assignedMentors : [],
-    }));
+    const now = Date.now();
+    const rows = (result.rows || result).map((r: any) => {
+      const enrolledCourses = Array.isArray(r.enrolledCourses) ? r.enrolledCourses : [];
+      const assignedMentors = Array.isArray(r.assignedMentors) ? r.assignedMentors : [];
+
+      // Progress Calculation: completed lessons vs estimated standard course lessons (48) or dynamic
+      const completed = Number(r.completedLessonsCount) || 0;
+      const progressPercent = Math.min(100, Math.round((completed / 48) * 100));
+
+      // Status Rules (Named constants per user specification):
+      // INACTIVE: No platform activity in 14+ days
+      // AT_RISK: No activity in 7+ days OR 2+ overdue/pending items
+      // ON_TRACK: Active within 7 days and < 2 overdue items
+      const lastActiveDate = r.lastActiveAt ? new Date(r.lastActiveAt) : new Date(r.createdAt || 0);
+      const diffDays = Math.max(0, Math.floor((now - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const overdueCount = Number(r.overdueCount) || 0;
+
+      let status: "ON_TRACK" | "AT_RISK" | "INACTIVE" = "ON_TRACK";
+      if (diffDays >= 14) {
+        status = "INACTIVE";
+      } else if (diffDays >= 7 || overdueCount >= 2) {
+        status = "AT_RISK";
+      } else {
+        status = "ON_TRACK";
+      }
+
+      return {
+        ...r,
+        progressPercent,
+        lastActiveAt: r.lastActiveAt || r.updatedAt || r.createdAt,
+        overdueCount,
+        status,
+        enrolledCourses,
+        assignedMentors,
+      };
+    });
+
+    // Optional status filter
+    const finalItems = filters?.status
+      ? rows.filter((st: any) => st.status === filters.status)
+      : rows;
+
+    if (filters?.limit) {
+      return {
+        items: finalItems,
+        total: totalCount,
+      };
+    }
+
+    return finalItems;
   },
 
   async getById(id: string): Promise<User | null> {
@@ -239,28 +386,7 @@ export const usersRepository = {
       // 10. Clean up coupons created_by_id
       await tx.execute(sql`UPDATE coupons SET created_by_id = NULL WHERE created_by_id = ${id}`);
 
-      // 11. Clean up orders and order items belonging to this user
-      await tx.execute(sql`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = ${id})`);
-      await tx.execute(sql`DELETE FROM orders WHERE user_id = ${id}`);
-
-      // 12. Clean up leads references & call logs
-      await tx.execute(sql`DELETE FROM lead_call_logs WHERE caller_user_id = ${id}`);
-      await tx.execute(sql`UPDATE leads SET user_id = NULL WHERE user_id = ${id}`);
-      await tx.execute(sql`UPDATE leads SET assigned_to_user_id = NULL WHERE assigned_to_user_id = ${id}`);
-      await tx.execute(sql`UPDATE leads SET created_by_id = NULL WHERE created_by_id = ${id}`);
-
-      // 13. Clean up IAPT registrations
-      await tx.execute(sql`DELETE FROM iapt_nain_registrations WHERE user_id = ${id}`);
-
-      // 14. Clean up presentation leads and OTP verifications
-      if (user.phone) {
-        await tx.execute(sql`DELETE FROM presentation_leads WHERE user_id = ${id} OR phone = ${user.phone}`);
-        await tx.execute(sql`DELETE FROM otp_verifications WHERE phone = ${user.phone}`);
-      } else {
-        await tx.execute(sql`DELETE FROM presentation_leads WHERE user_id = ${id}`);
-      }
-
-      // 15. Delete the user record
+      // 11. Delete user
       const [deleted] = await tx.delete(users).where(eq(users.id, id)).returning();
       return deleted ?? null;
     });

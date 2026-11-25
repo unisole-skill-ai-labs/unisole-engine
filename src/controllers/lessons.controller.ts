@@ -6,6 +6,9 @@ export const lessonsController = {
   list: asyncHandler(async (_req: Request, res: Response) => {
     res.json(await lessonsService.list());
   }),
+  listOrphans: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await lessonsService.listOrphans());
+  }),
   getById: asyncHandler(async (req: Request, res: Response) => {
     res.json(await lessonsService.getById(req.params.id));
   }),
