@@ -30,9 +30,14 @@ export async function seedSystemData() {
     if (isProd && !adminPasswordRaw) {
       console.warn("[Seed:System] ⚠️ WARNING: SUPERADMIN_PASSWORD environment variable is unset in production. Skipping Super Admin user creation and password update.");
     } else {
-      const girishCheck = await pool.query(
-        "SELECT id, password FROM users WHERE LOWER(username) = 'girish' OR phone = '+910000000000' OR phone = '0000000000' LIMIT 1"
+      let girishCheck = await pool.query(
+        "SELECT id, password FROM users WHERE LOWER(username) = 'girish' LIMIT 1"
       );
+      if (!girishCheck.rows || girishCheck.rows.length === 0) {
+        girishCheck = await pool.query(
+          "SELECT id, password FROM users WHERE phone IN ('+910000000000', '0000000000') LIMIT 1"
+        );
+      }
 
       if (adminPasswordRaw) {
         const hashedPassword = await bcrypt.hash(adminPasswordRaw, 10);
