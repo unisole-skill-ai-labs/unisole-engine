@@ -10,6 +10,7 @@ import { validateBody } from "../../middleware/validate";
 export const lmsRouter: Router = Router();
 
 const canManageCalendar = requireRole(["SUPER_ADMIN", "ADMIN", "COURSE_MANAGER", "PROGRAM_MANAGER"]);
+const canReviewSubmissions = requireRole(["SUPER_ADMIN", "ADMIN", "COURSE_MANAGER", "PROGRAM_MANAGER", "MENTOR"]);
 
 // Protect all LMS routes with authentication
 lmsRouter.use(authMiddleware);
@@ -31,7 +32,7 @@ lmsRouter.get("/lessons/:id", lmsController.getLessonContent);
 lmsRouter.post("/progress", validateBody({ required: ["lessonId"] }), lmsController.markProgress);
 lmsRouter.get("/progress", lmsController.getProgress);
 lmsRouter.get("/progress/:pathwayId", lmsController.getProgress);
-lmsRouter.get("/submissions/audit", lmsController.getSubmissionsAudit);
+lmsRouter.get("/submissions/audit", canReviewSubmissions, lmsController.getSubmissionsAudit);
 lmsRouter.post("/submissions", validateBody({ required: ["lessonId"] }), lmsController.submitAssignment);
 lmsRouter.get("/submissions", lmsController.getSubmissions);
 lmsRouter.get("/submissions/:pathwayId", lmsController.getSubmissions);
@@ -53,7 +54,7 @@ lmsRouter.get("/mentor/cockpit", lmsController.getMentorCockpit);
 lmsRouter.get("/assignments", lmsController.getAssignments);
 lmsRouter.post("/assignments", validateBody({ required: ["title", "category", "type"] }), lmsController.createAssignment);
 lmsRouter.post("/assignments/submit", validateBody({ required: ["assignmentId"] }), lmsController.submitAssessmentTask);
-lmsRouter.post("/submissions/:id/grade", validateBody({ required: ["score"] }), lmsController.gradeSubmission);
+lmsRouter.post("/submissions/:id/grade", canReviewSubmissions, validateBody({ required: ["score"] }), lmsController.gradeSubmission);
 
 // Enrollments
 lmsRouter.get("/enrollments", enrollmentsController.list);
