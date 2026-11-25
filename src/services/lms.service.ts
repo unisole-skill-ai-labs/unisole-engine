@@ -427,13 +427,23 @@ export const lmsService = {
       }
     }
 
-    // B3: Check hierarchy cache with DB revision check to prevent stale cache
+    // B3: Check hierarchy cache with DB revision check across courses, modules, lessons, and links
     let cacheVersion = "0";
     try {
-      const vRes = await db.execute<any>(
-        sql`SELECT GREATEST(COALESCE(MAX(m.updated_at), '1970-01-01'::timestamptz), COALESCE(MAX(c.updated_at), '1970-01-01'::timestamptz)) as v FROM modules m, courses c;`
-      );
-      cacheVersion = (vRes.rows || vRes)[0]?.v ? new Date((vRes.rows || vRes)[0].v).getTime().toString() : "0";
+      const vRes = await db.execute<any>(sql`
+        SELECT
+          GREATEST(
+            COALESCE((SELECT MAX(updated_at) FROM courses), '1970-01-01'::timestamptz),
+            COALESCE((SELECT MAX(updated_at) FROM modules), '1970-01-01'::timestamptz),
+            COALESCE((SELECT MAX(updated_at) FROM lessons), '1970-01-01'::timestamptz),
+            COALESCE((SELECT MAX(created_at) FROM module_lessons), '1970-01-01'::timestamptz),
+            COALESCE((SELECT MAX(created_at) FROM course_modules), '1970-01-01'::timestamptz)
+          ) as v,
+          (SELECT COUNT(*) FROM module_lessons)::text || ':' || (SELECT COUNT(*) FROM course_modules)::text as counts;
+      `);
+      const row = (vRes.rows || vRes)[0];
+      const ts = row?.v ? new Date(row.v).getTime().toString() : "0";
+      cacheVersion = `${ts}:${row?.counts || "0:0"}`;
     } catch {
       cacheVersion = "0";
     }
