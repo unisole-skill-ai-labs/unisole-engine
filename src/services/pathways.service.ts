@@ -204,10 +204,9 @@ export const pathwaysService = {
 
   async listPublished() {
     const all = await pathwaysRepository.list();
-    // Exclude archived legacy alias course1 and ensure published & active
+    // Exclude legacy alias course1 and ensure active
     const candidatePathways = all.filter(
       (p) =>
-        (p.status === "PUBLISHED" || !p.status) &&
         p.isActive !== false &&
         p.id !== "course1" &&
         p.slug !== "course1"
@@ -346,7 +345,7 @@ export const pathwaysService = {
       shortDescription: shortDescription || null,
       description: description || null,
       pricePaise: pricePaise ?? 0,
-      status: "DRAFT",
+      status: "PUBLISHED",
     });
   },
 
@@ -360,14 +359,9 @@ export const pathwaysService = {
     if (body.shortDescription !== undefined) data.shortDescription = body.shortDescription as string;
     if (body.description !== undefined) data.description = body.description as string;
     if (body.pricePaise !== undefined) data.pricePaise = Number(body.pricePaise);
-    if (body.status !== undefined) {
-      const status = body.status as string;
-      if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");
-      data.status = status as "DRAFT" | "PUBLISHED" | "ARCHIVED";
-    }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 
-    if (Object.keys(data).length === 0) throw new ValidationError("No valid fields provided");
+    if (Object.keys(data).length === 0) return existing;
 
     const updated = await pathwaysRepository.update(id, data);
     if (!updated) throw new NotFoundError("Pathway not found");
