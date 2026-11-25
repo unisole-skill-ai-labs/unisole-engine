@@ -337,7 +337,54 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "lesson_id" varchar(50);
       ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "position" integer;
       ALTER TABLE "public"."module_lessons" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;
+      CREATE INDEX IF NOT EXISTS "idx_module_lessons_lesson" ON "public"."module_lessons" USING btree ("lesson_id");
     `);
+
+    // 4b. Reconcile module_lessons constraints safely (additive, idempotent, non-blocking)
+    const ensureModuleLessonsConstraint = async (
+      constraintName: string,
+      violationCheckSql: string,
+      addConstraintSql: string
+    ) => {
+      try {
+        const existsRes = await pool.query(
+          `SELECT 1 FROM pg_constraint WHERE conname = $1 AND conrelid = 'public.module_lessons'::regclass LIMIT 1`,
+          [constraintName]
+        );
+        if (existsRes.rows.length > 0) return;
+
+        const violRes = await pool.query(violationCheckSql);
+        if (violRes.rows.length > 0) {
+          console.warn(`[DB-INIT] ⚠️ Skipping constraint "${constraintName}" on module_lessons: existing rows violate it.`);
+          return;
+        }
+        await pool.query(addConstraintSql);
+        console.log(`[DB-INIT] ✅ Applied missing constraint "${constraintName}" on module_lessons.`);
+      } catch (err: any) {
+        console.warn(`[DB-INIT] ⚠️ Could not apply constraint "${constraintName}" on module_lessons:`, err.message);
+      }
+    };
+
+    await ensureModuleLessonsConstraint(
+      "uq_module_lessons_position",
+      `SELECT 1 FROM public.module_lessons GROUP BY module_id, position HAVING count(*) > 1 OR position IS NULL LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "uq_module_lessons_position" UNIQUE ("module_id", "position")`
+    );
+    await ensureModuleLessonsConstraint(
+      "chk_module_lessons_position",
+      `SELECT 1 FROM public.module_lessons WHERE position IS NULL OR position <= 0 LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "chk_module_lessons_position" CHECK ("position" > 0)`
+    );
+    await ensureModuleLessonsConstraint(
+      "fk_module_lessons_module",
+      `SELECT 1 FROM public.module_lessons ml LEFT JOIN public.modules m ON m.id = ml.module_id WHERE m.id IS NULL LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "fk_module_lessons_module" FOREIGN KEY ("module_id") REFERENCES "public"."modules"("id") ON DELETE CASCADE`
+    );
+    await ensureModuleLessonsConstraint(
+      "fk_module_lessons_lesson",
+      `SELECT 1 FROM public.module_lessons ml LEFT JOIN public.lessons l ON l.id = ml.lesson_id WHERE l.id IS NULL LIMIT 1`,
+      `ALTER TABLE "public"."module_lessons" ADD CONSTRAINT "fk_module_lessons_lesson" FOREIGN KEY ("lesson_id") REFERENCES "public"."lessons"("id") ON DELETE RESTRICT`
+    );
 
     // 5. Commercial Orders, Pricing Catalog & Coupons Tables
     await execSqlSafe("orders_tables", `

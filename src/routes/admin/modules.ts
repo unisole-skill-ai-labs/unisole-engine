@@ -13,7 +13,8 @@ adminModulesRouter.post("/", canManageModules, validateBody({ required: ["title"
 adminModulesRouter.put("/:id", canManageModules, modulesController.update);
 
 // Lessons
-adminModulesRouter.post("/:id/lessons", canManageModules, validateBody({ required: ["lessonId", "position"] }), modulesController.attachLesson);
+adminModulesRouter.post("/:id/create-lesson", canManageModules, validateBody({ required: ["title", "slug"] }), modulesController.createAndAttachLesson);
+adminModulesRouter.post("/:id/lessons", canManageModules, validateBody({ required: ["lessonId"] }), modulesController.attachLesson);
 adminModulesRouter.post("/:id/reorder-lessons", canManageModules, validateBody({ required: ["lessonIds"] }), modulesController.reorderLessons);
 adminModulesRouter.post("/:id/move-lesson", canManageModules, validateBody({ required: ["targetModuleId", "lessonId"] }), modulesController.moveLesson);
 adminModulesRouter.delete("/:id/lessons/:lessonId", canManageModules, modulesController.detachLesson);

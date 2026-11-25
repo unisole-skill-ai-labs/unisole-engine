@@ -1,14 +1,57 @@
-import { eq, and, asc, ne } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   modules, Module, NewModule,
   moduleLessons, NewModuleLesson,
   courseModules,
-  lessons,
+  lessons, Lesson, NewLesson,
   lessonProgress,
   submissions,
 } from "../db/schema";
-import { ConflictError } from "../errors";
+import { ConflictError, NotFoundError } from "../errors";
+import { generateLessonId } from "./lessons.repository";
+
+async function lockModuleTx(tx: any, moduleId: string): Promise<void> {
+  const res = await tx.execute(sql`SELECT id FROM modules WHERE id = ${moduleId} FOR UPDATE`);
+  if (!res.rows || res.rows.length === 0) {
+    throw new NotFoundError("Module not found");
+  }
+}
+
+async function getNextModuleLessonPositionTx(tx: any, moduleId: string): Promise<number> {
+  const res = await tx.execute(
+    sql`SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM module_lessons WHERE module_id = ${moduleId}`
+  );
+  return Number((res.rows?.[0] as any)?.next_pos) || 1;
+}
+
+async function renumberModuleLessonsTx(tx: any, moduleId: string): Promise<void> {
+  const rows = await tx
+    .select({ lessonId: moduleLessons.lessonId, position: moduleLessons.position })
+    .from(moduleLessons)
+    .where(eq(moduleLessons.moduleId, moduleId))
+    .orderBy(asc(moduleLessons.position), asc(moduleLessons.createdAt), asc(moduleLessons.lessonId));
+
+  if (rows.length === 0) return;
+
+  const needsRenumber = rows.some((r: any, idx: number) => r.position !== idx + 1);
+  if (!needsRenumber) return;
+
+  // Two-step update through temporary high positive positions (> 0 satisfies chk_module_lessons_position
+  // and avoids uq_module_lessons_position collisions during renumbering)
+  for (let i = 0; i < rows.length; i++) {
+    await tx
+      .update(moduleLessons)
+      .set({ position: 100000 + i + 1 })
+      .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, rows[i].lessonId)));
+  }
+  for (let i = 0; i < rows.length; i++) {
+    await tx
+      .update(moduleLessons)
+      .set({ position: i + 1 })
+      .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, rows[i].lessonId)));
+  }
+}
 
 export const modulesRepository = {
   async list(): Promise<Module[]> {
@@ -45,23 +88,95 @@ export const modulesRepository = {
   },
 
   // --- Lesson relationships ---
-  async attachLesson(data: NewModuleLesson): Promise<void> {
-    const existing = await db
-      .select({ position: moduleLessons.position })
-      .from(moduleLessons)
-      .where(eq(moduleLessons.moduleId, data.moduleId));
+  async createAndAttachLesson(
+    moduleId: string,
+    lessonData: Omit<NewLesson, "id">
+  ): Promise<Lesson & { position: number; moduleId: string; lessonId: string }> {
+    return db.transaction(async (tx) => {
+      await lockModuleTx(tx, moduleId);
+      const nextPosition = await getNextModuleLessonPositionTx(tx, moduleId);
 
-    const nextPosition = data.position || (existing.length + 1);
+      const lessonId = generateLessonId();
+      const [created] = await tx
+        .insert(lessons)
+        .values({ ...lessonData, id: lessonId })
+        .returning();
 
-    await db.insert(moduleLessons).values({
-      moduleId: data.moduleId,
-      lessonId: data.lessonId,
-      position: nextPosition,
+      await tx.insert(moduleLessons).values({
+        moduleId,
+        lessonId: created.id,
+        position: nextPosition,
+      });
+
+      return {
+        ...created,
+        position: nextPosition,
+        moduleId,
+        lessonId: created.id,
+      };
+    });
+  },
+
+  async attachLesson(
+    data: Omit<NewModuleLesson, "position"> & { position?: number }
+  ): Promise<{ moduleId: string; lessonId: string; position: number; alreadyAttached: boolean }> {
+    return db.transaction(async (tx) => {
+      await lockModuleTx(tx, data.moduleId);
+
+      const lessonCheck = await tx
+        .select({ id: lessons.id })
+        .from(lessons)
+        .where(eq(lessons.id, data.lessonId))
+        .limit(1);
+      if (lessonCheck.length === 0) {
+        throw new NotFoundError("Lesson not found");
+      }
+
+      const existingLink = await tx
+        .select({
+          moduleId: moduleLessons.moduleId,
+          lessonId: moduleLessons.lessonId,
+          position: moduleLessons.position,
+        })
+        .from(moduleLessons)
+        .where(
+          and(
+            eq(moduleLessons.moduleId, data.moduleId),
+            eq(moduleLessons.lessonId, data.lessonId)
+          )
+        )
+        .limit(1);
+
+      if (existingLink.length > 0) {
+        return {
+          moduleId: existingLink[0].moduleId,
+          lessonId: existingLink[0].lessonId,
+          position: existingLink[0].position,
+          alreadyAttached: true,
+        };
+      }
+
+      const nextPosition = await getNextModuleLessonPositionTx(tx, data.moduleId);
+
+      await tx.insert(moduleLessons).values({
+        moduleId: data.moduleId,
+        lessonId: data.lessonId,
+        position: nextPosition,
+      });
+
+      return {
+        moduleId: data.moduleId,
+        lessonId: data.lessonId,
+        position: nextPosition,
+        alreadyAttached: false,
+      };
     });
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {
     await db.transaction(async (tx) => {
+      await lockModuleTx(tx, moduleId);
+
       // 1. Guard against deleting lesson with student progress or submissions
       const progress = await tx
         .select({ id: lessonProgress.id })
@@ -77,10 +192,11 @@ export const modulesRepository = {
         throw new ConflictError("This lesson has student activity, archive it instead");
       }
 
-      // 2. Remove module-lesson relationship
+      // 2. Remove module-lesson relationship and renumber remaining items atomically
       await tx.delete(moduleLessons).where(
         and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonId))
       );
+      await renumberModuleLessonsTx(tx, moduleId);
 
       // 3. Remove orphan lesson if not attached to any other module
       const otherLinks = await tx
@@ -96,38 +212,66 @@ export const modulesRepository = {
 
   async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
     await db.transaction(async (tx) => {
-      for (let i = 0; i < lessonIds.length; i++) {
+      await lockModuleTx(tx, moduleId);
+
+      const currentRows = await tx
+        .select({ lessonId: moduleLessons.lessonId })
+        .from(moduleLessons)
+        .where(eq(moduleLessons.moduleId, moduleId))
+        .orderBy(asc(moduleLessons.position), asc(moduleLessons.createdAt));
+
+      const currentSet = new Set(currentRows.map((r: any) => r.lessonId));
+      const orderedIds = lessonIds.filter((id) => currentSet.has(id));
+      for (const r of currentRows) {
+        if (!orderedIds.includes(r.lessonId)) {
+          orderedIds.push(r.lessonId);
+        }
+      }
+
+      for (let i = 0; i < orderedIds.length; i++) {
         await tx
           .update(moduleLessons)
-          .set({ position: i + 1000 })
-          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
+          .set({ position: 100000 + i + 1 })
+          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, orderedIds[i])));
       }
-      for (let i = 0; i < lessonIds.length; i++) {
+      for (let i = 0; i < orderedIds.length; i++) {
         await tx
           .update(moduleLessons)
           .set({ position: i + 1 })
-          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, lessonIds[i])));
+          .where(and(eq(moduleLessons.moduleId, moduleId), eq(moduleLessons.lessonId, orderedIds[i])));
       }
     });
   },
 
-  async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, targetPosition?: number): Promise<void> {
-    await db.delete(moduleLessons).where(
-      and(eq(moduleLessons.moduleId, sourceModuleId), eq(moduleLessons.lessonId, lessonId))
-    );
-    
-    const existing = await db
-      .select({ position: moduleLessons.position })
-      .from(moduleLessons)
-      .where(eq(moduleLessons.moduleId, targetModuleId))
-      .orderBy(asc(moduleLessons.position));
-    
-    const nextPos = targetPosition || (existing.length + 1);
+  async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, _targetPosition?: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      const lockOrder = sourceModuleId <= targetModuleId
+        ? [sourceModuleId, targetModuleId]
+        : [targetModuleId, sourceModuleId];
+      await lockModuleTx(tx, lockOrder[0]);
+      if (lockOrder[1] !== lockOrder[0]) {
+        await lockModuleTx(tx, lockOrder[1]);
+      }
 
-    await db.insert(moduleLessons).values({
-      moduleId: targetModuleId,
-      lessonId,
-      position: nextPos,
+      await tx.delete(moduleLessons).where(
+        and(eq(moduleLessons.moduleId, sourceModuleId), eq(moduleLessons.lessonId, lessonId))
+      );
+      await renumberModuleLessonsTx(tx, sourceModuleId);
+
+      const existingInTarget = await tx
+        .select({ lessonId: moduleLessons.lessonId })
+        .from(moduleLessons)
+        .where(and(eq(moduleLessons.moduleId, targetModuleId), eq(moduleLessons.lessonId, lessonId)))
+        .limit(1);
+
+      if (existingInTarget.length === 0) {
+        const nextPos = await getNextModuleLessonPositionTx(tx, targetModuleId);
+        await tx.insert(moduleLessons).values({
+          moduleId: targetModuleId,
+          lessonId,
+          position: nextPos,
+        });
+      }
     });
   },
 

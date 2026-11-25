@@ -1,4 +1,6 @@
 import { modulesRepository } from "../repositories/modules.repository";
+import { lessonsRepository } from "../repositories/lessons.repository";
+import { buildValidatedNewLesson } from "./lessons.service";
 import { Module, NewModule } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
 
@@ -72,8 +74,16 @@ export const modulesService = {
     return updated;
   },
 
-  async attachLesson(moduleId: string, lessonId: string, position: number): Promise<void> {
-    await modulesRepository.attachLesson({ moduleId, lessonId, position });
+  async createAndAttachLesson(moduleId: string, body: Record<string, unknown>) {
+    const newLesson = buildValidatedNewLesson(body);
+    const existing = await lessonsRepository.getBySlug(newLesson.slug);
+    if (existing) throw new ConflictError("A lesson with this slug already exists");
+
+    return modulesRepository.createAndAttachLesson(moduleId, newLesson);
+  },
+
+  async attachLesson(moduleId: string, lessonId: string, position?: number) {
+    return modulesRepository.attachLesson({ moduleId, lessonId, position });
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {
