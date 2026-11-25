@@ -1,6 +1,7 @@
 import { lessonsRepository } from "../repositories/lessons.repository";
 import { Lesson, NewLesson } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
+import { appCache } from "../utils/cache";
 
 export function buildValidatedNewLesson(body: Record<string, unknown>): Omit<NewLesson, "id"> {
   const { title, slug, description, content, videoUrl, durationMinutes, unlockAt, lockAt } = body as any;
@@ -21,7 +22,7 @@ export function buildValidatedNewLesson(body: Record<string, unknown>): Omit<New
     durationMinutes: durationMinutes ? Number(durationMinutes) : null,
     unlockAt: unlockDate ? unlockDate.toISOString() : null,
     lockAt: lockDate ? lockDate.toISOString() : null,
-    status: "DRAFT",
+    status: "PUBLISHED",
   };
 }
 
@@ -45,7 +46,9 @@ export const lessonsService = {
     const existing = await lessonsRepository.getBySlug(newLesson.slug);
     if (existing) throw new ConflictError("A lesson with this slug already exists");
 
-    return lessonsRepository.create(newLesson);
+    const created = await lessonsRepository.create(newLesson);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
+    return created;
   },
 
   async update(id: string, body: Record<string, unknown>): Promise<Lesson> {
@@ -73,17 +76,13 @@ export const lessonsService = {
       }
     }
 
-    if (body.status !== undefined) {
-      const status = body.status as string;
-      if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");
-      data.status = status as "DRAFT" | "PUBLISHED" | "ARCHIVED";
-    }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 
-    if (Object.keys(data).length === 0) throw new ValidationError("No valid fields provided");
+    if (Object.keys(data).length === 0) return existing;
 
     const updated = await lessonsRepository.update(id, data);
     if (!updated) throw new NotFoundError("Lesson not found");
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
     return updated;
   },
 };

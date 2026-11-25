@@ -59,7 +59,7 @@ export const coursesRepository = {
       const rows = await db
         .select()
         .from(courses)
-        .where(and(eq(courses.isActive, true), eq(courses.status, "PUBLISHED")));
+        .where(eq(courses.isActive, true));
       const validRows = rows.filter((c) => !deprecatedCourseIds.has(c.id));
       if (validRows.length > 0) return validRows;
     } catch {}

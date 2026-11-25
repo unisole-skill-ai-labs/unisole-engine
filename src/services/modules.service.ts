@@ -3,6 +3,7 @@ import { lessonsRepository } from "../repositories/lessons.repository";
 import { buildValidatedNewLesson } from "./lessons.service";
 import { Module, NewModule } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
+import { appCache } from "../utils/cache";
 
 export const modulesService = {
   async list(): Promise<Module[]> {
@@ -28,14 +29,16 @@ export const modulesService = {
     const existing = await modulesRepository.getBySlug(slug);
     if (existing) throw new ConflictError("A module with this slug already exists");
 
-    return modulesRepository.create({
+    const created = await modulesRepository.create({
       title,
       slug,
       description: description || null,
       unlockAt: unlockDate ? unlockDate.toISOString() : null,
       lockAt: lockDate ? lockDate.toISOString() : null,
-      status: "DRAFT",
+      status: "PUBLISHED",
     });
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
+    return created;
   },
 
   async update(id: string, body: Record<string, unknown>): Promise<Module> {
@@ -60,17 +63,13 @@ export const modulesService = {
       }
     }
 
-    if (body.status !== undefined) {
-      const status = body.status as string;
-      if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");
-      data.status = status as "DRAFT" | "PUBLISHED" | "ARCHIVED";
-    }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 
-    if (Object.keys(data).length === 0) throw new ValidationError("No valid fields provided");
+    if (Object.keys(data).length === 0) return existing;
 
     const updated = await modulesRepository.update(id, data);
     if (!updated) throw new NotFoundError("Module not found");
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
     return updated;
   },
 
@@ -79,23 +78,30 @@ export const modulesService = {
     const existing = await lessonsRepository.getBySlug(newLesson.slug);
     if (existing) throw new ConflictError("A lesson with this slug already exists");
 
-    return modulesRepository.createAndAttachLesson(moduleId, newLesson);
+    const result = await modulesRepository.createAndAttachLesson(moduleId, newLesson);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
+    return result;
   },
 
   async attachLesson(moduleId: string, lessonId: string, position?: number) {
-    return modulesRepository.attachLesson({ moduleId, lessonId, position });
+    const result = await modulesRepository.attachLesson({ moduleId, lessonId, position });
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
+    return result;
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {
     await modulesRepository.detachLesson(moduleId, lessonId);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
   },
 
   async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
     await modulesRepository.reorderLessons(moduleId, lessonIds);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
   },
 
   async moveLesson(sourceModuleId: string, targetModuleId: string, lessonId: string, targetPosition?: number): Promise<void> {
     await modulesRepository.moveLesson(sourceModuleId, targetModuleId, lessonId, targetPosition);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
   },
 
   async getLessons(moduleId: string) {
