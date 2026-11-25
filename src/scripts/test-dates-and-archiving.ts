@@ -117,36 +117,36 @@ async function runDateAndArchiveTests() {
   }
   console.log(" -> [PASS] Module unlockAt and lockAt cleared to NULL and confirmed in database reload.");
 
-  // 4. Test Archiving behavior & Student Protection
-  console.log("\n[Test 4] Testing Archive status & student protection...");
-  // Archive the lesson
+  // 4. Test Inactive (isActive: false) behavior & Student Protection
+  console.log("\n[Test 4] Testing isActive: false & student protection...");
+  // Deactivate the lesson
   await lessonsService.update(createdLes.id, {
-    status: "ARCHIVED",
+    isActive: false,
   });
-  const archivedLes = await lessonsService.getById(createdLes.id);
-  if (archivedLes.status !== "ARCHIVED") {
-    throw new Error(`Lesson status was not set to ARCHIVED: ${archivedLes.status}`);
+  const inactiveLes = await lessonsService.getById(createdLes.id);
+  if (inactiveLes.isActive !== false) {
+    throw new Error(`Lesson isActive was not set to false: ${inactiveLes.isActive}`);
   }
-  console.log(" -> [PASS] Lesson successfully updated to status: ARCHIVED.");
+  console.log(" -> [PASS] Lesson successfully updated to isActive: false.");
 
   // Student getLessonContent should throw ForbiddenError
   let studentBlocked = false;
   try {
     await lmsService.getLessonContent("usr_test_student", createdLes.id, false); // isAdmin = false
   } catch (err: any) {
-    if (err instanceof ForbiddenError && err.message.includes("archived")) {
+    if (err instanceof ForbiddenError) {
       studentBlocked = true;
     }
   }
-  if (!studentBlocked) throw new Error("Student was not blocked from accessing archived lesson content!");
-  console.log(" -> [PASS] Student access to archived lesson content was strictly blocked with ForbiddenError.");
+  if (!studentBlocked) throw new Error("Student was not blocked from accessing inactive lesson content!");
+  console.log(" -> [PASS] Student access to inactive lesson content was strictly blocked with ForbiddenError.");
 
   // Admin getLessonContent should succeed
   const adminAccess = await lmsService.getLessonContent("usr_test_admin", createdLes.id, true); // isAdmin = true
   if (adminAccess.id !== createdLes.id) {
-    throw new Error("Admin failed to access archived lesson!");
+    throw new Error("Admin failed to access inactive lesson!");
   }
-  console.log(" -> [PASS] Admin successfully retrieved archived lesson for editor maintenance.");
+  console.log(" -> [PASS] Admin successfully retrieved inactive lesson for editor maintenance.");
 
   // Student markLessonProgress should throw ForbiddenError
   let progressBlocked = false;
@@ -156,23 +156,23 @@ async function runDateAndArchiveTests() {
       isCompleted: true,
     });
   } catch (err: any) {
-    if (err instanceof ForbiddenError && err.message.includes("archived")) {
+    if (err instanceof ForbiddenError) {
       progressBlocked = true;
     }
   }
-  if (!progressBlocked) throw new Error("Student was not blocked from updating progress on archived lesson!");
-  console.log(" -> [PASS] Student progress update on archived lesson strictly blocked with ForbiddenError.");
+  if (!progressBlocked) throw new Error("Student was not blocked from updating progress on inactive lesson!");
+  console.log(" -> [PASS] Student progress update on inactive lesson strictly blocked with ForbiddenError.");
 
-  // 5. Test Restoring behavior
-  console.log("\n[Test 5] Testing Restore (ARCHIVED -> DRAFT)...");
+  // 5. Test Reactivating behavior (isActive: true)
+  console.log("\n[Test 5] Testing Reactivate (isActive: false -> true)...");
   await lessonsService.update(createdLes.id, {
-    status: "DRAFT",
+    isActive: true,
   });
   const restoredLes = await lessonsService.getById(createdLes.id);
-  if (restoredLes.status !== "DRAFT") {
-    throw new Error(`Lesson failed to restore to DRAFT: ${restoredLes.status}`);
+  if (restoredLes.isActive !== true) {
+    throw new Error(`Lesson failed to reactivate: ${restoredLes.isActive}`);
   }
-  console.log(" -> [PASS] Lesson successfully restored from ARCHIVED to DRAFT.");
+  console.log(" -> [PASS] Lesson successfully reactivated (isActive: true).");
 
   // Cleanup test rows
   await db.delete(lessons).where(eq(lessons.id, createdLes.id));

@@ -148,7 +148,7 @@ export const coursesRepository = {
           .where(inArray(submissions.lessonId, lessonIds))
           .limit(1);
         if (hasProgress.length > 0 || hasSubs.length > 0) {
-          throw new ConflictError("Cannot delete module: one or more lessons have student activity. Archive them instead.");
+          throw new ConflictError("Cannot delete module: one or more lessons have student activity.");
         }
       }
 

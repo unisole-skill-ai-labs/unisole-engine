@@ -911,6 +911,20 @@ export const lmsService = {
               throw new ForbiddenError("You do not have access to this lesson. Please enroll in the relevant pathway.");
             }
 
+            // Record last-opened module for this student & pathway (best-effort)
+            try {
+              const modRow = await db
+                .select({ moduleId: moduleLessons.moduleId })
+                .from(moduleLessons)
+                .where(sql`${moduleLessons.lessonId}::text = ${lessonId}::text`)
+                .limit(1);
+              const targetModId = modRow[0]?.moduleId;
+              const targetPwyId = accessiblePathways[0]?.pathwayId || accessiblePathways[0]?.courseId;
+              if (targetModId && targetPwyId) {
+                await this.recordModuleVisit(userId, targetPwyId, targetModId);
+              }
+            } catch { }
+
             return lesson;
           }
 
@@ -1401,6 +1415,25 @@ export const lmsService = {
           };
         },
 
+  async recordModuleVisit(userId: string, pathwayId: string, moduleId: string) {
+    if (!userId || !pathwayId || !moduleId) return { ok: false };
+    const canonicalPathwayId = pathwayId === "course1" ? "cs-agentic" : pathwayId;
+    const id = `scs_${userId}_${canonicalPathwayId}`;
+    try {
+      await pool.query(
+        `INSERT INTO student_course_state (id, user_id, pathway_id, last_module_id, last_opened_at, updated_at)
+         VALUES ($1, $2, $3, $4, now(), now())
+         ON CONFLICT (user_id, pathway_id)
+         DO UPDATE SET last_module_id = EXCLUDED.last_module_id, last_opened_at = now(), updated_at = now()`,
+        [id, userId, canonicalPathwayId, moduleId]
+      );
+      return { ok: true, pathwayId: canonicalPathwayId, moduleId };
+    } catch (err) {
+      console.warn("[LMSService] recordModuleVisit notice:", err);
+      return { ok: false };
+    }
+  },
+
   /**
    * B2: Aggregated Dashboard Summary endpoint for Student LMS.
    * Consolidates pathway overview, progress, submissions, activities, and calendar events
@@ -1562,9 +1595,68 @@ export const lmsService = {
             }
             : null;
 
+          // Resolve target module for Dashboard "Start/Continue Week" button:
+          // 1) last_module_id from student_course_state (exists, active, unlocked)
+          // 2) module of most recently updated lesson_progress (exists, active, unlocked)
+          // 3) first incomplete UNLOCKED module
+          // 4) first module (even if locked)
+          const canonicalEffPathway = effectivePathwayId === "course1" ? "cs-agentic" : effectivePathwayId;
+          let resolvedTarget: (typeof moduleStats)[number] | null = null;
+          let hasModuleHistory = false;
+
+          try {
+            const stateRes = await pool.query(
+              `SELECT last_module_id FROM student_course_state
+               WHERE user_id = $1 AND pathway_id IN ($2, $3)
+               ORDER BY last_opened_at DESC LIMIT 1`,
+              [userId, canonicalEffPathway, effectivePathwayId]
+            );
+            const lastModId = stateRes.rows?.[0]?.last_module_id;
+            if (lastModId) {
+              const found = moduleStats.find(
+                (ms) => ms.module?.id === lastModId && isVisibleToStudent(ms.module) && !ms.isLocked
+              );
+              if (found) {
+                resolvedTarget = found;
+                hasModuleHistory = true;
+              }
+            }
+          } catch { }
+
+          if (!resolvedTarget) {
+            try {
+              const progRes = await pool.query(
+                `SELECT lp.lesson_id FROM lesson_progress lp
+                 WHERE lp.user_id = $1 AND (lp.pathway_id IS NULL OR lp.pathway_id IN ($2, $3))
+                 ORDER BY lp.updated_at DESC LIMIT 5`,
+                [userId, canonicalEffPathway, effectivePathwayId]
+              );
+              for (const row of progRes.rows || []) {
+                const found = moduleStats.find(
+                  (ms) =>
+                    isVisibleToStudent(ms.module) &&
+                    !ms.isLocked &&
+                    (ms.module?.lessons || []).some((l: any) => l.id === row.lesson_id)
+                );
+                if (found) {
+                  resolvedTarget = found;
+                  hasModuleHistory = true;
+                  break;
+                }
+              }
+            } catch { }
+          }
+
+          if (!resolvedTarget) {
+            resolvedTarget = moduleStats.find((ms) => !ms.isCompleted && !ms.isLocked) || null;
+          }
+          if (!resolvedTarget) {
+            resolvedTarget = moduleStats[0] || null;
+          }
+
           const courseProgress = {
             currentWeekNumber: targetModule ? targetModule.weekNumber : 1,
-            totalWeeks: moduleStats.length || 12,
+            totalWeeks: moduleStats.length,
             totalActivities: totalCourseActivities,
             completedActivities: completedCourseActivities,
             progressPercent,
@@ -1594,6 +1686,9 @@ export const lmsService = {
             currentWeek: currentWeekData,
             courseProgress,
             nextLesson,
+            targetModuleId: resolvedTarget?.module?.id || null,
+            targetWeekNumber: resolvedTarget ? resolvedTarget.weekNumber : 1,
+            hasModuleHistory,
           };
         },
 

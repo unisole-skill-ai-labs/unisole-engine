@@ -22,6 +22,7 @@ lmsRouter.put("/me", lmsController.updateProfile);
 // Dashboard Aggregation (B2)
 lmsRouter.get("/dashboard/summary", lmsController.getDashboardSummary);
 lmsRouter.get("/dashboard", lmsController.getDashboardSummary);
+lmsRouter.post("/module-visit", validateBody({ required: ["pathwayId", "moduleId"] }), lmsController.recordModuleVisit);
 
 // Pathways & Content
 lmsRouter.get("/pathways", lmsController.getMyPathways);

@@ -1125,6 +1125,18 @@ export async function initializeDatabase() {
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_sso_codes_code_hash" ON "public"."sso_codes" ("code_hash");
       CREATE INDEX IF NOT EXISTS "idx_sso_codes_user_id" ON "public"."sso_codes" ("user_id");
       CREATE INDEX IF NOT EXISTS "idx_sso_codes_expires_at" ON "public"."sso_codes" ("expires_at");
+
+      CREATE TABLE IF NOT EXISTS "public"."student_course_state" (
+        "id" varchar(120) PRIMARY KEY,
+        "user_id" varchar(50) NOT NULL,
+        "pathway_id" varchar(100) NOT NULL,
+        "last_module_id" varchar(50),
+        "last_opened_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_student_course_state_user_pathway"
+        ON "public"."student_course_state" ("user_id", "pathway_id");
     `);
 
     // 18b. Ensure Partial Unique Index on Active Enrollments (Catches duplicate errors safely without halting boot)
