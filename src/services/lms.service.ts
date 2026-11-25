@@ -819,9 +819,9 @@ export const lmsService = {
         return lesson;
       }
 
-      // Check if lesson or module is archived
-      if (lesson.status === "ARCHIVED" || lesson.isActive === false) {
-        throw new ForbiddenError("This activity has been archived and is not available.");
+      // Check if lesson is published and active for students (same rule as getPathwayContent)
+      if (!isVisibleToStudent(lesson as any)) {
+        throw new ForbiddenError("This activity is not published or available.");
       }
 
       // Time lock enforcement for students
@@ -849,10 +849,10 @@ export const lmsService = {
         .innerJoin(modules, sql`${moduleLessons.moduleId}::text = ${modules.id}::text`)
         .where(sql`${moduleLessons.lessonId}::text = ${lessonId}::text`);
 
+      if (parentModules.length > 0 && !parentModules.some((pm) => isVisibleToStudent(pm as any))) {
+        throw new ForbiddenError("This module is not published or available.");
+      }
       for (const pm of parentModules) {
-        if (pm.status === "ARCHIVED" || pm.isActive === false) {
-          throw new ForbiddenError("This module has been archived and is not available.");
-        }
         if (pm.unlockAt && new Date(pm.unlockAt).getTime() > nowMs) {
           throw new ForbiddenError(
             `This module is scheduled and locked until ${new Date(pm.unlockAt).toLocaleString()}`
@@ -1152,7 +1152,8 @@ export const lmsService = {
 
       let content: any = null;
       try {
-        content = await this.getPathwayContent(userId, pathwayId, true, true);
+        // Use student visibility rules (isAdmin = false) so DRAFT/inactive/archived content never generates notifications
+        content = await this.getPathwayContent(userId, pathwayId, false, true);
       } catch {
         continue;
       }
@@ -1172,7 +1173,10 @@ export const lmsService = {
       for (const crs of coursesList) {
         const mods = crs.modules || [];
         mods.forEach((mod: any, mIdx: number) => {
-          const modLessons = mod.lessons || [];
+          if (!isVisibleToStudent(mod) || mod.isLocked) return;
+          const modLessons = (mod.lessons || []).filter(
+            (l: any) => isVisibleToStudent(l) && !l.isLocked
+          );
           modLessons.forEach((les: any, lIdx: number) => {
             if (seenLessonIds.has(les.id)) return;
             seenLessonIds.add(les.id);
