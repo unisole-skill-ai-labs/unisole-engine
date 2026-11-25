@@ -704,11 +704,7 @@ export const lmsService = {
               durationMinutes: lesson.durationMinutes,
               videoUrl: isLesLocked
                 ? null
-                : (lesson.videoUrl ||
-                    parsedContent?.videoUrl ||
-                    (computedType === "video"
-                      ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1"
-                      : null)),
+                : (lesson.videoUrl || parsedContent?.videoUrl || null),
               content: (isLesLocked || summaryOnly) ? null : lesson.content,
               contentType: computedType.toUpperCase(),
               type: computedType,

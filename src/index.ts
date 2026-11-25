@@ -124,11 +124,13 @@ async function bootstrap() {
       console.warn("[BOOTSTRAP] Note on dummy curriculum cleanup:", purgeErr?.message || purgeErr);
     }
 
-    // 5. Auto-sync any manual/grant enrollments that lack complimentary orders
-    try {
-      await enrollmentsService.syncOrphanedEnrollments();
-    } catch (syncErr: any) {
-      console.warn("[BOOTSTRAP] Warning during enrollments order sync:", syncErr);
+    // 5. Auto-sync any orphaned PURCHASE enrollments in non-production environments
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        await enrollmentsService.syncOrphanedEnrollments();
+      } catch (syncErr: any) {
+        console.warn("[BOOTSTRAP] Warning during enrollments order sync:", syncErr);
+      }
     }
   } catch (err) {
     console.error("[BOOTSTRAP] Database bootstrap error:", err);
