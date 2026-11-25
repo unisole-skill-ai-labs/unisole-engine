@@ -137,6 +137,10 @@ const inMemoryNotes: Array<{
 
 const inMemoryCalendarEvents: Array<any> = [];
 
+export function isVisibleToStudent(entity: { status?: string; isActive?: boolean } | null | undefined): boolean {
+  return Boolean(entity && entity.status === "PUBLISHED" && entity.isActive !== false);
+}
+
 export const lmsService = {
   /**
    * Get all pathways that the student has an ACTIVE enrollment in.
@@ -199,7 +203,7 @@ export const lmsService = {
            ON CONFLICT DO NOTHING`,
           [`enr_${userId}_cs-agentic`, userId]
         );
-      } catch {}
+      } catch { }
 
       let flagshipRows: any[] = [];
       try {
@@ -207,7 +211,7 @@ export const lmsService = {
           .select()
           .from(pathways)
           .where(or(eq(pathways.id, "cs-agentic"), eq(pathways.slug, "cs-agentic")));
-      } catch {}
+      } catch { }
 
       if (flagshipRows.length > 0) {
         return flagshipRows.map((pwy) => ({
@@ -494,7 +498,7 @@ export const lmsService = {
         if (directCourse[0]) {
           linkedCourses = [{ position: 1, course: directCourse[0] }];
         }
-      } catch {}
+      } catch { }
 
       // If no course row exists in courses table, synthesize a course container from pathway
       // so any modules and lessons linked to this pathway ID can still be loaded
@@ -560,9 +564,7 @@ export const lmsService = {
 
       // Hide draft, archived, and inactive modules from students
       if (!isAdmin) {
-        linkedModules = linkedModules.filter(
-          (lm) => lm.module && lm.module.status === "PUBLISHED" && (lm.module as any).isActive !== false
-        );
+        linkedModules = linkedModules.filter((lm) => isVisibleToStudent(lm.module as any));
       }
 
       // Fallback: Merge (do not overwrite) seeded cs-agentic week modules if fewer than 12 are linked
@@ -584,7 +586,7 @@ export const lmsService = {
               }
             }
           }
-        } catch {}
+        } catch { }
       }
 
       const moduleList: any[] = [];
@@ -615,14 +617,12 @@ export const lmsService = {
                 lesson: l,
               }));
             }
-          } catch {}
+          } catch { }
         }
 
         // Hide draft, archived, and inactive lessons from students
         if (!isAdmin) {
-          linkedLessons = linkedLessons.filter(
-            (ll) => ll.lesson && ll.lesson.status === "PUBLISHED" && (ll.lesson as any).isActive !== false
-          );
+          linkedLessons = linkedLessons.filter((ll) => isVisibleToStudent(ll.lesson as any));
         }
 
         const modUnlockMs = mod.unlockAt ? new Date(mod.unlockAt).getTime() : null;
@@ -654,7 +654,7 @@ export const lmsService = {
               if (lesson.content && lesson.content.startsWith("{")) {
                 parsedContent = JSON.parse(lesson.content);
               }
-            } catch {}
+            } catch { }
 
             const isCoding =
               parsedContent?.testType === "CODING_TEST" ||
@@ -754,16 +754,16 @@ export const lmsService = {
               config: (isLesLocked || summaryOnly)
                 ? null
                 : (parsedContent?.codingTest ||
-                    parsedContent?.subjectiveTest ||
-                    parsedContent?.videoTest ||
-                    parsedContent?.assignment ||
-                    parsedContent?.quiz),
+                  parsedContent?.subjectiveTest ||
+                  parsedContent?.videoTest ||
+                  parsedContent?.assignment ||
+                  parsedContent?.quiz),
               questions: (isLesLocked || summaryOnly) ? [] : (parsedContent?.quiz?.questions || parsedContent?.questions),
               instructions: isLesLocked
                 ? "Content is scheduled and locked."
                 : summaryOnly
-                ? null
-                : (parsedContent?.assignment?.instructions ||
+                  ? null
+                  : (parsedContent?.assignment?.instructions ||
                     parsedContent?.instructions ||
                     lesson.description),
               maxScore:
@@ -1064,7 +1064,7 @@ export const lmsService = {
       type,
       title: data.title || (type === "quiz" ? "Graded Quiz" : "Hands-on Lab"),
       submissionUrl: data.submissionUrl || null,
-      submissionText: data.submissionText || null,
+      submissionText: data.submissionText || (data as any).notes || null,
       score: data.score !== undefined ? data.score : null,
       maxScore: data.maxScore || 100,
       status,
@@ -1167,9 +1167,9 @@ export const lmsService = {
         primaryPathwayId = pathwayId;
       }
 
-    const seenLessonIds = new Set<string>();
+      const seenLessonIds = new Set<string>();
 
-    for (const crs of coursesList) {
+      for (const crs of coursesList) {
         const mods = crs.modules || [];
         mods.forEach((mod: any, mIdx: number) => {
           const modLessons = mod.lessons || [];
@@ -1192,12 +1192,12 @@ export const lmsService = {
             const category = isQuiz
               ? "Graded Quiz"
               : isAssignment
-              ? les.title?.toLowerCase().includes("capstone")
-                ? "Capstone Project"
-                : "Hands-on Lab"
-              : isLive
-              ? "Live Class"
-              : "Video Lecture";
+                ? les.title?.toLowerCase().includes("capstone")
+                  ? "Capstone Project"
+                  : "Hands-on Lab"
+                : isLive
+                  ? "Live Class"
+                  : "Video Lecture";
 
             // If completed, add to completedList
             if (isDone) {
@@ -1221,8 +1221,8 @@ export const lmsService = {
                 statusText: isQuiz
                   ? `Marks: ${existingSub?.score !== null && existingSub?.score !== undefined ? existingSub.score : 10}/10`
                   : existingSub?.status === "APPROVED"
-                  ? "Evaluation Complete"
-                  : "Completed",
+                    ? "Evaluation Complete"
+                    : "Completed",
               });
             } else if (mIdx === 0) {
               // Week 1 (Past week) - Uncompleted lessons, quizzes, or assignments are MISSED
@@ -1238,8 +1238,8 @@ export const lmsService = {
                 dateText: isQuiz
                   ? "Missed deadline: 09 Oct 2026"
                   : isAssignment
-                  ? "Missed deadline: 11 Oct 2026"
-                  : "Missed schedule: 07 Oct 2026",
+                    ? "Missed deadline: 11 Oct 2026"
+                    : "Missed schedule: 07 Oct 2026",
                 status: "MISSED",
                 isOverdue: true,
                 actionText: isQuiz ? "Take Quiz" : isAssignment ? "Submit Lab" : "Watch Lecture",
@@ -1258,10 +1258,10 @@ export const lmsService = {
                 dateText: isLive
                   ? "Today • 6:00 PM – 7:30 PM IST"
                   : isQuiz
-                  ? "Due Tonight • 11:59 PM"
-                  : isAssignment
-                  ? "Due Friday • 11:59 PM"
-                  : "Target: Today / This Week",
+                    ? "Due Tonight • 11:59 PM"
+                    : isAssignment
+                      ? "Due Friday • 11:59 PM"
+                      : "Target: Today / This Week",
                 status: "UPCOMING",
                 isToday: isLive || isQuiz,
                 isUrgent: isQuiz || isAssignment,
@@ -1284,8 +1284,8 @@ export const lmsService = {
                 dateText: isLive
                   ? "Saturday • 6:00 PM – 8:00 PM IST"
                   : isQuiz
-                  ? "Due Sunday • 11:59 PM"
-                  : "Upcoming Next Week",
+                    ? "Due Sunday • 11:59 PM"
+                    : "Upcoming Next Week",
                 status: "UPCOMING",
                 isToday: false,
                 isUrgent: false,
@@ -1379,7 +1379,7 @@ export const lmsService = {
       if (enrolledIds.length > 0 && !enrolledIds.includes(effectivePathwayId)) {
         effectivePathwayId = enrolledIds[0] as string;
       }
-    } catch {}
+    } catch { }
 
     const [pathwayContent, progress, submissions, activities, calendarEvents] = await Promise.all([
       this.getPathwayContent(userId, effectivePathwayId, false, true),
@@ -1510,18 +1510,18 @@ export const lmsService = {
 
     const currentWeekData = targetModule
       ? {
-          weekNumber: targetModule.weekNumber,
-          weekIndex: targetModule.moduleIndex,
-          title: targetModule.title,
-          isLocked: targetModule.isLocked,
-          unlockAt: targetModule.unlockAt,
-          status: weekStatus,
-          totalActivities: targetModule.totalItems,
-          completedActivities: targetModule.completedCount,
-          progressPercent: targetModule.totalItems > 0
-            ? Math.round((targetModule.completedCount / targetModule.totalItems) * 100)
-            : 0,
-        }
+        weekNumber: targetModule.weekNumber,
+        weekIndex: targetModule.moduleIndex,
+        title: targetModule.title,
+        isLocked: targetModule.isLocked,
+        unlockAt: targetModule.unlockAt,
+        status: weekStatus,
+        totalActivities: targetModule.totalItems,
+        completedActivities: targetModule.completedCount,
+        progressPercent: targetModule.totalItems > 0
+          ? Math.round((targetModule.completedCount / targetModule.totalItems) * 100)
+          : 0,
+      }
       : null;
 
     const courseProgress = {
@@ -1535,15 +1535,15 @@ export const lmsService = {
 
     const nextLesson = nextIncompleteItem
       ? {
-          id: nextIncompleteItem.id,
-          title: nextIncompleteItem.title,
-          type: nextIncompleteItem.type,
-          category: nextIncompleteItem.category,
-          duration: nextIncompleteItem.duration,
-          isLocked: !!nextIncompleteItem.isLocked,
-          unlockAt: nextIncompleteItem.unlockAt || null,
-          weekNumber: nextIncompleteWeekNum,
-        }
+        id: nextIncompleteItem.id,
+        title: nextIncompleteItem.title,
+        type: nextIncompleteItem.type,
+        category: nextIncompleteItem.category,
+        duration: nextIncompleteItem.duration,
+        isLocked: !!nextIncompleteItem.isLocked,
+        unlockAt: nextIncompleteItem.unlockAt || null,
+        weekNumber: nextIncompleteWeekNum,
+      }
       : null;
 
     return {
@@ -1981,7 +1981,7 @@ export const lmsService = {
               updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
           `);
-        } catch {}
+        } catch { }
 
         // Ensure mentor_mentees table exists
         try {
@@ -1998,7 +1998,7 @@ export const lmsService = {
               updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
           `);
-        } catch {}
+        } catch { }
 
         if (!mentorRecord) {
           mentorRecord = {
@@ -2105,7 +2105,7 @@ export const lmsService = {
               SET scope = 'COURSE' 
               WHERE course_id IS NOT NULL AND scope = 'GLOBAL';
             `);
-          } catch {}
+          } catch { }
 
           const now = new Date();
 
@@ -2345,11 +2345,127 @@ export const lmsService = {
       status: ["GRADED", "APPROVED"].includes(row.status)
         ? "APPROVED"
         : row.status === "CHANGES_REQUESTED"
-        ? "CHANGES_REQUESTED"
-        : "PENDING",
-      score: row.score ?? (row.status === "GRADED" || row.status === "APPROVED" ? 85 : null),
+          ? "CHANGES_REQUESTED"
+          : "PENDING",
+      score: row.score ?? null,
       maxScore: row.maxScore ?? 100,
     }));
+  },
+
+  async getAdminSubmissions(options: {
+    callerUserId: string;
+    callerRoles: string[];
+    courseId?: string;
+    lessonId?: string;
+    type?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { callerUserId, callerRoles, courseId, lessonId, type, status, search } = options;
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(options.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const isAdminOrManager = callerRoles.some((r) =>
+      ["SUPER_ADMIN", "ADMIN", "COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r)
+    );
+    const isMentorOnly = callerRoles.includes("MENTOR") && !isAdminOrManager;
+
+    const whereClauses: any[] = [];
+
+    if (isMentorOnly) {
+      whereClauses.push(sql`EXISTS (
+        SELECT 1 FROM mentor_mentees mm
+        JOIN mentors m ON m.id = mm.mentor_id
+        WHERE mm.mentee_id = s.user_id
+          AND m.user_id = ${callerUserId}
+          AND mm.status = 'ACTIVE'
+      )`);
+    }
+
+    if (courseId && courseId !== "ALL") {
+      whereClauses.push(sql`s.pathway_id = ${courseId}`);
+    }
+    if (lessonId && lessonId !== "ALL") {
+      whereClauses.push(sql`(s.lesson_id = ${lessonId} OR s.assignment_id = ${lessonId})`);
+    }
+    if (type && type !== "ALL") {
+      whereClauses.push(sql`LOWER(s.type) = LOWER(${type})`);
+    }
+    if (status && status !== "ALL") {
+      if (status === "PENDING") {
+        whereClauses.push(sql`s.status::text IN ('SUBMITTED', 'UNDER_REVIEW', 'PENDING')`);
+      } else if (status === "GRADED" || status === "APPROVED") {
+        whereClauses.push(sql`s.status::text IN ('GRADED', 'APPROVED', 'COMPLETED')`);
+      } else {
+        whereClauses.push(sql`s.status::text = ${status}`);
+      }
+    }
+    if (search && search.trim()) {
+      const q = `%${search.trim()}%`;
+      whereClauses.push(sql`(
+        u.name ILIKE ${q} OR
+        u.email ILIKE ${q} OR
+        COALESCE(s.title, l.title, '') ILIKE ${q} OR
+        COALESCE(c.title, p.title, s.pathway_id, '') ILIKE ${q}
+      )`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? sql`WHERE ${sql.join(whereClauses, sql` AND `)}` : sql``;
+
+    const countRes = await db.execute<any>(sql`
+      SELECT COUNT(*)::int as total
+      FROM submissions s
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN lessons l ON l.id = s.lesson_id
+      LEFT JOIN courses c ON (c.id = s.pathway_id OR c.slug = s.pathway_id)
+      LEFT JOIN pathways p ON (p.id = s.pathway_id OR p.slug = s.pathway_id)
+      ${whereSql};
+    `);
+    const total = Number((countRes.rows || countRes)[0]?.total || 0);
+
+    const rowsRes = await db.execute<any>(sql`
+      SELECT
+        s.id,
+        s.user_id as "studentId",
+        u.name as "studentName",
+        u.email as "studentEmail",
+        u.phone as "studentPhone",
+        s.pathway_id as "courseId",
+        COALESCE(c.title, p.title, s.pathway_id, 'Course') as "courseTitle",
+        s.lesson_id as "lessonId",
+        s.assignment_id as "assignmentId",
+        COALESCE(s.title, l.title, s.lesson_id) as "lessonTitle",
+        s.type,
+        s.submission_url as "submissionUrl",
+        s.submission_text as "submissionText",
+        s.code_snippet as "codeSnippet",
+        s.video_url as "videoUrl",
+        s.score,
+        COALESCE(s.max_score, 100) as "maxScore",
+        s.status,
+        s.mentor_feedback as "mentorFeedback",
+        s.evaluated_at as "evaluatedAt",
+        s.created_at as "createdAt",
+        s.updated_at as "updatedAt"
+      FROM submissions s
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN lessons l ON l.id = s.lesson_id
+      LEFT JOIN courses c ON (c.id = s.pathway_id OR c.slug = s.pathway_id)
+      LEFT JOIN pathways p ON (p.id = s.pathway_id OR p.slug = s.pathway_id)
+      ${whereSql}
+      ORDER BY s.created_at DESC
+      LIMIT ${limit} OFFSET ${offset};
+    `);
+
+    return {
+      items: rowsRes.rows || rowsRes,
+      total,
+      page,
+      limit,
+    };
   },
 
   // -------------------------------------------------------------
@@ -2547,7 +2663,7 @@ export const lmsService = {
       type: data.type || "assignment",
       title: data.title || "Assignment Submission",
       submissionUrl: data.submissionUrl || null,
-      submissionText: data.submissionText || null,
+      submissionText: data.submissionText || (data as any).notes || null,
       codeSnippet: data.codeSnippet || null,
       videoUrl: data.videoUrl || null,
       status: "SUBMITTED",
@@ -2637,7 +2753,7 @@ export const lmsService = {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
       `);
-    } catch {}
+    } catch { }
 
     const whereClauses: any[] = [];
 
