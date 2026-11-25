@@ -35,6 +35,7 @@ export function authMiddleware(
       id: string;
       phone: string;
       role: string;
+      scope?: string;
       roles?: string[];
       metadata?: any;
       name?: string;
@@ -43,6 +44,10 @@ export function authMiddleware(
       departmentId?: string | null;
       permissions?: string[];
     };
+    if (decoded.scope === "video:upload" || decoded.scope === "video:play") {
+      res.status(401).json({ error: "Unauthorized: Scoped video token cannot access general API" });
+      return;
+    }
     req.user = decoded;
     next();
   } catch {
