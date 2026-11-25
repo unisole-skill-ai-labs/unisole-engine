@@ -903,12 +903,7 @@ export async function initializeDatabase() {
       VALUES 
         ('UNISOLE20', 'Official Campus Launch 20% Discount (All Courses)', 'PERCENTAGE'::discount_type, 20, 0, 200000, 1000, '[]'::jsonb, TRUE),
         ('EARLYBIRD500', 'Early Bird Flat ₹500 Discount on Flagship Engineering & Analytics Tracks', 'FLAT'::discount_type, 50000, 100000, NULL, 500, '["cs-p1", "cs-p2", "cs-p3", "mgmt-p1", "mgmt-p3"]'::jsonb, TRUE)
-      ON CONFLICT ("code") DO UPDATE SET
-        "description" = EXCLUDED."description",
-        "discount_type" = EXCLUDED."discount_type",
-        "discount_value" = EXCLUDED."discount_value",
-        "applicable_item_ids" = EXCLUDED."applicable_item_ids",
-        "is_active" = TRUE;
+      ON CONFLICT ("code") DO NOTHING;
     `);
 
     // 14. Surveys and Survey Responses

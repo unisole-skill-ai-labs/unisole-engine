@@ -4,8 +4,24 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { lessonsRepository } from "../repositories/lessons.repository";
 
-const BASE_URL = process.env.API_URL || "http://localhost:3000";
+if (process.env.NODE_ENV === "production") {
+  console.error("[SAFETY ERROR] test-lesson-attach.ts cannot be executed with NODE_ENV=production. Aborting.");
+  process.exit(1);
+}
+
 const DB_URL = process.env.DATABASE_URL || "postgres://postgres:postgres@127.0.0.1:5433/unisole_copy";
+let dbHost = "";
+try {
+  dbHost = new URL(DB_URL).hostname;
+} catch {
+  dbHost = DB_URL.includes("@") ? DB_URL.split("@")[1].split("/")[0].split(":")[0] : "";
+}
+if (dbHost !== "localhost" && dbHost !== "127.0.0.1") {
+  console.error(`[SAFETY ERROR] test-lesson-attach.ts is strictly prohibited from running against non-local databases (host: "${dbHost || "unknown"}"). Aborting.`);
+  process.exit(1);
+}
+
+const BASE_URL = process.env.API_URL || "http://localhost:3000";
 const JWT_SECRET = process.env.JWT_SECRET || "unisole-secret-key";
 
 async function api(path: string, method = "GET", body?: any, token?: string) {

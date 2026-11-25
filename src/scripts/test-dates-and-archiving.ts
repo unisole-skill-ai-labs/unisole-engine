@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { db } from "../db";
 import { lessonsService } from "../services/lessons.service";
 import { modulesService } from "../services/modules.service";
@@ -5,6 +6,23 @@ import { lmsService } from "../services/lms.service";
 import { lessons, modules } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { ValidationError, ForbiddenError } from "../errors";
+
+if (process.env.NODE_ENV === "production") {
+  console.error("[SAFETY ERROR] test-dates-and-archiving.ts cannot be executed with NODE_ENV=production. Aborting.");
+  process.exit(1);
+}
+
+const dbUrl = process.env.DATABASE_URL || "";
+let dbHost = "";
+try {
+  dbHost = new URL(dbUrl).hostname;
+} catch {
+  dbHost = dbUrl.includes("@") ? dbUrl.split("@")[1].split("/")[0].split(":")[0] : "";
+}
+if (dbHost !== "localhost" && dbHost !== "127.0.0.1") {
+  console.error(`[SAFETY ERROR] test-dates-and-archiving.ts is strictly prohibited from running against non-local databases (host: "${dbHost || "unknown"}"). Aborting.`);
+  process.exit(1);
+}
 
 async function runDateAndArchiveTests() {
   console.log("=================================================");
