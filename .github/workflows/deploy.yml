@@ -63,16 +63,20 @@ jobs:
                   chmod 600 ~/.ssh/id_rsa
                   ssh-keyscan -H $AWS_EC2_HOST >> ~/.ssh/known_hosts
 
-                  ssh -i ~/.ssh/id_rsa $AWS_EC2_USER@$AWS_EC2_HOST << 'EOF'
+                  ssh -i ~/.ssh/id_rsa $AWS_EC2_USER@$AWS_EC2_HOST \
+                    "DOCKER_USERNAME=$(printf '%q' "$DOCKER_USERNAME") DOCKER_PASSWORD=$(printf '%q' "$DOCKER_PASSWORD") bash -s" << 'EOF'
                     set -e
                     cd $HOME/unisole-prod
                     git fetch origin production
                     git reset --hard HEAD
                     git checkout -B production origin/production
                     git reset --hard origin/production
-                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-                    if docker image inspect "$DOCKER_USERNAME/unisole-engine:latest" >/dev/null 2>&1; then
-                      docker tag "$DOCKER_USERNAME/unisole-engine:latest" "$DOCKER_USERNAME/unisole-engine:rollback-pre-merge"
+                    if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+                      printf '%s\n' "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                    fi
+                    IMG_USER="${DOCKER_USERNAME:-$(grep -E '^DOCKER_USERNAME=' .env 2>/dev/null | cut -d= -f2- || echo unisole)}"
+                    if docker image inspect "$IMG_USER/unisole-engine:latest" >/dev/null 2>&1; then
+                      docker tag "$IMG_USER/unisole-engine:latest" "$IMG_USER/unisole-engine:rollback-pre-merge"
                     fi
                     docker compose -f docker-compose.prod.yml pull
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
