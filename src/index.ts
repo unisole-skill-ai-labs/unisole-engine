@@ -9,6 +9,7 @@ dotenv.config();
 
 import { Server as SocketIOServer } from "socket.io";
 import { authRouter } from "./routes/auth";
+import { videoCliRouter } from "./routes/admin/videos";
 import { adminRouter } from "./routes/admin";
 import { lmsRouter } from "./routes/lms";
 import { publicRouter } from "./routes/public";
@@ -67,6 +68,7 @@ app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
 // Route Groups
 app.use("/api/auth", authRouter);
+app.use("/api/admin/lessons/:id/video", videoCliRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/lms", lmsRouter);
 app.use("/api/public", publicRouter);

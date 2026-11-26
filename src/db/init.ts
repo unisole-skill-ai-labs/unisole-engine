@@ -303,6 +303,11 @@ export async function initializeDatabase() {
       ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
       ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "unlock_at" timestamp with time zone;
       ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "lock_at" timestamp with time zone;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "video_provider" varchar(20) DEFAULT 'YOUTUBE' NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "video_status" varchar(20) DEFAULT 'NONE' NOT NULL;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "video_hls_path" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "video_error" text;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "video_updated_at" timestamp with time zone;
 
       DO $$ BEGIN
         ALTER TABLE "public"."modules" ALTER COLUMN "id" TYPE varchar(50) USING id::text;

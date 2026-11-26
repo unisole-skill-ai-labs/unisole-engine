@@ -744,6 +744,8 @@ export const lmsService = {
                       videoUrl: isLesLocked
                         ? null
                         : (lesson.videoUrl || parsedContent?.videoUrl || null),
+                      videoProvider: isLesLocked ? null : (lesson.videoProvider || "YOUTUBE"),
+                      videoStatus: isLesLocked ? null : (lesson.videoStatus || "NONE"),
                       content: (isLesLocked || summaryOnly) ? null : lesson.content,
                       contentType: computedType.toUpperCase(),
                       type: computedType,

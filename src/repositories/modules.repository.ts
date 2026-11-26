@@ -1,5 +1,6 @@
 import { eq, and, asc, sql } from "drizzle-orm";
 import { db } from "../db";
+import { getVideoStorageProvider } from "../services/video-storage.service";
 import {
   modules, Module, NewModule,
   moduleLessons, NewModuleLesson,
@@ -174,6 +175,7 @@ export const modulesRepository = {
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {
+    let shouldDeleteVideoBlobs = false;
     await db.transaction(async (tx) => {
       await lockModuleTx(tx, moduleId);
 
@@ -205,9 +207,22 @@ export const modulesRepository = {
         .where(eq(moduleLessons.lessonId, lessonId))
         .limit(1);
       if (otherLinks.length === 0) {
-        await tx.delete(lessons).where(eq(lessons.id, lessonId));
+        const deletedRows = await tx
+          .delete(lessons)
+          .where(eq(lessons.id, lessonId))
+          .returning({ videoHlsPath: lessons.videoHlsPath });
+        if (deletedRows[0]?.videoHlsPath) {
+          shouldDeleteVideoBlobs = true;
+        }
       }
     });
+
+    if (shouldDeleteVideoBlobs) {
+      // Best-effort Azure blob cleanup; any remaining prefixes can also be audited via /api/admin/videos/orphans
+      await getVideoStorageProvider()
+        .deletePrefix(`${lessonId}/`)
+        .catch(() => {});
+    }
   },
 
   async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
