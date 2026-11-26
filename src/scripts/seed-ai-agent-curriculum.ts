@@ -636,7 +636,7 @@ export async function seedAiAgentCurriculum(force = false) {
         id: "cs-agentic",
         title: "AI Agent Engineering",
         slug: "cs-agentic",
-        shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+        shortDescription: "15-Week AI Agent Engineering Certificate Program (Weeks 1 - 15)",
         description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
         pricePaise: 299900,
         status: "PUBLISHED",
@@ -646,7 +646,7 @@ export async function seedAiAgentCurriculum(force = false) {
         id: "course1",
         title: "AI Agent Engineering (Legacy Alias)",
         slug: "course1",
-        shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+        shortDescription: "15-Week AI Agent Engineering Certificate Program (Weeks 1 - 15)",
         description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
         pricePaise: 299900,
         status: "ARCHIVED",
@@ -678,7 +678,7 @@ export async function seedAiAgentCurriculum(force = false) {
       console.log(`[Seed:AI-Agent] Creating course 'cs-agentic'...`);
       await client.query(
         `INSERT INTO courses (id, title, slug, short_description, description, status, is_active, price_paise, mrp_paise, metadata, created_at, updated_at)
-         VALUES ($1, 'AI Agent Engineering', 'cs-agentic', '12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 'PUBLISHED', TRUE, 299900, 999900, '{"duration": "12 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb, NOW(), NOW())
+         VALUES ($1, 'AI Agent Engineering', 'cs-agentic', '15-Week AI Agent Engineering Certificate Program (Weeks 1 - 15)', 'From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.', 'PUBLISHED', TRUE, 299900, 999900, '{"duration": "15 Weeks (132 Hours)", "level": "Production AI Agent Engineering", "group": "group-1"}'::jsonb, NOW(), NOW())
          ON CONFLICT (id) DO NOTHING`,
         [courseId]
       );
