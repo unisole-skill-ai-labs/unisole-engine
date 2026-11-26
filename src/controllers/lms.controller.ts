@@ -37,6 +37,13 @@ export const lmsController = {
     res.json(summary);
   }),
 
+  recordModuleVisit: asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { pathwayId, moduleId } = req.body;
+    const result = await lmsService.recordModuleVisit(userId, String(pathwayId), String(moduleId));
+    res.json(result);
+  }),
+
   getLessonContent: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user!.id;
     const userRoles = [
