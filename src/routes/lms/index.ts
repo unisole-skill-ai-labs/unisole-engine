@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware, requireRole } from "../../middleware/auth";
 import { authController } from "../../controllers/auth.controller";
 import { lmsController } from "../../controllers/lms.controller";
+import { videoController } from "../../controllers/video.controller";
 import { mentorshipController } from "../../controllers/mentorship.controller";
 import { enrollmentsController } from "../../controllers/enrollments.controller";
 import { paymentsController } from "../../controllers/payments.controller";
@@ -11,6 +12,9 @@ export const lmsRouter: Router = Router();
 
 const canManageCalendar = requireRole(["SUPER_ADMIN", "ADMIN", "COURSE_MANAGER", "PROGRAM_MANAGER"]);
 const canReviewSubmissions = requireRole(["SUPER_ADMIN", "ADMIN", "COURSE_MANAGER", "PROGRAM_MANAGER", "MENTOR"]);
+
+// Signed HLS playlist delivery (authenticated via short-lived playJwt ?token= query param)
+lmsRouter.get("/lessons/:id/hls/*", videoController.getHlsPlaylist);
 
 // Protect all LMS routes with authentication
 lmsRouter.use(authMiddleware);
@@ -28,6 +32,7 @@ lmsRouter.post("/module-visit", validateBody({ required: ["pathwayId", "moduleId
 lmsRouter.get("/pathways", lmsController.getMyPathways);
 lmsRouter.get("/pathways/:id", lmsController.getPathwayContent);
 lmsRouter.get("/lessons/:id", lmsController.getLessonContent);
+lmsRouter.post("/lessons/:id/video-access", videoController.getVideoAccess);
 
 // Progress & Submissions
 lmsRouter.post("/progress", validateBody({ required: ["lessonId"] }), lmsController.markProgress);

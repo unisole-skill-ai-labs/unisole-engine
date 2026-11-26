@@ -30,6 +30,7 @@
     "db:sync:pathways:dev": "tsx src/scripts/sync-canonical-pathways.ts"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.34.0",
     "@google-cloud/storage": "^8.1.0",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.2",
@@ -37,6 +38,7 @@
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.45.2",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.7.5",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.13.0",
     "qrcode": "^1.5.4",

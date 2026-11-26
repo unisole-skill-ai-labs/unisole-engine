@@ -1,0 +1,12 @@
+{
+  "name": "unisole-video-cli",
+  "version": "1.0.0",
+  "description": "Local MacBook ffmpeg HLS encoder and Azure Blob uploader for Unisole LMS lessons",
+  "type": "module",
+  "bin": {
+    "unisole-video": "./bin/unisole-video.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
