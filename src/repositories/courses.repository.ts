@@ -59,7 +59,7 @@ export const coursesRepository = {
       const rows = await db
         .select()
         .from(courses)
-        .where(and(eq(courses.isActive, true), eq(courses.status, "PUBLISHED")));
+        .where(eq(courses.isActive, true));
       const validRows = rows.filter((c) => !deprecatedCourseIds.has(c.id));
       if (validRows.length > 0) return validRows;
     } catch {}
@@ -148,7 +148,7 @@ export const coursesRepository = {
           .where(inArray(submissions.lessonId, lessonIds))
           .limit(1);
         if (hasProgress.length > 0 || hasSubs.length > 0) {
-          throw new ConflictError("Cannot delete module: one or more lessons have student activity. Archive them instead.");
+          throw new ConflictError("Cannot delete module: one or more lessons have student activity.");
         }
       }
 

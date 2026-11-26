@@ -189,7 +189,7 @@ export const modulesRepository = {
         .where(eq(submissions.lessonId, lessonId))
         .limit(1);
       if (progress.length > 0 || subs.length > 0) {
-        throw new ConflictError("This lesson has student activity, archive it instead");
+        throw new ConflictError("This lesson has student activity and cannot be deleted.");
       }
 
       // 2. Remove module-lesson relationship and renumber remaining items atomically

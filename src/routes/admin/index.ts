@@ -25,6 +25,7 @@ import { adminCouponsRouter } from "./coupons";
 import { adminSurveysRouter } from "./surveys";
 import { adminDashboardRouter } from "./dashboard";
 import { adminMentorshipRouter } from "./mentorship";
+import { adminSubmissionsRouter } from "./submissions";
 
 export const adminRouter: Router = Router();
 
@@ -61,6 +62,7 @@ adminRouter.use("/courses", adminCoursesRouter);
 adminRouter.use("/modules", adminModulesRouter);
 adminRouter.use("/lessons", adminLessonsRouter);
 adminRouter.use("/enrollments", adminEnrollmentsRouter);
+adminRouter.use("/submissions", adminSubmissionsRouter);
 adminRouter.use("/presentations", adminPresentationsRouter);
 adminRouter.use("/surveys", adminSurveysRouter);
 adminRouter.use("/mentorship", adminMentorshipRouter);

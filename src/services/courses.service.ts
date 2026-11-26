@@ -5,6 +5,7 @@ import { modulesRepository } from "../repositories/modules.repository";
 import { lessonsRepository } from "../repositories/lessons.repository";
 import { Course, NewCourse, courseAssignments } from "../db/schema";
 import { NotFoundError, ValidationError, ConflictError } from "../errors";
+import { appCache } from "../utils/cache";
 
 export const coursesService = {
   async list(): Promise<Course[]> {
@@ -34,7 +35,7 @@ export const coursesService = {
     const existing = await coursesRepository.getBySlug(slug);
     if (existing) throw new ConflictError("A course with this slug already exists");
 
-    return coursesRepository.create({
+    const created = await coursesRepository.create({
       title,
       slug,
       shortDescription: shortDescription || null,
@@ -42,9 +43,11 @@ export const coursesService = {
       pricePaise: Number(pricePaise) || 0,
       mrpPaise: Number(mrpPaise) || 0,
       metadata: metadata || {},
-      status: (status as any) || "PUBLISHED",
+      status: "PUBLISHED",
       isActive: isActive !== undefined ? Boolean(isActive) : true,
     });
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
+    return created;
   },
 
   async update(id: string, body: Record<string, unknown>): Promise<Course> {
@@ -59,18 +62,13 @@ export const coursesService = {
     if (body.pricePaise !== undefined) data.pricePaise = Number(body.pricePaise);
     if (body.mrpPaise !== undefined) data.mrpPaise = Number(body.mrpPaise);
     if (body.metadata !== undefined) data.metadata = body.metadata as Record<string, unknown>;
-    if (body.status !== undefined) {
-      const status = body.status as string;
-      if (!["DRAFT", "PUBLISHED", "ARCHIVED"].includes(status)) throw new ValidationError("Invalid status");
-      data.status = status as "DRAFT" | "PUBLISHED" | "ARCHIVED";
-    }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 
-    if (Object.keys(data).length === 0) throw new ValidationError("No valid fields provided");
+    if (Object.keys(data).length === 0) return existing;
 
-    // Enforce archive-instead-of-delete for used courses (PRD §33)
     const updated = await coursesRepository.update(id, data);
     if (!updated) throw new NotFoundError("Course not found");
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
     return updated;
   },
 
@@ -79,27 +77,34 @@ export const coursesService = {
     if (!existing) throw new NotFoundError("Course not found");
     const removed = await coursesRepository.remove(id);
     if (!removed) throw new NotFoundError("Course not found");
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
     return removed;
   },
 
   async attachModule(courseId: string, moduleId: string, position: number): Promise<void> {
     await coursesRepository.attachModule({ courseId, moduleId, position });
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
   },
 
   async detachModule(courseId: string, moduleId: string): Promise<void> {
     await coursesRepository.detachModule(courseId, moduleId);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
   },
 
   async clearModules(courseId: string): Promise<void> {
     await coursesRepository.clearModules(courseId);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
   },
 
   async purgeAllCurriculum(): Promise<{ modulesDeleted: number; lessonsDeleted: number }> {
-    return coursesRepository.purgeAllCurriculum();
+    const res = await coursesRepository.purgeAllCurriculum();
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
+    return res;
   },
 
   async reorderModules(courseId: string, moduleIds: string[]): Promise<void> {
     await coursesRepository.reorderModules(courseId, moduleIds);
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
   },
 
   async getModules(courseId: string) {
@@ -200,7 +205,7 @@ export const coursesService = {
       pricePaise: original.pricePaise,
       mrpPaise: original.mrpPaise,
       metadata: { ...(original.metadata as any), duplicatedFrom: original.id },
-      status: "DRAFT",
+      status: "PUBLISHED",
       isActive: true,
     });
 
@@ -212,7 +217,7 @@ export const coursesService = {
           title: mod.title,
           slug: modSlug,
           description: mod.description,
-          status: "DRAFT",
+          status: "PUBLISHED",
           isActive: true,
           unlockAt: mod.unlockAt,
           lockAt: mod.lockAt,
@@ -234,7 +239,7 @@ export const coursesService = {
             content: les.content,
             videoUrl: les.videoUrl,
             durationMinutes: les.durationMinutes,
-            status: "DRAFT",
+            status: "PUBLISHED",
             isActive: true,
             unlockAt: les.unlockAt,
             lockAt: les.lockAt,
@@ -280,7 +285,7 @@ export const coursesService = {
         pricePaise: Number(pricePaise) || 0,
         mrpPaise: Number(mrpPaise) || 0,
         metadata: metadata || {},
-        status: "DRAFT",
+        status: "PUBLISHED",
       }))!;
       await coursesRepository.clearModules(targetCourse.id);
     } else {
@@ -292,7 +297,7 @@ export const coursesService = {
         pricePaise: Number(pricePaise) || 0,
         mrpPaise: Number(mrpPaise) || 0,
         metadata: metadata || {},
-        status: "DRAFT",
+        status: "PUBLISHED",
         isActive: true,
       });
     }
@@ -311,7 +316,7 @@ export const coursesService = {
         title: mod.title || `Module ${mIdx + 1}`,
         slug: modSlug,
         description: mod.description || null,
-        status: "DRAFT",
+        status: "PUBLISHED",
         isActive: true,
         unlockAt: mod.unlockAt ? new Date(mod.unlockAt).toISOString() : null,
         lockAt: mod.lockAt ? new Date(mod.lockAt).toISOString() : null,
@@ -340,7 +345,7 @@ export const coursesService = {
           content: les.content || null,
           videoUrl: les.videoUrl || null,
           durationMinutes: les.durationMinutes ? Number(les.durationMinutes) : null,
-          status: "DRAFT",
+          status: "PUBLISHED",
           isActive: true,
           unlockAt: les.unlockAt ? new Date(les.unlockAt).toISOString() : null,
           lockAt: les.lockAt ? new Date(les.lockAt).toISOString() : null,
