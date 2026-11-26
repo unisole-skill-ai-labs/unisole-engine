@@ -11,6 +11,7 @@ import {
   ValidationError,
 } from "../errors";
 import { lmsService } from "./lms.service";
+import { appCache } from "../utils/cache";
 import {
   MAX_HLS_UPLOAD_FILES,
   VideoStorageProvider,
@@ -258,6 +259,7 @@ export const videoService = {
     }
 
     await db.update(lessons).set(updateData).where(eq(lessons.id, lessonId));
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
 
     return { status: "READY", videoProvider: "AZURE_HLS", videoHlsPath: hlsPath };
   },
@@ -297,6 +299,7 @@ export const videoService = {
         updatedAt: new Date().toISOString(),
       })
       .where(eq(lessons.id, lessonId));
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
 
     return { videoProvider: "YOUTUBE", videoStatus: "NONE", videoHlsPath: null };
   },
@@ -421,6 +424,7 @@ export const videoService = {
     }
 
     await db.update(lessons).set(updateData).where(eq(lessons.id, lessonId));
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
 
     return { status: "READY", videoProvider: "AZURE_MP4", videoHlsPath: blobPath };
   },
@@ -512,7 +516,7 @@ export const videoService = {
       );
     }
 
-    const variantDir = requestedPath.split("/")[0] as "360p" | "480p" | "720p";
+    const variantDir = requestedPath.split("/")[0] as "360p" | "480p" | "720p" | "1080p";
     const ttlSec = getPlayTtlSeconds();
     const lines = rawPlaylist.split(/\r?\n/);
     const rewrittenLines = await Promise.all(

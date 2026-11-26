@@ -8,7 +8,7 @@ import {
 import { ValidationError } from "../errors";
 
 export const HLS_FILE_WHITELIST_RE =
-  /^(master\.m3u8|(360p|480p|720p)\/(index\.m3u8|seg_\d+\.ts))$/;
+  /^(master\.m3u8|(360p|480p|720p|1080p)\/(index\.m3u8|seg_\d+\.ts))$/;
 
 export const MAX_HLS_UPLOAD_FILES = 2000;
 
@@ -25,7 +25,7 @@ export function rewriteMasterPlaylist(
   return content
     .split(/\r?\n/)
     .map((line) => {
-      const trimmed = line.trim();
+      const trimmed = line.trim().replace(/\\/g, "/");
       if (!trimmed || trimmed.startsWith("#")) return line;
       assertValidHlsFile(trimmed);
       if (!trimmed.endsWith("/index.m3u8")) {
@@ -38,13 +38,13 @@ export function rewriteMasterPlaylist(
 
 export function rewriteVariantPlaylist(
   content: string,
-  variantDir: "360p" | "480p" | "720p",
+  variantDir: "360p" | "480p" | "720p" | "1080p",
   buildSegmentUrl: (relativePath: string) => string
 ): string {
   return content
     .split(/\r?\n/)
     .map((line) => {
-      const trimmed = line.trim();
+      const trimmed = line.trim().replace(/\\/g, "/");
       if (!trimmed || trimmed.startsWith("#")) return line;
       const relativePath = `${variantDir}/${trimmed}`;
       assertValidHlsFile(relativePath);

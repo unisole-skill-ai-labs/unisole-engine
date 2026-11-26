@@ -24,12 +24,13 @@ async function run() {
   assert.equal(HLS_FILE_WHITELIST_RE.test("360p/index.m3u8"), true);
   assert.equal(HLS_FILE_WHITELIST_RE.test("480p/seg_000.ts"), true);
   assert.equal(HLS_FILE_WHITELIST_RE.test("720p/seg_999.ts"), true);
+  assert.equal(HLS_FILE_WHITELIST_RE.test("1080p/index.m3u8"), true);
 
   for (const bad of [
     "../secret.txt",
     "hls/master.m3u8",
     "/master.m3u8",
-    "1080p/index.m3u8",
+    "240p/index.m3u8",
     "360p/seg_000.mp4",
     "360p/index.m3u8?x=1",
     "360p/../480p/index.m3u8",

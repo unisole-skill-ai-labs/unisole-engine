@@ -175,6 +175,7 @@ export const modulesRepository = {
   },
 
   async detachLesson(moduleId: string, lessonId: string): Promise<void> {
+    let shouldDeleteVideoBlobs = false;
     await db.transaction(async (tx) => {
       await lockModuleTx(tx, moduleId);
 
@@ -211,13 +212,17 @@ export const modulesRepository = {
           .where(eq(lessons.id, lessonId))
           .returning({ videoHlsPath: lessons.videoHlsPath });
         if (deletedRows[0]?.videoHlsPath) {
-          // Best-effort Azure blob cleanup outside rollback risk; orphaned blobs can also be audited via /api/admin/videos/orphans
-          getVideoStorageProvider()
-            .deletePrefix(`${lessonId}/`)
-            .catch(() => {});
+          shouldDeleteVideoBlobs = true;
         }
       }
     });
+
+    if (shouldDeleteVideoBlobs) {
+      // Best-effort Azure blob cleanup; any remaining prefixes can also be audited via /api/admin/videos/orphans
+      await getVideoStorageProvider()
+        .deletePrefix(`${lessonId}/`)
+        .catch(() => {});
+    }
   },
 
   async reorderLessons(moduleId: string, lessonIds: string[]): Promise<void> {
