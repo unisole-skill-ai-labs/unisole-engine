@@ -109,7 +109,7 @@ async function run() {
       false,
       "http://localhost:3000"
     );
-    assert.ok(access.manifestUrl.startsWith("http://localhost:3000/api/lms/lessons/les_123/hls/master.m3u8?token="));
+    assert.ok(access.manifestUrl && access.manifestUrl.startsWith("http://localhost:3000/api/lms/lessons/les_123/hls/master.m3u8?token="));
     assert.equal(access.storageMode, "stub");
   } finally {
     (lmsService as any).getLessonContent = origGetLessonContent;

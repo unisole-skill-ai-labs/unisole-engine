@@ -1,5 +1,6 @@
 import { eq, and, asc, sql } from "drizzle-orm";
 import { db } from "../db";
+import { getVideoStorageProvider } from "../services/video-storage.service";
 import {
   modules, Module, NewModule,
   moduleLessons, NewModuleLesson,
@@ -205,7 +206,16 @@ export const modulesRepository = {
         .where(eq(moduleLessons.lessonId, lessonId))
         .limit(1);
       if (otherLinks.length === 0) {
-        await tx.delete(lessons).where(eq(lessons.id, lessonId));
+        const deletedRows = await tx
+          .delete(lessons)
+          .where(eq(lessons.id, lessonId))
+          .returning({ videoHlsPath: lessons.videoHlsPath });
+        if (deletedRows[0]?.videoHlsPath) {
+          // Best-effort Azure blob cleanup outside rollback risk; orphaned blobs can also be audited via /api/admin/videos/orphans
+          getVideoStorageProvider()
+            .deletePrefix(`${lessonId}/`)
+            .catch(() => {});
+        }
       }
     });
   },

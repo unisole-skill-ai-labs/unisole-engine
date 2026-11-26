@@ -56,6 +56,42 @@ export const videoController = {
     res.json(await videoService.failUpload(lessonId, error || "Upload failed"));
   }),
 
+  initSimpleUpload: asyncHandler(async (req: Request, res: Response) => {
+    const lessonId = req.params.id;
+    const { fileName, contentType, sizeBytes } = req.body || {};
+    res.json(await videoService.initSimpleUpload(lessonId, { fileName, contentType, sizeBytes }));
+  }),
+
+  completeSimpleUpload: asyncHandler(async (req: Request, res: Response) => {
+    const lessonId = req.params.id;
+    const { blobPath, durationMinutes } = req.body || {};
+    res.json(await videoService.completeSimpleUpload(lessonId, blobPath, durationMinutes));
+  }),
+
+  failSimpleUpload: asyncHandler(async (req: Request, res: Response) => {
+    const lessonId = req.params.id;
+    const { error } = req.body || {};
+    res.json(await videoService.failUpload(lessonId, error || "Direct upload failed"));
+  }),
+
+  getSetupCheck: asyncHandler(async (req: Request, res: Response) => {
+    const probe = req.method === "POST" || req.query.probe === "1" || req.query.probe === "true";
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://lms.unisole.org")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    res.json(await videoService.getSetupCheck(probe, allowedOrigins));
+  }),
+
+  listOrphans: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await videoService.listOrphanedVideoBlobs(true));
+  }),
+
+  cleanupOrphans: asyncHandler(async (req: Request, res: Response) => {
+    const dryRun = req.body?.dryRun !== false;
+    res.json(await videoService.listOrphanedVideoBlobs(dryRun));
+  }),
+
   getVideoAccess: asyncHandler(async (req: CustomRequest, res: Response) => {
     const userId = req.user!.id;
     const userRoles = [
