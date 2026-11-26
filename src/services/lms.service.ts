@@ -29,13 +29,13 @@ const PATHWAY_CATALOG: Record<string, { title: string; description: string; dura
   "cs-agentic": {
     title: "AI Agent Engineering",
     description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-    duration: "12 Weeks (132 Hours)",
+    duration: "15 Weeks",
     level: "Production AI Agent Engineering",
   },
   "course1": {
     title: "AI Agent Engineering",
     description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
-    duration: "12 Weeks (132 Hours)",
+    duration: "15 Weeks",
     level: "Production AI Agent Engineering",
   },
   "cs-p1": {
@@ -258,7 +258,7 @@ export const lmsService = {
           title: enr.course.title,
           description: enr.course.description || enr.course.shortDescription || "Curriculum & Projects",
           slug: enr.course.slug,
-          duration: "12 Weeks (132 Hours)",
+          duration: (enr.course.metadata as any)?.duration || "15 Weeks",
           level: "Intermediate",
           isActive: enr.course.isActive,
           isPublic: true,
@@ -291,7 +291,7 @@ export const lmsService = {
             title: cat?.title || "Curriculum Track",
             description: cat?.description || "Structured Academic Track",
             slug: requestedId,
-            duration: cat?.duration || "12 Weeks",
+            duration: cat?.duration || "15 Weeks",
             level: cat?.level || "Undergraduate",
             isActive: true,
             isPublic: true,

@@ -243,7 +243,7 @@ export const CANONICAL_GROUPS: CanonicalGroupItem[] = [
         "id": "cs-agentic",
         "eyebrow": "PATHWAY 02",
         "title": "AI Agent Engineering",
-        "duration": "12 Weeks (132 Hours)",
+        "duration": "15 Weeks",
         "level": "Fundamentals to Production",
         "handsOn": "Theory + Hands-on Labs + Capstone",
         "price": 2999,

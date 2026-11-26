@@ -5,7 +5,7 @@ dotenv.config();
 import { pool } from "../db";
 import crypto from "crypto";
 
-// Exact 12-week curriculum data transcribed from the official syllabus
+// Exact 15-week curriculum data transcribed from the official syllabus
 export const WEEKS_DATA = [
   {
     weekNum: 1,
@@ -624,7 +624,7 @@ export async function seedAiAgentCurriculum(force = false) {
     console.warn("[Seed:AI-Agent] ⚠️ WARNING: ENABLE_PRODUCTION_SEEDS=true detected in production. Running seed by explicit override.");
   }
 
-  console.log("[Seed:AI-Agent] Starting official 12-week AI Agent Engineering curriculum database sync...");
+  console.log("[Seed:AI-Agent] Starting official 15-week AI Agent Engineering curriculum database sync...");
   const client = await pool.connect();
 
   try {
@@ -842,7 +842,7 @@ export async function seedAiAgentCurriculum(force = false) {
 
     // Commit curriculum modules, lessons, course_modules and module_lessons first!
     await client.query("COMMIT");
-    console.log(`[Seed:AI-Agent] Successfully verified all 12 weeks with 48 lessons in PostgreSQL.`);
+    console.log(`[Seed:AI-Agent] Successfully verified all 15 weeks with 48 lessons in PostgreSQL.`);
 
     // 4. Post-commit user enrollment — strictly skipped in production!
     if (process.env.NODE_ENV !== "production") {

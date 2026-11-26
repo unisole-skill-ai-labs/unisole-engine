@@ -57,7 +57,7 @@ const RAW_CANONICAL_SEO_OFFERINGS: CanonicalOffering[] = [
       group: "group-1",
       groupTitle: "Computer Science & IT",
       eyebrow: "PATHWAY 02",
-      duration: "12 Weeks (132 Hours)",
+      duration: "15 Weeks",
       level: "Fundamentals to Production",
       handsOn: "Theory + Hands-on Labs + Capstone",
       syllabusLink: "/syllabi/cs-agentic.pdf",
