@@ -26,6 +26,7 @@ import { adminSurveysRouter } from "./surveys";
 import { adminDashboardRouter } from "./dashboard";
 import { adminMentorshipRouter } from "./mentorship";
 import { adminSubmissionsRouter } from "./submissions";
+import { adminVideosGlobalRouter } from "./videos";
 
 export const adminRouter: Router = Router();
 
@@ -61,6 +62,7 @@ adminRouter.use("/pathways", adminPathwaysRouter);
 adminRouter.use("/courses", adminCoursesRouter);
 adminRouter.use("/modules", adminModulesRouter);
 adminRouter.use("/lessons", adminLessonsRouter);
+adminRouter.use("/videos", adminVideosGlobalRouter);
 adminRouter.use("/enrollments", adminEnrollmentsRouter);
 adminRouter.use("/submissions", adminSubmissionsRouter);
 adminRouter.use("/presentations", adminPresentationsRouter);
