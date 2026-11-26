@@ -39,7 +39,7 @@ export const coursesRepository = {
         mrpPaise: 999900,
         status: "PUBLISHED" as const,
         isActive: true,
-        metadata: { duration: "12 Weeks", level: "Production AI Agent Engineering" },
+        metadata: { duration: "15 Weeks", level: "Production AI Agent Engineering" },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
