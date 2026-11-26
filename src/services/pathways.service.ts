@@ -256,7 +256,7 @@ export const pathwaysService = {
           id: "cs-agentic",
           title: "AI Agent Engineering",
           slug: "cs-agentic",
-          shortDescription: "12-Week AI Agent Engineering Certificate Program (Weeks 1 - 12)",
+          shortDescription: "15-Week AI Agent Engineering Certificate Program (Weeks 1 - 15)",
           description: "From fundamentals of AI agents to designing, building, evaluating, and deploying a production-grade multi-agent system through a single progressive build.",
           pricePaise: 299900,
           status: "PUBLISHED",
