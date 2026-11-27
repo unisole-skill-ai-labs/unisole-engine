@@ -111,15 +111,17 @@ node tools/video-cli/encode-hls.mjs path/to/lecture.mp4 path/to/output-hls
 ### Option B: Direct `ffmpeg` command
 ```bash
 ffmpeg -y -i lecture.mp4 \
-  -filter_complex "[0:v]split=3[v1][v2][v3];[v1]scale=-2:360[v360];[v2]scale=-2:480[v480];[v3]scale=-2:720[v720]" \
+  -filter_complex "[0:v]fps=30,format=yuv420p,split=3[v1][v2][v3];[v1]scale=-2:360[v360];[v2]scale=-2:480[v480];[v3]scale=-2:720[v720]" \
   -map "[v360]" -map 0:a? -map "[v480]" -map 0:a? -map "[v720]" -map 0:a? \
-  -c:v libx264 -profile:v main -preset veryfast -g 48 -keyint_min 48 -sc_threshold 0 \
+  -c:v libx264 -profile:v main -level:v 4.0 -pix_fmt yuv420p -preset veryfast \
+  -x264-params "scenecut=0:open_gop=0" -g 180 -keyint_min 180 -sc_threshold 0 \
+  -force_key_frames "expr:gte(t,n_forced*6)" \
   -b:v:0 600k -b:v:1 1000k -b:v:2 2200k \
-  -c:a aac -b:a 128k -ac 2 \
+  -c:a aac -b:a 128k -ar 48000 -ac 2 \
   -f hls -hls_time 6 -hls_playlist_type vod -hls_flags independent_segments \
   -master_pl_name master.m3u8 \
   -var_stream_map "v:0,a:0,name:360p v:1,a:1,name:480p v:2,a:2,name:720p" \
-  -hls_segment_filename "output-hls/%v/seg_%03d.ts" \
+  -hls_segment_filename "output-hls/%v/seg_%05d.ts" \
   "output-hls/%v/index.m3u8"
 ```
 

@@ -35,6 +35,14 @@ export const videoController = {
     res.json(await videoService.switchToLink(req.params.id));
   }),
 
+  replaceVideo: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await videoService.resetForReplace(req.params.id));
+  }),
+
+  diagnoseVideo: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await videoService.diagnoseLessonVideo(req.params.id));
+  }),
+
   createUploadUrls: asyncHandler(async (req: Request, res: Response) => {
     const lessonId = req.params.id;
     verifyCliVideoToken(extractCliToken(req), lessonId);
