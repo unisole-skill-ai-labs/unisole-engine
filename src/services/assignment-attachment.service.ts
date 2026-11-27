@@ -8,6 +8,7 @@ import { appCache } from "../utils/cache";
 import {
   buildStoredFileName,
   getFileStorageProvider,
+  getStorageProviderForRecord,
 } from "./file-storage.service";
 import { lmsService } from "./lms.service";
 import { TempUploadedFile } from "../utils/multipart-upload";
@@ -43,6 +44,7 @@ export function validateAssignmentAttachmentFile(
 }
 
 export interface StoredAttachmentMeta {
+  provider?: "gdrive" | "local";
   driveFileId: string;
   originalName: string;
   storedName: string;
@@ -99,10 +101,16 @@ export const assignmentAttachmentService = {
     // Delete previous attachment from storage if replacing
     const prev = lesson.assignmentAttachment as StoredAttachmentMeta | null;
     if (prev?.driveFileId) {
-      await storage.deleteFile(prev.driveFileId).catch(() => {});
+      try {
+        const prevStorage = getStorageProviderForRecord(prev.provider, prev.driveFileId);
+        await prevStorage.deleteFile(prev.driveFileId).catch(() => {});
+      } catch {
+        // Ignore if previous provider is not configured
+      }
     }
 
     const meta: StoredAttachmentMeta = {
+      provider: storage.mode,
       driveFileId: uploaded.fileId,
       originalName: file.originalName,
       storedName: uploaded.storedName,
@@ -133,8 +141,12 @@ export const assignmentAttachmentService = {
     }
     const prev = rows[0].assignmentAttachment as StoredAttachmentMeta | null;
     if (prev?.driveFileId) {
-      const storage = getFileStorageProvider();
-      await storage.deleteFile(prev.driveFileId).catch(() => {});
+      try {
+        const storage = getStorageProviderForRecord(prev.provider, prev.driveFileId);
+        await storage.deleteFile(prev.driveFileId).catch(() => {});
+      } catch {
+        // Ignore if provider not configured
+      }
     }
     await db
       .update(lessons)
@@ -161,7 +173,7 @@ export const assignmentAttachmentService = {
     if (!att?.driveFileId) {
       throw new NotFoundError("No attachment found for this assignment");
     }
-    const storage = getFileStorageProvider();
+    const storage = getStorageProviderForRecord(att.provider, att.driveFileId);
     const result = await storage.streamFile(att.driveFileId, rangeHeader);
     return {
       ...result,

@@ -10,6 +10,7 @@ import {
   buildStoredFileName,
   ensureStudentSubmissionFolder,
   getFileStorageProvider,
+  getStorageProviderForRecord,
 } from "./file-storage.service";
 import { lmsService } from "./lms.service";
 import { TempUploadedFile } from "../utils/multipart-upload";
@@ -274,13 +275,14 @@ export const assignmentSubmissionsService = {
           });
 
           uploadedFiles.push({
+            provider: storage.mode,
             driveFileId: uploaded.fileId,
             originalName: f.originalName,
             storedName: uploaded.storedName,
             size: uploaded.sizeBytes,
             mime: canonicalMime,
             durationSec,
-          });
+          } as any);
         }
       } catch (err: any) {
         // Roll back newly uploaded files if any upload fails
@@ -380,7 +382,7 @@ export const assignmentSubmissionsService = {
       throw new NotFoundError("File not found in submission");
     }
 
-    const storage = getFileStorageProvider();
+    const storage = getStorageProviderForRecord((target as any).provider, target.driveFileId);
     const result = await storage.streamFile(target.driveFileId, rangeHeader);
     return {
       ...result,

@@ -6,7 +6,7 @@ import { db } from "../db";
 import { lessons } from "../db/schema";
 import { NotFoundError, ValidationError } from "../errors";
 import { appCache } from "../utils/cache";
-import { buildStoredFileName, getFileStorageProvider } from "./file-storage.service";
+import { buildStoredFileName, getFileStorageProvider, getStorageProviderForRecord } from "./file-storage.service";
 import { lmsService } from "./lms.service";
 import { TempUploadedFile } from "../utils/multipart-upload";
 
@@ -68,6 +68,7 @@ export function validateLectureResourceFile(
 
 export interface StoredLectureResource {
   id: string;
+  provider?: "gdrive" | "local";
   driveFileId: string;
   originalName: string;
   storedName: string;
@@ -150,6 +151,7 @@ export const lessonResourcesService = {
 
         added.push({
           id: `res_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`,
+          provider: storage.mode,
           driveFileId: uploaded.fileId,
           originalName: file.originalName,
           storedName: uploaded.storedName,
@@ -233,8 +235,12 @@ export const lessonResourcesService = {
     }
 
     if (target.driveFileId) {
-      const storage = getFileStorageProvider();
-      await storage.deleteFile(target.driveFileId).catch(() => {});
+      try {
+        const storage = getStorageProviderForRecord(target.provider, target.driveFileId);
+        await storage.deleteFile(target.driveFileId).catch(() => {});
+      } catch {
+        // Ignore if provider is not configured
+      }
     }
 
     const updated = existing.filter((r) => r.id !== resourceId);
@@ -272,7 +278,7 @@ export const lessonResourcesService = {
       throw new NotFoundError("Resource not found");
     }
 
-    const storage = getFileStorageProvider();
+    const storage = getStorageProviderForRecord(target.provider, target.driveFileId);
     const result = await storage.streamFile(target.driveFileId, rangeHeader);
     return {
       ...result,

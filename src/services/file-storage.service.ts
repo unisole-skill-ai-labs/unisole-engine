@@ -7,6 +7,7 @@ import { Readable } from "stream";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "../db/schema";
+import { NotFoundError, ServiceUnavailableError } from "../errors";
 
 export interface UploadFileParams {
   folderId: string;
@@ -351,13 +352,21 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
     const metaRes = await fetch(
       `${this.endpoints.driveApiBase}/files/${encodeURIComponent(
         fileId
-      )}?fields=size,mimeType,name`,
+      )}?fields=size,mimeType,name,trashed`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
+    if (metaRes.status === 404) {
+      console.warn(`[STORAGE_MISSING] Google Drive file not found: ${fileId}`);
+      throw new NotFoundError("Attachment is no longer available");
+    }
     if (!metaRes.ok) {
       throw new Error(`Drive file metadata failed with HTTP ${metaRes.status}`);
     }
-    const meta = (await metaRes.json()) as { size?: string; mimeType?: string; name?: string };
+    const meta = (await metaRes.json()) as { size?: string; mimeType?: string; name?: string; trashed?: boolean };
+    if (meta.trashed) {
+      console.warn(`[STORAGE_MISSING] Google Drive file is trashed: ${fileId}`);
+      throw new NotFoundError("Attachment is no longer available");
+    }
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -480,7 +489,8 @@ export class LocalDiskStorageProvider implements FileStorageProvider {
     const cleaned = fileId.replace(/\.\./g, "").replace(/^[/\\]+/, "");
     const absFile = path.join(this.baseDir, cleaned);
     if (!fs.existsSync(absFile)) {
-      throw new Error("File not found in local storage");
+      console.warn(`[STORAGE_MISSING] Local file not found: ${cleaned}`);
+      throw new NotFoundError("Attachment is no longer available");
     }
     const stat = fs.statSync(absFile);
     const total = stat.size;
@@ -565,6 +575,48 @@ export function getFileStorageProvider(): FileStorageProvider {
 
   cachedProvider = { key, provider };
   return provider;
+}
+
+/**
+ * Determine the storage provider for an existing DB record.
+ * Local disk fileIds always contain '/' (e.g. "assignments/les_123/file.pdf");
+ * Google Drive fileIds are opaque IDs without '/'.
+ */
+export function resolveRecordProvider(
+  recordProvider?: string | null,
+  fileId?: string | null
+): "gdrive" | "local" {
+  if (recordProvider === "local") return "local";
+  if (recordProvider === "gdrive") return "gdrive";
+  if (fileId && fileId.includes("/")) return "local";
+  return "gdrive";
+}
+
+/**
+ * Resolve a FileStorageProvider for reading/deleting an existing record.
+ * Never silently falls back to local disk for a Drive-backed record.
+ */
+export function getStorageProviderForRecord(
+  recordProvider?: string | null,
+  fileId?: string | null
+): FileStorageProvider {
+  const mode = resolveRecordProvider(recordProvider, fileId);
+  if (mode === "local") {
+    return new LocalDiskStorageProvider(process.env.LOCAL_STORAGE_DIR || undefined);
+  }
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || "";
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || "";
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN || "";
+  const rootFolderId = process.env.GDRIVE_ROOT_FOLDER_ID || "";
+  if (!clientId || !clientSecret || !refreshToken || !rootFolderId) {
+    console.error(
+      "[STORAGE_ERROR] Record is stored on Google Drive, but Drive OAuth env vars are not configured in this environment."
+    );
+    throw new ServiceUnavailableError(
+      "File storage (Google Drive) is not configured in this environment."
+    );
+  }
+  return getFileStorageProvider();
 }
 
 export function logFileStorageStartupStatus(): FileStorageProvider {
