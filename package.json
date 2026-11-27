@@ -29,6 +29,7 @@
     "db:sync:pathways": "node dist/scripts/sync-canonical-pathways.js",
     "db:sync:pathways:dev": "tsx src/scripts/sync-canonical-pathways.ts",
     "gdrive:auth": "tsx src/scripts/gdrive-auth.ts",
+    "drive:diagnose": "tsx src/scripts/diagnose-drive.ts",
     "backfill:dry-run": "tsx src/scripts/backfill-dry-run.ts"
   },
   "dependencies": {

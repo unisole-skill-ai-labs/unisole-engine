@@ -32,6 +32,7 @@ export interface StreamFileResult {
 export interface FileStorageProvider {
   readonly mode: "gdrive" | "local";
   ensureFolder(pathSegments: string[]): Promise<string>;
+  verifyFolderExists(folderId: string): Promise<boolean>;
   resolveUniqueFileName(folderId: string, desiredName: string): Promise<string>;
   uploadFile(params: UploadFileParams): Promise<UploadedFileResult>;
   streamFile(fileId: string, rangeHeader?: string): Promise<StreamFileResult>;
@@ -157,6 +158,29 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
     }
   ) {}
 
+  private async fetchWithRetry(url: string, init?: RequestInit, retries = 1): Promise<Response> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(url, init);
+        if (res.status === 429 || (res.status >= 500 && res.status <= 599)) {
+          if (attempt < retries) {
+            await new Promise((r) => setTimeout(r, 300));
+            continue;
+          }
+        }
+        return res;
+      } catch (err) {
+        lastError = err;
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 300));
+          continue;
+        }
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
   private async getAccessToken(): Promise<string> {
     if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) {
       return this.accessToken;
@@ -172,12 +196,23 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
         refresh_token: this.refreshToken,
         grant_type: "refresh_token",
       });
-      const res = await fetch(this.endpoints.tokenUrl, {
+      const res = await this.fetchWithRetry(this.endpoints.tokenUrl, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),
       });
       if (!res.ok) {
+        let oauthError = "";
+        try {
+          const errJson = (await res.json()) as { error?: string };
+          oauthError = errJson?.error || "";
+        } catch {
+          // ignore non-JSON error body
+        }
+        if (oauthError === "invalid_grant") {
+          console.error("[STORAGE_ERROR] Drive refresh token invalid or expired");
+          throw new ServiceUnavailableError("File storage is temporarily unavailable.");
+        }
         throw new Error(`Google OAuth token refresh failed with HTTP ${res.status}`);
       }
       const data = (await res.json()) as { access_token: string; expires_in?: number };
@@ -204,7 +239,7 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
         q
       )}&fields=files(id,name)&pageSize=1`;
 
-      const listRes = await fetch(listUrl, {
+      const listRes = await this.fetchWithRetry(listUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!listRes.ok) {
@@ -215,7 +250,7 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
         return listData.files[0].id;
       }
 
-      const createRes = await fetch(`${this.endpoints.driveApiBase}/files?fields=id`, {
+      const createRes = await this.fetchWithRetry(`${this.endpoints.driveApiBase}/files?fields=id`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -244,6 +279,27 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
     return currentParent;
   }
 
+  async verifyFolderExists(folderId: string): Promise<boolean> {
+    if (!folderId) return false;
+    const token = await this.getAccessToken();
+    const res = await this.fetchWithRetry(
+      `${this.endpoints.driveApiBase}/files/${encodeURIComponent(
+        folderId
+      )}?fields=id,trashed,mimeType`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (res.status === 404) {
+      return false;
+    }
+    if (!res.ok) {
+      throw new Error(`Drive folder verification failed with HTTP ${res.status}`);
+    }
+    const meta = (await res.json()) as { trashed?: boolean; mimeType?: string };
+    if (meta.trashed) return false;
+    if (meta.mimeType && meta.mimeType !== "application/vnd.google-apps.folder") return false;
+    return true;
+  }
+
   async resolveUniqueFileName(folderId: string, desiredName: string): Promise<string> {
     const token = await this.getAccessToken();
     const ext = path.extname(desiredName);
@@ -255,7 +311,7 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
       q
     )}&fields=files(name)&pageSize=100`;
 
-    const res = await fetch(url, {
+    const res = await this.fetchWithRetry(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
@@ -271,7 +327,7 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
     const storedName = await this.resolveUniqueFileName(params.folderId, params.fileName);
 
     // 1. Initiate resumable upload session
-    const initRes = await fetch(
+    const initRes = await this.fetchWithRetry(
       `${this.endpoints.driveUploadBase}/files?uploadType=resumable&fields=id,name,size`,
       {
         method: "POST",
@@ -349,7 +405,7 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
   async streamFile(fileId: string, rangeHeader?: string): Promise<StreamFileResult> {
     const token = await this.getAccessToken();
 
-    const metaRes = await fetch(
+    const metaRes = await this.fetchWithRetry(
       `${this.endpoints.driveApiBase}/files/${encodeURIComponent(
         fileId
       )}?fields=size,mimeType,name,trashed`,
@@ -375,7 +431,7 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
       headers.Range = rangeHeader;
     }
 
-    const mediaRes = await fetch(
+    const mediaRes = await this.fetchWithRetry(
       `${this.endpoints.driveApiBase}/files/${encodeURIComponent(fileId)}?alt=media`,
       { headers }
     );
@@ -410,7 +466,7 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
   async deleteFile(fileId: string): Promise<void> {
     if (!fileId) return;
     const token = await this.getAccessToken();
-    const res = await fetch(
+    const res = await this.fetchWithRetry(
       `${this.endpoints.driveApiBase}/files/${encodeURIComponent(fileId)}`,
       {
         method: "DELETE",
@@ -447,6 +503,12 @@ export class LocalDiskStorageProvider implements FileStorageProvider {
     const abs = path.join(this.baseDir, ...safeSegments);
     fs.mkdirSync(abs, { recursive: true });
     return rel;
+  }
+
+  async verifyFolderExists(folderId: string): Promise<boolean> {
+    if (!folderId) return false;
+    const absDir = this.resolveFolderAbs(folderId);
+    return fs.existsSync(absDir) && fs.statSync(absDir).isDirectory();
   }
 
   async resolveUniqueFileName(folderId: string, desiredName: string): Promise<string> {
@@ -683,11 +745,22 @@ export async function ensureStudentSubmissionFolder(
       .where(eq(users.id, userId))
       .limit(1);
 
+    const storage = getFileStorageProvider();
+
     if (rows[0]?.driveFolderId) {
-      return rows[0].driveFolderId;
+      const exists = await storage.verifyFolderExists(rows[0].driveFolderId);
+      if (exists) {
+        return rows[0].driveFolderId;
+      }
+      console.warn(
+        `[STORAGE_WARN] Stale student submission folder ${rows[0].driveFolderId} for user ${userId}; recreating.`
+      );
+      await db
+        .update(users)
+        .set({ driveFolderId: null, updatedAt: new Date().toISOString() })
+        .where(eq(users.id, userId));
     }
 
-    const storage = getFileStorageProvider();
     const folderName = buildStudentFolderName(phone, studentName, userId);
     const folderId = await storage.ensureFolder(["submissions", folderName]);
 
