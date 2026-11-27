@@ -145,9 +145,7 @@ async function bootstrap() {
     logFileStorageStartupStatus();
   } catch (storageErr: any) {
     console.error("[BOOTSTRAP] Fatal storage configuration error:", storageErr?.message || storageErr);
-    if (process.env.NODE_ENV === "production") {
-      process.exit(1);
-    }
+    process.exit(1);
   }
   server.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);

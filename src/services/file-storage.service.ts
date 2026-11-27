@@ -548,16 +548,42 @@ export class LocalDiskStorageProvider implements FileStorageProvider {
 
 let cachedProvider: { key: string; provider: FileStorageProvider } | null = null;
 
+export function isStorageStrict(): boolean {
+  if (process.env.STORAGE_STRICT === "true") return true;
+  if (process.env.STORAGE_STRICT === "false") return false;
+  return process.env.NODE_ENV === "production" || process.env.APP_ENV === "staging";
+}
+
+export function getMissingDriveEnvVars(): string[] {
+  const required = [
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "GOOGLE_OAUTH_REFRESH_TOKEN",
+    "GDRIVE_ROOT_FOLDER_ID",
+  ] as const;
+  return required.filter((k) => !(process.env[k] || "").trim());
+}
+
+export function getMissingAzureVideoEnvVars(): string[] {
+  const required = [
+    "AZURE_STORAGE_ACCOUNT",
+    "AZURE_STORAGE_ACCOUNT_KEY",
+    "AZURE_HLS_CONTAINER",
+  ] as const;
+  return required.filter((k) => !(process.env[k] || "").trim());
+}
+
 export function getFileStorageProvider(): FileStorageProvider {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || "";
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || "";
   const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN || "";
   const rootFolderId = process.env.GDRIVE_ROOT_FOLDER_ID || "";
 
-  const hasGdrive = Boolean(clientId && clientSecret && refreshToken && rootFolderId);
-  if (!hasGdrive && process.env.NODE_ENV === "production") {
+  const missingDrive = getMissingDriveEnvVars();
+  const hasGdrive = missingDrive.length === 0;
+  if (!hasGdrive && isStorageStrict()) {
     throw new Error(
-      "Google Drive OAuth storage is not configured in production (requires GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN, GDRIVE_ROOT_FOLDER_ID)."
+      `Google Drive OAuth storage is required (STORAGE_STRICT=true / production / staging) but missing environment variable(s): ${missingDrive.join(", ")}`
     );
   }
 
@@ -621,11 +647,16 @@ export function getStorageProviderForRecord(
 
 export function logFileStorageStartupStatus(): FileStorageProvider {
   const provider = getFileStorageProvider();
-  if (provider.mode === "gdrive") {
-    console.log("[STORAGE] Active file storage provider: Google Drive (OAuth2, drive.file scope)");
-  } else {
-    console.log("[STORAGE] Active file storage provider: Local Disk (non-production fallback)");
+  const videoMode = (process.env.VIDEO_STORAGE_MODE || "stub").toLowerCase().trim() === "azure" ? "azure" : "stub";
+  if (videoMode === "azure") {
+    const missingAzure = getMissingAzureVideoEnvVars();
+    if (missingAzure.length > 0) {
+      throw new Error(
+        `VIDEO_STORAGE_MODE=azure is enabled but missing environment variable(s): ${missingAzure.join(", ")}`
+      );
+    }
   }
+  console.log(`[STORAGE] Active storage modes — files: ${provider.mode}, video: ${videoMode}`);
   return provider;
 }
 
