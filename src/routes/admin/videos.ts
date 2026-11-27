@@ -27,6 +27,8 @@ const videoMutationLimiter = rateLimit({
 adminVideosRouter.post("/cli-token", canManageLessons, videoMutationLimiter, videoController.createCliToken);
 adminVideosRouter.get("/status", canManageLessons, videoController.getStatus);
 adminVideosRouter.post("/switch-to-link", canManageLessons, videoController.switchToLink);
+adminVideosRouter.post("/replace", canManageLessons, videoMutationLimiter, videoController.replaceVideo);
+adminVideosRouter.get("/diagnose", canManageLessons, videoController.diagnoseVideo);
 adminVideosRouter.post("/simple-upload/init", canManageLessons, videoMutationLimiter, videoController.initSimpleUpload);
 adminVideosRouter.post("/simple-upload/complete", canManageLessons, videoMutationLimiter, videoController.completeSimpleUpload);
 adminVideosRouter.post("/simple-upload/fail", canManageLessons, videoMutationLimiter, videoController.failSimpleUpload);

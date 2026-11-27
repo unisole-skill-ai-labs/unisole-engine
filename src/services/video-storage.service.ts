@@ -10,7 +10,7 @@ import { ValidationError } from "../errors";
 export const HLS_FILE_WHITELIST_RE =
   /^(master\.m3u8|(360p|480p|720p|1080p)\/(index\.m3u8|seg_\d+\.ts))$/;
 
-export const MAX_HLS_UPLOAD_FILES = 2000;
+export const MAX_HLS_UPLOAD_FILES = 5000;
 
 export function assertValidHlsFile(filePath: string): void {
   if (!filePath || typeof filePath !== "string" || !HLS_FILE_WHITELIST_RE.test(filePath)) {
@@ -70,6 +70,7 @@ export interface VideoStorageProvider {
   ): Promise<Record<string, string>>;
   generateSingleWriteSasUrl(blobPath: string, ttlSeconds: number): Promise<string>;
   verifyBlobExists(blobPath: string): Promise<{ exists: boolean; sizeBytes: number }>;
+  listBlobsWithSizes?(prefix: string): Promise<Map<string, number>>;
   getPlaylistText(blobPath: string): Promise<string>;
   generateReadSasUrl(blobPath: string, ttlSeconds: number): Promise<string>;
   deletePrefix(prefix: string): Promise<number>;
@@ -238,6 +239,16 @@ export class AzureVideoStorageProvider implements VideoStorageProvider {
     } catch {
       return { exists: false, sizeBytes: 0 };
     }
+  }
+
+  async listBlobsWithSizes(prefix: string): Promise<Map<string, number>> {
+    const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+    const normalized = prefix.endsWith("/") ? prefix : `${prefix}/`;
+    const result = new Map<string, number>();
+    for await (const item of containerClient.listBlobsFlat({ prefix: normalized })) {
+      result.set(item.name, Number(item.properties?.contentLength || 0));
+    }
+    return result;
   }
 
   async getPlaylistText(blobPath: string): Promise<string> {

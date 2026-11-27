@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { analyzeHlsFolder } from "../hls-doctor.mjs";
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -58,14 +59,18 @@ function getDurationMinutes(inputPath) {
 
 function buildFfmpegArgs(inputPath, outDir, useHardware) {
   const codec = useHardware ? "h264_videotoolbox" : "libx264";
-  const extraCodecArgs = useHardware ? [] : ["-preset", "veryfast"];
+  const extraCodecArgs = useHardware
+    ? ["-allow_sw", "1"]
+    : ["-preset", "veryfast", "-x264-params", "scenecut=0:open_gop=0"];
+  const targetFps = 30;
+  const gopFrames = targetFps * 6;
 
   return [
     "-y",
     "-i",
     inputPath,
     "-filter_complex",
-    "[0:v]split=3[v1][v2][v3];[v1]scale=-2:360[v360];[v2]scale=-2:480[v480];[v3]scale=-2:720[v720]",
+    `[0:v]fps=${targetFps},format=yuv420p,split=3[v1][v2][v3];[v1]scale=-2:360[v360];[v2]scale=-2:480[v480];[v3]scale=-2:720[v720]`,
     "-map",
     "[v360]",
     "-map",
@@ -82,13 +87,19 @@ function buildFfmpegArgs(inputPath, outDir, useHardware) {
     codec,
     "-profile:v",
     "main",
+    "-level:v",
+    "4.0",
+    "-pix_fmt",
+    "yuv420p",
     ...extraCodecArgs,
     "-g",
-    "48",
+    String(gopFrames),
     "-keyint_min",
-    "48",
+    String(gopFrames),
     "-sc_threshold",
     "0",
+    "-force_key_frames",
+    "expr:gte(t,n_forced*6)",
     "-b:v:0",
     "600k",
     "-b:v:1",
@@ -99,6 +110,8 @@ function buildFfmpegArgs(inputPath, outDir, useHardware) {
     "aac",
     "-b:a",
     "128k",
+    "-ar",
+    "48000",
     "-ac",
     "2",
     "-f",
@@ -114,8 +127,8 @@ function buildFfmpegArgs(inputPath, outDir, useHardware) {
     "-var_stream_map",
     "v:0,a:0,name:360p v:1,a:1,name:480p v:2,a:2,name:720p",
     "-hls_segment_filename",
-    path.join(outDir, "%v", "seg_%03d.ts"),
-    path.join(outDir, "%v", "index.m3u8"),
+    path.join(outDir, "%v", "seg_%05d.ts").replace(/\\/g, "/"),
+    path.join(outDir, "%v", "index.m3u8").replace(/\\/g, "/"),
   ];
 }
 
@@ -225,6 +238,17 @@ async function main() {
     const ff = spawnSync("ffmpeg", ffArgs, { stdio: "inherit" });
     if (ff.status !== 0) {
       throw new Error(`ffmpeg exited with code ${ff.status}`);
+    }
+
+    console.log("    Validating encoded HLS with hls-doctor...");
+    const doctor = analyzeHlsFolder(outDir);
+    for (const w of doctor.warnings) {
+      console.warn(`    [WARN] ${w}`);
+    }
+    if (!doctor.ok) {
+      throw new Error(
+        `HLS validation failed:\n  - ${doctor.errors.join("\n  - ")}\nRe-encode with: node tools/video-cli/encode-hls.mjs "${absInput}"`
+      );
     }
 
     const files = collectFiles(outDir);

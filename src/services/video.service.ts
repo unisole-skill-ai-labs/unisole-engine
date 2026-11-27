@@ -230,9 +230,14 @@ export const videoService = {
     };
   },
 
-  async completeUpload(lessonId: string, hlsPath: string, durationMinutes?: number) {
+  async completeUpload(
+    lessonId: string,
+    hlsPath: string,
+    durationMinutes?: number,
+    storage: VideoStorageProvider = getVideoStorageProvider()
+  ) {
     assertVideoConfiguredForEnv();
-    if (process.env.NODE_ENV === "production" && getVideoStorageProvider().mode !== "azure") {
+    if (process.env.NODE_ENV === "production" && storage.mode !== "azure") {
       throw new ServiceUnavailableError("Stub mode cannot mark video READY in production");
     }
     const expectedRe = new RegExp(
@@ -245,6 +250,24 @@ export const videoService = {
 
     const rows = await db.select({ id: lessons.id }).from(lessons).where(eq(lessons.id, lessonId)).limit(1);
     if (rows.length === 0) throw new NotFoundError("Lesson not found");
+
+    // Verify master.m3u8, every variant index.m3u8, and every referenced segment exists with size > 0
+    const prefix = hlsPath.replace(/\/master\.m3u8$/, "");
+    const diag = await this.verifyHlsBlobs(prefix, storage);
+    if (diag.missingCount > 0 || diag.emptyCount > 0 || !diag.masterExists) {
+      const sample = [...diag.missingSample, ...diag.emptySample].slice(0, 5).join(", ");
+      const msg = `Incomplete HLS upload (${diag.missingCount} missing, ${diag.emptyCount} empty): ${sample || "master.m3u8 missing"}`;
+      await db
+        .update(lessons)
+        .set({
+          videoStatus: "FAILED",
+          videoError: msg.slice(0, 500),
+          videoUpdatedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(lessons.id, lessonId));
+      throw new ValidationError(msg);
+    }
 
     const updateData: Record<string, any> = {
       videoProvider: "AZURE_HLS",
@@ -262,6 +285,152 @@ export const videoService = {
     appCache.invalidatePattern(/^pathway_hierarchy:/);
 
     return { status: "READY", videoProvider: "AZURE_HLS", videoHlsPath: hlsPath };
+  },
+
+  async verifyHlsBlobs(prefix: string, storage: VideoStorageProvider) {
+    const masterBlob = `${prefix}/master.m3u8`;
+    const blobSizes = storage.listBlobsWithSizes ? await storage.listBlobsWithSizes(prefix) : null;
+    const checkBlob = async (blobPath: string): Promise<{ exists: boolean; sizeBytes: number }> => {
+      if (blobSizes) {
+        const size = blobSizes.get(blobPath);
+        return size !== undefined ? { exists: true, sizeBytes: size } : { exists: false, sizeBytes: 0 };
+      }
+      return storage.verifyBlobExists(blobPath);
+    };
+
+    const masterCheck = await checkBlob(masterBlob);
+    if (!masterCheck.exists || masterCheck.sizeBytes <= 0) {
+      return {
+        masterExists: false,
+        renditions: [],
+        missingCount: 1,
+        emptyCount: masterCheck.exists ? 1 : 0,
+        missingSample: ["master.m3u8"],
+        emptySample: [],
+      };
+    }
+
+    const masterText = await storage.getPlaylistText(masterBlob);
+    const variantPaths = masterText
+      .split(/\r?\n/)
+      .map((l) => l.trim().replace(/\\/g, "/"))
+      .filter((l) => l && !l.startsWith("#"));
+
+    const missingSample: string[] = [];
+    const emptySample: string[] = [];
+    let missingCount = 0;
+    let emptyCount = 0;
+    const renditions: Array<{ path: string; segments: number; missing: number; empty: number }> = [];
+
+    for (const vp of variantPaths) {
+      assertValidHlsFile(vp);
+      const vBlob = `${prefix}/${vp}`;
+      const vCheck = await checkBlob(vBlob);
+      if (!vCheck.exists || vCheck.sizeBytes <= 0) {
+        if (!vCheck.exists) {
+          missingCount++;
+          if (missingSample.length < 10) missingSample.push(vp);
+        } else {
+          emptyCount++;
+          if (emptySample.length < 10) emptySample.push(vp);
+        }
+        renditions.push({ path: vp, segments: 0, missing: vCheck.exists ? 0 : 1, empty: vCheck.exists ? 1 : 0 });
+        continue;
+      }
+
+      const variantDir = vp.split("/")[0];
+      const vText = await storage.getPlaylistText(vBlob);
+      const segs = vText
+        .split(/\r?\n/)
+        .map((l) => l.trim().replace(/\\/g, "/"))
+        .filter((l) => l && !l.startsWith("#"));
+
+      let rMissing = 0;
+      let rEmpty = 0;
+      for (const seg of segs) {
+        const rel = `${variantDir}/${seg}`;
+        assertValidHlsFile(rel);
+        const sCheck = await checkBlob(`${prefix}/${rel}`);
+        if (!sCheck.exists) {
+          missingCount++;
+          rMissing++;
+          if (missingSample.length < 10) missingSample.push(rel);
+        } else if (sCheck.sizeBytes <= 0) {
+          emptyCount++;
+          rEmpty++;
+          if (emptySample.length < 10) emptySample.push(rel);
+        }
+      }
+      renditions.push({ path: vp, segments: segs.length, missing: rMissing, empty: rEmpty });
+    }
+
+    return { masterExists: true, renditions, missingCount, emptyCount, missingSample, emptySample };
+  },
+
+  async resetForReplace(lessonId: string, storage: VideoStorageProvider = getVideoStorageProvider()) {
+    assertVideoConfiguredForEnv();
+    const rows = await db.select({ id: lessons.id }).from(lessons).where(eq(lessons.id, lessonId)).limit(1);
+    if (rows.length === 0) throw new NotFoundError("Lesson not found");
+
+    let deletedBlobs = 0;
+    try {
+      deletedBlobs = await storage.deletePrefix(`${lessonId}/`);
+    } catch {
+      // Best-effort cleanup; allow admin to re-upload immediately
+    }
+
+    await db
+      .update(lessons)
+      .set({
+        videoProvider: "YOUTUBE",
+        videoStatus: "NONE",
+        videoHlsPath: null,
+        videoError: null,
+        videoUpdatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(lessons.id, lessonId));
+    appCache.invalidatePattern(/^pathway_hierarchy:/);
+
+    return { reset: true, deletedBlobs, videoStatus: "NONE" };
+  },
+
+  async diagnoseLessonVideo(lessonId: string, storage: VideoStorageProvider = getVideoStorageProvider()) {
+    const rows = await db
+      .select({
+        id: lessons.id,
+        videoProvider: lessons.videoProvider,
+        videoStatus: lessons.videoStatus,
+        videoHlsPath: lessons.videoHlsPath,
+        videoError: lessons.videoError,
+      })
+      .from(lessons)
+      .where(eq(lessons.id, lessonId))
+      .limit(1);
+    if (rows.length === 0) throw new NotFoundError("Lesson not found");
+    const lesson = rows[0];
+    if (!lesson.videoHlsPath || lesson.videoProvider !== "AZURE_HLS") {
+      return {
+        lessonId,
+        videoProvider: lesson.videoProvider,
+        videoStatus: lesson.videoStatus,
+        videoError: lesson.videoError,
+        masterExists: false,
+        renditions: [],
+        missingCount: 0,
+        emptyCount: 0,
+      };
+    }
+    const prefix = lesson.videoHlsPath.replace(/\/master\.m3u8$/, "");
+    const check = await this.verifyHlsBlobs(prefix, storage);
+    return {
+      lessonId,
+      videoProvider: lesson.videoProvider,
+      videoStatus: lesson.videoStatus,
+      videoHlsPath: lesson.videoHlsPath,
+      videoError: lesson.videoError,
+      ...check,
+    };
   },
 
   async failUpload(lessonId: string, errorMessage: string) {
