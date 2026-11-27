@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { studentSurveySchema } from "../constants/defaultSurvey";
 import { pricingService } from "../services/pricing.service";
 import { seedLmsDemoData } from "../scripts/seed-lms-demo";
+import { LEGACY_BACKFILL_UPDATE_SQL } from "./legacy-backfill";
 
 async function addEnumValueSafely(typeName: string, value: string) {
   try {
@@ -1143,6 +1144,44 @@ export async function initializeDatabase() {
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_student_course_state_user_pathway"
         ON "public"."student_course_state" ("user_id", "pathway_id");
     `);
+
+    // 18a. Google Drive Storage & Assignment Submissions Tables
+    await execSqlSafe("drive_storage_columns", `
+      ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "drive_folder_id" varchar(120);
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "assignment_attachment" jsonb;
+    `);
+
+    await execSqlSafe("lesson_assignment_submissions_table", `
+      CREATE TABLE IF NOT EXISTS "public"."lesson_assignment_submissions" (
+        "id" varchar(50) PRIMARY KEY,
+        "student_id" varchar(50) NOT NULL,
+        "assignment_id" varchar(50) NOT NULL,
+        "text" text,
+        "attempt_count" integer DEFAULT 1 NOT NULL,
+        "files" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "review_status" varchar(20) DEFAULT 'NOT_REVIEWED' NOT NULL,
+        "admin_comment" text,
+        "reviewed_by" varchar(50),
+        "reviewed_at" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_lesson_assignment_submissions_student_assignment"
+        ON "public"."lesson_assignment_submissions" ("student_id", "assignment_id");
+      CREATE INDEX IF NOT EXISTS "idx_lesson_assignment_submissions_assignment"
+        ON "public"."lesson_assignment_submissions" ("assignment_id");
+      CREATE INDEX IF NOT EXISTS "idx_lesson_assignment_submissions_student"
+        ON "public"."lesson_assignment_submissions" ("student_id");
+      CREATE INDEX IF NOT EXISTS "idx_lesson_assignment_submissions_status"
+        ON "public"."lesson_assignment_submissions" ("review_status");
+      ALTER TABLE "public"."lesson_assignment_submissions"
+        ADD COLUMN IF NOT EXISTS "links" jsonb DEFAULT '[]'::jsonb NOT NULL;
+    `);
+
+    if (process.env.RUN_LEGACY_TYPE_BACKFILL === "true") {
+      await execSqlSafe("backfill_legacy_lesson_types", LEGACY_BACKFILL_UPDATE_SQL);
+      console.log("[DB-INIT] ✅ Ran opt-in legacy lesson type backfill (RUN_LEGACY_TYPE_BACKFILL=true).");
+    }
 
     // 18b. Ensure Partial Unique Index on Active Enrollments (Catches duplicate errors safely without halting boot)
     try {

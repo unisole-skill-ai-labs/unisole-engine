@@ -3,6 +3,7 @@ import { asyncHandler } from "../../middleware/async-handler";
 import { CustomRequest, requireRole } from "../../middleware/auth";
 import { lmsService } from "../../services/lms.service";
 import { adminSubmissionsService } from "../../services/admin-submissions.service";
+import { assignmentSubmissionsService } from "../../services/assignment-submissions.service";
 
 export const adminSubmissionsRouter: Router = Router();
 
@@ -25,6 +26,36 @@ function extractCallerContext(req: CustomRequest) {
     .map((r) => String(r).toUpperCase());
   return { callerUserId, callerRoles };
 }
+
+adminSubmissionsRouter.get(
+  "/assignment-uploads",
+  canViewSubmissions,
+  asyncHandler(async (req: CustomRequest, res: Response) => {
+    const { assignmentId, status, search, page, limit } = req.query;
+    const result = await assignmentSubmissionsService.listForAdmin({
+      assignmentId: assignmentId ? String(assignmentId) : undefined,
+      status: status ? String(status) : undefined,
+      search: search ? String(search) : undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 30,
+    });
+    res.json(result);
+  })
+);
+
+adminSubmissionsRouter.patch(
+  "/assignment-uploads/:submissionId/review",
+  canViewSubmissions,
+  asyncHandler(async (req: CustomRequest, res: Response) => {
+    const { reviewStatus, adminComment } = req.body || {};
+    const updated = await assignmentSubmissionsService.review(
+      String(req.params.submissionId),
+      req.user!.id,
+      { reviewStatus, adminComment }
+    );
+    res.json({ submission: updated });
+  })
+);
 
 adminSubmissionsRouter.get(
   "/activities",
