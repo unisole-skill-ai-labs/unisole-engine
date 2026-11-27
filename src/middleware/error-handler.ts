@@ -64,9 +64,8 @@ export function errorHandler(
     (req.headers["x-request-id"] as string) ||
     `req_${crypto.randomBytes(6).toString("hex")}`;
 
-  const isDev = process.env.NODE_ENV !== "production";
-  const isAdmin = (req as CustomRequest).user?.role?.toUpperCase() === "ADMIN";
-  const allowInternalDetails = isDev || isAdmin;
+  const nodeEnv = (process.env.NODE_ENV || "").toLowerCase();
+  const allowInternalDetails = nodeEnv === "development" || nodeEnv === "test";
 
   const anyErr = (err && typeof err === "object" ? err : {}) as Record<string, any>;
   const pgErr = extractPgError(err);

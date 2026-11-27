@@ -457,6 +457,7 @@ export const users = pgTable(
     signupSessionCode: varchar("signup_session_code", { length: 50 }),
     signupCollegeId: varchar("signup_college_id", { length: 50 }),
     signupCollegeName: varchar("signup_college_name", { length: 200 }),
+    driveFolderId: varchar("drive_folder_id", { length: 120 }),
     metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
@@ -867,6 +868,8 @@ export const lessons = pgTable(
     isActive: boolean("is_active").default(true).notNull(),
     unlockAt: timestamp("unlock_at", { withTimezone: true, mode: "string" }),
     lockAt: timestamp("lock_at", { withTimezone: true, mode: "string" }),
+    assignmentAttachment: jsonb("assignment_attachment"),
+    lessonResources: jsonb("lesson_resources").default([]).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
@@ -2220,6 +2223,48 @@ export type ModuleLesson = InferSelectModel<typeof moduleLessons>;
 export type Enrollment = InferSelectModel<typeof enrollments>;
 export type LessonProgress = InferSelectModel<typeof lessonProgress>;
 export type Submission = InferSelectModel<typeof submissions>;
+
+export const assignmentSubmissions = pgTable(
+  "lesson_assignment_submissions",
+  {
+    id: varchar({ length: 50 }).primaryKey().notNull(),
+    studentId: varchar("student_id", { length: 50 }).notNull(),
+    assignmentId: varchar("assignment_id", { length: 50 }).notNull(),
+    text: text("text"),
+    attemptCount: integer("attempt_count").default(1).notNull(),
+    files: jsonb("files").default(sql`'[]'::jsonb`).notNull(),
+    links: jsonb("links").default(sql`'[]'::jsonb`).notNull(),
+    reviewStatus: varchar("review_status", { length: 20 }).default("NOT_REVIEWED").notNull(),
+    adminComment: text("admin_comment"),
+    reviewedBy: varchar("reviewed_by", { length: 50 }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("uq_assignment_submissions_student_assignment").on(table.studentId, table.assignmentId),
+    index("idx_assignment_submissions_assignment").on(table.assignmentId),
+    index("idx_assignment_submissions_student").on(table.studentId),
+    index("idx_assignment_submissions_status").on(table.reviewStatus),
+    foreignKey({
+      columns: [table.studentId],
+      foreignColumns: [users.id],
+      name: "fk_assignment_submissions_student",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.assignmentId],
+      foreignColumns: [lessons.id],
+      name: "fk_assignment_submissions_assignment",
+    }).onDelete("cascade"),
+  ]
+);
+
+export type AssignmentSubmission = InferSelectModel<typeof assignmentSubmissions>;
+export type NewAssignmentSubmission = InferInsertModel<typeof assignmentSubmissions>;
 export type Note = InferSelectModel<typeof notes>;
 export type ProgramManager = InferSelectModel<typeof programManagers>;
 export type Mentor = InferSelectModel<typeof mentors>;

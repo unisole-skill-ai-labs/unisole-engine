@@ -18,3 +18,4 @@ backups/
 config/*.json
 config/credentials/
 firebase-key.json
+.e2e-drive-manifest.json

@@ -31,9 +31,10 @@ import { courseModules, moduleLessons, lessons, modules } from "./db/schema";
 import { pathwaysService } from "./services/pathways.service";
 import { pricingService } from "./services/pricing.service";
 import { enrollmentsService } from "./services/enrollments.service";
+import { logFileStorageStartupStatus } from "./services/file-storage.service";
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", process.env.TRUSTED_PROXY || ["loopback", "linklocal", "uniquelocal"]);
 const server = http.createServer(app);
 
 // Initialize Real-time Socket.io Engine
@@ -140,6 +141,12 @@ async function bootstrap() {
 
 
   const PORT = Number(process.env.PORT ?? 3000);
+  try {
+    logFileStorageStartupStatus();
+  } catch (storageErr: any) {
+    console.error("[BOOTSTRAP] Fatal storage configuration error:", storageErr?.message || storageErr);
+    process.exit(1);
+  }
   server.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
   });

@@ -6,11 +6,24 @@ interface RateLimitRecord {
 }
 
 export function getClientIp(req: Request): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim().length > 0) {
-    return forwarded.split(",")[0].trim();
+  const remote = req.socket?.remoteAddress || "";
+  const isFromTrustedProxy =
+    remote === "127.0.0.1" ||
+    remote === "::1" ||
+    remote === "::ffff:127.0.0.1" ||
+    remote.startsWith("10.") ||
+    remote.startsWith("172.") ||
+    remote.startsWith("192.168.") ||
+    remote.startsWith("::ffff:10.") ||
+    remote.startsWith("::ffff:192.168.");
+
+  if (isFromTrustedProxy) {
+    const cfIp = req.headers["cf-connecting-ip"];
+    if (typeof cfIp === "string" && cfIp.trim().length > 0) {
+      return cfIp.trim();
+    }
   }
-  return req.ip || req.socket.remoteAddress || "unknown";
+  return req.ip || remote || "unknown";
 }
 
 export function createRateLimiter({
