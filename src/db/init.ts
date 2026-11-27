@@ -1149,6 +1149,7 @@ export async function initializeDatabase() {
     await execSqlSafe("drive_storage_columns", `
       ALTER TABLE "public"."users" ADD COLUMN IF NOT EXISTS "drive_folder_id" varchar(120);
       ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "assignment_attachment" jsonb;
+      ALTER TABLE "public"."lessons" ADD COLUMN IF NOT EXISTS "lesson_resources" jsonb DEFAULT '[]'::jsonb NOT NULL;
     `);
 
     await execSqlSafe("lesson_assignment_submissions_table", `

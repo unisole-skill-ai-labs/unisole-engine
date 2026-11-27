@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { authMiddleware, CustomRequest, requireRole } from "../../middleware/auth";
 import { asyncHandler } from "../../middleware/async-handler";
 import { assignmentAttachmentService } from "../../services/assignment-attachment.service";
+import { lessonResourcesService } from "../../services/lesson-resources.service";
 import {
   assignmentSubmissionsService,
   MAX_SUBMISSION_FILES,
@@ -79,6 +80,38 @@ lmsRouter.get(
     res.setHeader(
       "Content-Disposition",
       `inline; filename="${encodeURIComponent(result.originalName)}"`
+    );
+    res.setHeader("Cache-Control", "private, no-store");
+    result.stream.pipe(res);
+  })
+);
+lmsRouter.get(
+  "/lessons/:id/resources/:resourceId",
+  asyncHandler(async (req: CustomRequest, res: Response) => {
+    const userId = req.user!.id;
+    const userRoles = [
+      req.user?.role,
+      ...(Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : []),
+      ...(Array.isArray((req.user as any)?.metadata?.roles) ? (req.user as any).metadata.roles : []),
+    ]
+      .filter(Boolean)
+      .map((r) => String(r).toUpperCase());
+    const isStaffOrMentor = userRoles.some((r) =>
+      ["ADMIN", "SUPER_ADMIN", "MENTOR", "MEMBER", "COURSE_MANAGER", "PROGRAM_MANAGER"].includes(r)
+    );
+    const result = await lessonResourcesService.stream(
+      req.params.id,
+      req.params.resourceId,
+      userId,
+      isStaffOrMentor,
+      req.headers.range
+    );
+    res.status(result.statusCode);
+    Object.entries(result.headers).forEach(([k, v]) => res.setHeader(k, v));
+    const disp = req.query.download === "1" ? "attachment" : "inline";
+    res.setHeader(
+      "Content-Disposition",
+      `${disp}; filename="${encodeURIComponent(result.originalName)}"`
     );
     res.setHeader("Cache-Control", "private, no-store");
     result.stream.pipe(res);

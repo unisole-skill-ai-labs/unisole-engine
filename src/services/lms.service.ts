@@ -21,8 +21,10 @@ import {
   Pathway,
   Lesson,
 } from "../db/schema";
-import { ForbiddenError, NotFoundError } from "../errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { getCanonicalPathway, CANONICAL_GROUPS } from "../constants/canonical-catalog";
+import { sanitizeAttachmentForClient } from "./assignment-attachment.service";
+import { sanitizeResourcesForClient } from "./lesson-resources.service";
 import { appCache } from "../utils/cache";
 
 const PATHWAY_CATALOG: Record<string, { title: string; description: string; duration: string; level: string }> = {
@@ -747,6 +749,10 @@ export const lmsService = {
                     size: (lesson as any).assignmentAttachment.size,
                     mime: (lesson as any).assignmentAttachment.mime,
                   },
+              lessonResources:
+                isLesLocked || summaryOnly
+                  ? []
+                  : sanitizeResourcesForClient((lesson as any).lessonResources),
               config: (isLesLocked || summaryOnly)
                 ? null
                 : (parsedContent?.codingTest ||
@@ -815,7 +821,11 @@ export const lmsService = {
     if (lessonRows.length > 0) {
       const lesson = lessonRows[0];
       if (isAdmin) {
-        return lesson;
+        return {
+          ...lesson,
+          assignmentAttachment: sanitizeAttachmentForClient((lesson as any).assignmentAttachment),
+          lessonResources: sanitizeResourcesForClient((lesson as any).lessonResources),
+        };
       }
 
       // Check if lesson is published and active for students (same rule as getPathwayContent)
@@ -949,7 +959,7 @@ export const lmsService = {
    */
   async markLessonProgress(userId: string, data: { lessonId: string; pathwayId?: string; isCompleted?: boolean }) {
     const lesRows = await db
-      .select({ status: lessons.status, isActive: lessons.isActive })
+      .select({ status: lessons.status, isActive: lessons.isActive, content: lessons.content })
       .from(lessons)
       .where(eq(lessons.id, data.lessonId))
       .limit(1);
@@ -959,6 +969,43 @@ export const lmsService = {
     }
 
     const isCompleted = data.isCompleted !== false;
+
+    // For submittable activities, require an existing submission/attempt before marking complete
+    if (isCompleted && lesRows.length > 0 && lesRows[0].content && lesRows[0].content.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(lesRows[0].content);
+        const t = String(parsed?.type || "").toUpperCase();
+        const isSubmittable =
+          t === "ASSIGNMENT" ||
+          t === "QUIZ" ||
+          t === "CODING_TEST" ||
+          t === "VIDEO_TEST" ||
+          t === "SUBJECTIVE_TEST";
+        if (isSubmittable) {
+          const [assignSubRes, legacySub] = await Promise.all([
+            pool.query(
+              `SELECT id FROM lesson_assignment_submissions WHERE student_id::text = $1 AND assignment_id::text = $2 LIMIT 1`,
+              [userId, data.lessonId]
+            ),
+            db
+              .select({ id: submissions.id })
+              .from(submissions)
+              .where(
+                and(
+                  sql`${submissions.userId}::text = ${userId}::text`,
+                  sql`${submissions.assignmentId}::text = ${data.lessonId}::text`
+                )
+              )
+              .limit(1),
+          ]);
+          if (assignSubRes.rows.length === 0 && legacySub.length === 0) {
+            throw new ValidationError("Submit to complete");
+          }
+        }
+      } catch (err) {
+        if (err instanceof ValidationError) throw err;
+      }
+    }
     const now = new Date().toISOString();
     const id = `prog_${userId}_${data.lessonId}`;
 

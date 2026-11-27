@@ -869,6 +869,7 @@ export const lessons = pgTable(
     unlockAt: timestamp("unlock_at", { withTimezone: true, mode: "string" }),
     lockAt: timestamp("lock_at", { withTimezone: true, mode: "string" }),
     assignmentAttachment: jsonb("assignment_attachment"),
+    lessonResources: jsonb("lesson_resources").default([]).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
