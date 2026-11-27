@@ -34,7 +34,7 @@ import { enrollmentsService } from "./services/enrollments.service";
 import { logFileStorageStartupStatus } from "./services/file-storage.service";
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", process.env.TRUSTED_PROXY || ["loopback", "linklocal", "uniquelocal"]);
 const server = http.createServer(app);
 
 // Initialize Real-time Socket.io Engine

@@ -145,6 +145,18 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
   private accessToken: string | null = null;
   private tokenExpiresAt = 0;
   private tokenRefreshPromise: Promise<string> | null = null;
+  private readonly fileCache = new Map<
+    string,
+    { buffer: Buffer; mimeType: string; sizeBytes: number; cachedAt: number }
+  >();
+  private fileCacheBytes = 0;
+  private readonly inFlightDownloads = new Map<
+    string,
+    Promise<{ buffer: Buffer; mimeType: string; sizeBytes: number }>
+  >();
+  private static readonly MAX_CACHE_FILE_BYTES = 15 * 1024 * 1024;
+  private static readonly MAX_CACHE_TOTAL_BYTES = 50 * 1024 * 1024;
+  private static readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(
     private readonly clientId: string,
@@ -231,7 +243,6 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
   private async ensureSingleChildFolder(parentId: string, name: string): Promise<string> {
     const safeSegment = sanitizeName(name, "folder");
     return withFolderLock(`${parentId}/${safeSegment}`, async () => {
-      const token = await this.getAccessToken();
       const q = `name = '${escapeDriveQueryValue(safeSegment)}' and '${escapeDriveQueryValue(
         parentId
       )}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
@@ -239,34 +250,51 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
         q
       )}&fields=files(id,name)&pageSize=1`;
 
-      const listRes = await this.fetchWithRetry(listUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!listRes.ok) {
-        throw new Error(`Drive folder lookup failed with HTTP ${listRes.status}`);
-      }
-      const listData = (await listRes.json()) as { files?: Array<{ id: string }> };
-      if (listData.files && listData.files.length > 0) {
-        return listData.files[0].id;
-      }
+      // Idempotent lookup-then-create: on transient error during create, re-run lookup before creating again
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const token = await this.getAccessToken();
+        const listRes = await this.fetchWithRetry(listUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!listRes.ok) {
+          throw new Error(`Drive folder lookup failed with HTTP ${listRes.status}`);
+        }
+        const listData = (await listRes.json()) as { files?: Array<{ id: string }> };
+        if (listData.files && listData.files.length > 0) {
+          return listData.files[0].id;
+        }
 
-      const createRes = await this.fetchWithRetry(`${this.endpoints.driveApiBase}/files?fields=id`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: safeSegment,
-          mimeType: "application/vnd.google-apps.folder",
-          parents: [parentId],
-        }),
-      });
-      if (!createRes.ok) {
-        throw new Error(`Drive folder creation failed with HTTP ${createRes.status}`);
+        try {
+          const createRes = await fetch(`${this.endpoints.driveApiBase}/files?fields=id`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name: safeSegment,
+              mimeType: "application/vnd.google-apps.folder",
+              parents: [parentId],
+            }),
+          });
+          if (createRes.ok) {
+            const created = (await createRes.json()) as { id: string };
+            return created.id;
+          }
+          if (attempt === 0 && (createRes.status === 429 || createRes.status >= 500)) {
+            await new Promise((r) => setTimeout(r, 300));
+            continue;
+          }
+          throw new Error(`Drive folder creation failed with HTTP ${createRes.status}`);
+        } catch (err) {
+          if (attempt === 0) {
+            await new Promise((r) => setTimeout(r, 300));
+            continue;
+          }
+          throw err;
+        }
       }
-      const created = (await createRes.json()) as { id: string };
-      return created.id;
+      throw new Error("Drive folder creation failed after retry");
     });
   }
 
@@ -402,13 +430,71 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
     };
   }
 
+  private putFileCache(
+    key: string,
+    entry: { buffer: Buffer; mimeType: string; sizeBytes: number; cachedAt: number }
+  ) {
+    const existing = this.fileCache.get(key);
+    if (existing) {
+      this.fileCacheBytes -= existing.buffer.length;
+      this.fileCache.delete(key);
+    }
+    while (
+      this.fileCacheBytes + entry.buffer.length > GoogleDriveStorageProvider.MAX_CACHE_TOTAL_BYTES &&
+      this.fileCache.size > 0
+    ) {
+      const oldestKey = this.fileCache.keys().next().value;
+      if (!oldestKey) break;
+      const oldest = this.fileCache.get(oldestKey);
+      if (oldest) this.fileCacheBytes -= oldest.buffer.length;
+      this.fileCache.delete(oldestKey);
+    }
+    this.fileCache.set(key, entry);
+    this.fileCacheBytes += entry.buffer.length;
+  }
+
+  private serveBufferRange(
+    buffer: Buffer,
+    mimeType: string,
+    rangeHeader?: string
+  ): StreamFileResult {
+    const total = buffer.length;
+    if (rangeHeader && rangeHeader.startsWith("bytes=")) {
+      const [startStr, endStr] = rangeHeader.replace("bytes=", "").split("-");
+      const start = startStr ? parseInt(startStr, 10) : 0;
+      const end = endStr ? Math.min(parseInt(endStr, 10), total - 1) : total - 1;
+      if (!Number.isNaN(start) && !Number.isNaN(end) && start <= end && start < total) {
+        const slice = buffer.subarray(start, end + 1);
+        return {
+          stream: Readable.from(slice),
+          statusCode: 206,
+          headers: {
+            "Content-Type": mimeType,
+            "Accept-Ranges": "bytes",
+            "Content-Length": String(slice.length),
+            "Content-Range": `bytes ${start}-${end}/${total}`,
+          },
+        };
+      }
+    }
+    return {
+      stream: Readable.from(buffer),
+      statusCode: 200,
+      headers: {
+        "Content-Type": mimeType,
+        "Accept-Ranges": "bytes",
+        "Content-Length": String(total),
+      },
+    };
+  }
+
   async streamFile(fileId: string, rangeHeader?: string): Promise<StreamFileResult> {
     const token = await this.getAccessToken();
 
     const metaRes = await this.fetchWithRetry(
       `${this.endpoints.driveApiBase}/files/${encodeURIComponent(
         fileId
-      )}?fields=size,mimeType,name,trashed`,
+      )}?fields=size,mimeType,name,trashed,modifiedTime`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (metaRes.status === 404) {
@@ -418,10 +504,55 @@ export class GoogleDriveStorageProvider implements FileStorageProvider {
     if (!metaRes.ok) {
       throw new Error(`Drive file metadata failed with HTTP ${metaRes.status}`);
     }
-    const meta = (await metaRes.json()) as { size?: string; mimeType?: string; name?: string; trashed?: boolean };
+    const meta = (await metaRes.json()) as {
+      size?: string;
+      mimeType?: string;
+      name?: string;
+      trashed?: boolean;
+      modifiedTime?: string;
+    };
     if (meta.trashed) {
       console.warn(`[STORAGE_MISSING] Google Drive file is trashed: ${fileId}`);
       throw new NotFoundError("Attachment is no longer available");
+    }
+
+    const declaredSize = Number(meta.size || 0);
+    if (declaredSize > 0 && declaredSize <= GoogleDriveStorageProvider.MAX_CACHE_FILE_BYTES) {
+      const cacheKey = `${fileId}:${declaredSize}:${meta.modifiedTime || ""}`;
+      const cached = this.fileCache.get(cacheKey);
+      if (cached && Date.now() - cached.cachedAt < GoogleDriveStorageProvider.CACHE_TTL_MS) {
+        // Refresh LRU position
+        this.fileCache.delete(cacheKey);
+        this.fileCache.set(cacheKey, cached);
+        return this.serveBufferRange(cached.buffer, cached.mimeType, rangeHeader);
+      }
+
+      let downloadPromise = this.inFlightDownloads.get(cacheKey);
+      if (!downloadPromise) {
+        downloadPromise = (async () => {
+          const freshToken = await this.getAccessToken();
+          const mediaRes = await this.fetchWithRetry(
+            `${this.endpoints.driveApiBase}/files/${encodeURIComponent(fileId)}?alt=media`,
+            { headers: { Authorization: `Bearer ${freshToken}` } }
+          );
+          if (!mediaRes.ok) {
+            throw new Error(`Drive media stream failed with HTTP ${mediaRes.status}`);
+          }
+          const buf = Buffer.from(await mediaRes.arrayBuffer());
+          const mimeType =
+            mediaRes.headers.get("content-type") || meta.mimeType || "application/octet-stream";
+          const entry = { buffer: buf, mimeType, sizeBytes: buf.length, cachedAt: Date.now() };
+          this.putFileCache(cacheKey, entry);
+          return entry;
+        })().finally(() => {
+          if (this.inFlightDownloads.get(cacheKey) === downloadPromise) {
+            this.inFlightDownloads.delete(cacheKey);
+          }
+        });
+        this.inFlightDownloads.set(cacheKey, downloadPromise);
+      }
+      const downloaded = await downloadPromise;
+      return this.serveBufferRange(downloaded.buffer, downloaded.mimeType, rangeHeader);
     }
 
     const headers: Record<string, string> = {

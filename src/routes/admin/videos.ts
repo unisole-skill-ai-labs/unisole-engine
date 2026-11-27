@@ -17,6 +17,7 @@ const canManageLessons = requireRole([
 const videoMutationLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
+  keyGenerator: (req: any) => req.user?.id || req.ip || "anon",
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many video requests, please try again shortly." },

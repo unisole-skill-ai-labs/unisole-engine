@@ -41,7 +41,7 @@ const adminAuthUserLimiter = createRateLimiter({
 // High capacity ensures hundreds of concurrent students on the same college Wi-Fi or NAT join freely.
 const studentAuthLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  maxRequests: 60,
+  maxRequests: 120,
   keyGenerator: getPhoneOrIpKey("student_auth"),
   message: "Too many login attempts for this number, please try again in a few minutes",
 });
@@ -70,10 +70,10 @@ const ssoCreateLimiter = createRateLimiter({
   message: "Too many SSO code requests. Please wait a few minutes.",
 });
 
-// 6. SSO Exchange Limiter (public): 30 requests per 10 minutes per IP
+// 6. SSO Exchange Limiter (public): 120 requests per 10 minutes per IP (campus-safe)
 const ssoExchangeLimiter = createRateLimiter({
   windowMs: 10 * 60 * 1000,
-  maxRequests: 30,
+  maxRequests: 120,
   keyGenerator: (req: any) => `sso_exchange:ip:${getClientIp(req)}`,
   message: "Too many code verification attempts, please try again later",
 });
