@@ -608,6 +608,10 @@ export const videoService = {
     // Reuse existing enrollment, archive, and unlock/lock checks
     const lesson = await lmsService.getLessonContent(userId, lessonId, isStaffOrMentor);
 
+    if (lesson.videoStatus === "NEEDS_REUPLOAD") {
+      throw new ServiceUnavailableError("This video is being updated. Please check back shortly.");
+    }
+
     const ttlSec = getPlayTtlSeconds();
     const expiresAt = new Date(Date.now() + ttlSec * 1000).toISOString();
     const storage = getVideoStorageProvider();
