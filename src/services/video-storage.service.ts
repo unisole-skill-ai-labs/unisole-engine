@@ -71,6 +71,7 @@ export interface VideoStorageProvider {
   generateSingleWriteSasUrl(blobPath: string, ttlSeconds: number): Promise<string>;
   verifyBlobExists(blobPath: string): Promise<{ exists: boolean; sizeBytes: number }>;
   listBlobsWithSizes?(prefix: string): Promise<Map<string, number>>;
+  listBlobsDetailed?(prefix: string): Promise<Array<{ name: string; sizeBytes: number; contentType?: string; cacheControl?: string }>>;
   getPlaylistText(blobPath: string): Promise<string>;
   generateReadSasUrl(blobPath: string, ttlSeconds: number): Promise<string>;
   deletePrefix(prefix: string): Promise<number>;
@@ -249,6 +250,21 @@ export class AzureVideoStorageProvider implements VideoStorageProvider {
       result.set(item.name, Number(item.properties?.contentLength || 0));
     }
     return result;
+  }
+
+  async listBlobsDetailed(prefix: string): Promise<Array<{ name: string; sizeBytes: number; contentType?: string; cacheControl?: string }>> {
+    const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+    const normalized = prefix.endsWith("/") ? prefix : `${prefix}/`;
+    const out: Array<{ name: string; sizeBytes: number; contentType?: string; cacheControl?: string }> = [];
+    for await (const item of containerClient.listBlobsFlat({ prefix: normalized })) {
+      out.push({
+        name: item.name,
+        sizeBytes: Number(item.properties?.contentLength || 0),
+        contentType: item.properties?.contentType,
+        cacheControl: item.properties?.cacheControl,
+      });
+    }
+    return out;
   }
 
   async getPlaylistText(blobPath: string): Promise<string> {
