@@ -31,6 +31,8 @@
     "gdrive:auth": "tsx src/scripts/gdrive-auth.ts",
     "drive:diagnose": "tsx src/scripts/diagnose-drive.ts",
     "video:diagnose": "tsx src/scripts/video-diagnose.ts",
+    "video:validate": "node tools/video-cli/validate-hls.mjs",
+    "video:reencode": "node tools/video-cli/reencode-hls.mjs",
     "backfill:dry-run": "tsx src/scripts/backfill-dry-run.ts"
   },
   "dependencies": {

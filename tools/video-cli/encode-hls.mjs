@@ -2,116 +2,177 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { validateHlsFolder } from "./validate-hls.mjs";
 
-const inputArg = process.argv[2];
-const outputArg = process.argv[3];
-
-if (!inputArg || inputArg === "--help" || inputArg === "-h") {
-  console.log("Usage: node tools/video-cli/encode-hls.mjs <input-video.mp4> [output-dir]");
-  process.exit(inputArg ? 0 : 1);
-}
-
-const inputPath = path.resolve(inputArg);
-if (!fs.existsSync(inputPath)) {
-  console.error(`Input file not found: ${inputPath}`);
-  process.exit(1);
-}
-
-const ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg";
-const probe = spawnSync(ffmpegBin, ["-version"], { stdio: "ignore" });
-if (probe.status !== 0) {
-  console.error("ffmpeg is not installed or not on PATH. Install ffmpeg (or set FFMPEG_PATH) and try again.");
-  process.exit(1);
-}
-
-const baseName = path.basename(inputPath, path.extname(inputPath));
-const outDir = path.resolve(outputArg || path.join(path.dirname(inputPath), `${baseName}-hls`));
-fs.mkdirSync(outDir, { recursive: true });
-
-let useHardware = false;
-if (process.env.FORCE_SW_ENCODE !== "1") {
-  try {
-    const encoders = execFileSync(ffmpegBin, ["-hide_banner", "-encoders"], { encoding: "utf8" });
-    useHardware = encoders.includes("h264_videotoolbox");
-  } catch {
-    useHardware = false;
-  }
-}
-
-const codec = useHardware ? "h264_videotoolbox" : "libx264";
-const extraCodecArgs = useHardware
-  ? ["-allow_sw", "1"]
-  : ["-preset", "veryfast", "-x264-params", "scenecut=0:open_gop=0"];
-
-const TARGET_FPS = 30;
-const GOP_FRAMES = TARGET_FPS * 6;
-
-const args = [
-  "-y",
-  "-i",
-  inputPath,
-  "-filter_complex",
-  `[0:v]fps=${TARGET_FPS},format=yuv420p,split=3[v1][v2][v3];[v1]scale=-2:360[v360];[v2]scale=-2:480[v480];[v3]scale=-2:720[v720]`,
-  "-map",
-  "[v360]",
-  "-map",
-  "0:a?",
-  "-map",
-  "[v480]",
-  "-map",
-  "0:a?",
-  "-map",
-  "[v720]",
-  "-map",
-  "0:a?",
-  "-c:v",
-  codec,
-  "-profile:v",
-  "main",
-  "-level:v",
-  "4.0",
-  "-pix_fmt",
-  "yuv420p",
-  ...extraCodecArgs,
-  "-g",
-  String(GOP_FRAMES),
-  "-keyint_min",
-  String(GOP_FRAMES),
-  "-sc_threshold",
-  "0",
-  "-force_key_frames",
-  "expr:gte(t,n_forced*6)",
-  "-b:v:0",
-  "600k",
-  "-b:v:1",
-  "1000k",
-  "-b:v:2",
-  "2200k",
-  "-c:a",
-  "aac",
-  "-b:a",
-  "128k",
-  "-ar",
-  "48000",
-  "-ac",
-  "2",
-  "-f",
-  "hls",
-  "-hls_time",
-  "6",
-  "-hls_playlist_type",
-  "vod",
-  "-hls_flags",
-  "independent_segments",
-  "-master_pl_name",
-  "master.m3u8",
-  "-var_stream_map",
-  "v:0,a:0,name:360p v:1,a:1,name:480p v:2,a:2,name:720p",
-  "-hls_segment_filename",
-  path.join(outDir, "%v", "seg_%05d.ts").replace(/\\/g, "/"),
-  path.join(outDir, "%v", "index.m3u8").replace(/\\/g, "/"),
+const RENDITION_LADDER = [
+  { name: "360p", height: 360, crf: "24", maxrate: "700k", bufsize: "1400k" },
+  { name: "480p", height: 480, crf: "23", maxrate: "1200k", bufsize: "2400k" },
+  { name: "720p", height: 720, crf: "22", maxrate: "2500k", bufsize: "5000k" },
 ];
 
-console.log(`Encoding "${inputPath}" -> "${outDir}" (CFR ${TARGET_FPS}fps, 6s forced keyframes, H.264+AAC)...`);
-execFileSync(ffmpegBin, args, { stdio: "inherit" });
-console.log(`Done! Upload the folder "${outDir}" in the Unisole Admin editor.`);
+export function probeSourceMedia(inputPath, ffprobeBin = process.env.FFPROBE_PATH || "ffprobe") {
+  const args = [];
+  if (inputPath.toLowerCase().endsWith(".m3u8")) {
+    args.push("-allowed_extensions", "ALL");
+  }
+  args.push("-v", "error", "-print_format", "json", "-show_streams", "-show_format", inputPath);
+  const out = execFileSync(ffprobeBin, args, { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+  const parsed = JSON.parse(out || "{}");
+  const streams = parsed.streams || [];
+  const vStream = streams.find((s) => s.codec_type === "video");
+  const aStream = streams.find((s) => s.codec_type === "audio");
+
+  let width = Number(vStream?.width || 1280);
+  let height = Number(vStream?.height || 720);
+  const rotateTag = Number(vStream?.tags?.rotate || 0);
+  const sideRotation = (vStream?.side_data_list || []).find((d) => d.rotation !== undefined)?.rotation;
+  const rot = Math.abs(Number(sideRotation ?? rotateTag ?? 0));
+  if (rot === 90 || rot === 270) {
+    [width, height] = [height, width];
+  }
+
+  const durationSec = Number(parsed.format?.duration || 0);
+  return {
+    width,
+    height,
+    hasAudio: Boolean(aStream),
+    durationMinutes: Number.isFinite(durationSec) && durationSec > 0 ? Math.max(1, Math.round(durationSec / 60)) : undefined,
+  };
+}
+
+export async function encodeHls({ inputPath, outDir, ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg", ffprobeBin = process.env.FFPROBE_PATH || "ffprobe" }) {
+  const absInput = path.resolve(inputPath);
+  const absOut = path.resolve(outDir);
+  if (!fs.existsSync(absInput)) {
+    throw new Error(`Input file not found: ${absInput}`);
+  }
+  const probeCheck = spawnSync(ffmpegBin, ["-version"], { stdio: "ignore" });
+  if (probeCheck.status !== 0) {
+    throw new Error("ffmpeg is not installed or not on PATH. Install ffmpeg and try again.");
+  }
+
+  fs.mkdirSync(absOut, { recursive: true });
+  const media = probeSourceMedia(absInput, ffprobeBin);
+
+  let renditions = RENDITION_LADDER.filter((r) => r.height <= media.height);
+  if (renditions.length === 0) {
+    const evenH = Math.max(2, Math.floor(media.height / 2) * 2);
+    renditions = [{ name: "360p", height: evenH, crf: "23", maxrate: "700k", bufsize: "1400k" }];
+  }
+
+  const targetFps = 30;
+  const gopFrames = targetFps * 6;
+  const splitLabels = renditions.map((_, i) => `[v${i}]`).join("");
+  const scaleFilters = renditions.map((r, i) => `[v${i}]scale=-2:${r.height}[out${i}]`).join(";");
+  const audioSplitLabels = renditions.map((_, i) => `[aout${i}]`).join("");
+  const audioInputLabel = media.hasAudio ? "[0:a]" : "[1:a]";
+  const audioFilter = media.hasAudio
+    ? `;${audioInputLabel}aresample=async=1:first_pts=0,asplit=${renditions.length}${audioSplitLabels}`
+    : `;${audioInputLabel}asplit=${renditions.length}${audioSplitLabels}`;
+  const filterComplex = `[0:v]fps=${targetFps},setpts=PTS-STARTPTS,format=yuv420p,split=${renditions.length}${splitLabels};${scaleFilters}${audioFilter}`;
+
+  const inputArgs = [];
+  if (absInput.toLowerCase().endsWith(".m3u8")) {
+    inputArgs.push("-allowed_extensions", "ALL");
+  }
+  inputArgs.push("-i", absInput);
+  if (!media.hasAudio) {
+    inputArgs.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000");
+  }
+
+  const mapArgs = [];
+  const rateArgs = [];
+  const varMap = [];
+  renditions.forEach((r, i) => {
+    mapArgs.push("-map", `[out${i}]`, "-map", `[aout${i}]`);
+    rateArgs.push(`-crf:v:${i}`, r.crf, `-maxrate:v:${i}`, r.maxrate, `-bufsize:v:${i}`, r.bufsize);
+    varMap.push(`v:${i},a:${i},name:${r.name}`);
+  });
+
+  const audioArgs = media.hasAudio
+    ? ["-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k"]
+    : ["-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k", "-shortest"];
+
+  const args = [
+    "-y",
+    "-avoid_negative_ts",
+    "make_zero",
+    ...inputArgs,
+    "-filter_complex",
+    filterComplex,
+    ...mapArgs,
+    "-c:v",
+    "libx264",
+    "-profile:v",
+    "main",
+    "-level:v",
+    "4.0",
+    "-pix_fmt",
+    "yuv420p",
+    "-preset",
+    "veryfast",
+    "-x264-params",
+    "scenecut=0:open_gop=0",
+    "-sc_threshold",
+    "0",
+    "-g",
+    String(gopFrames),
+    "-keyint_min",
+    String(gopFrames),
+    "-force_key_frames",
+    "expr:gte(t,n_forced*6)",
+    "-fps_mode",
+    "cfr",
+    ...rateArgs,
+    ...audioArgs,
+    "-max_muxing_queue_size",
+    "1024",
+    "-max_interleave_delta",
+    "0",
+    "-f",
+    "hls",
+    "-hls_time",
+    "6",
+    "-hls_playlist_type",
+    "vod",
+    "-hls_flags",
+    "independent_segments",
+    "-master_pl_name",
+    "master.m3u8",
+    "-var_stream_map",
+    varMap.join(" "),
+    "-hls_segment_filename",
+    path.join(absOut, "%v", "seg_%05d.ts").replace(/\\/g, "/"),
+    path.join(absOut, "%v", "index.m3u8").replace(/\\/g, "/"),
+  ];
+
+  console.log(`Encoding "${absInput}" -> "${absOut}" (renditions: ${renditions.map((r) => r.name).join(", ")}, CFR ${targetFps}fps, 6s keyframes)...`);
+  const res = spawnSync(ffmpegBin, args, { stdio: "inherit" });
+  if (res.status !== 0) {
+    throw new Error(`ffmpeg exited with code ${res.status}`);
+  }
+
+  console.log("Validating encoded HLS output...");
+  const validation = await validateHlsFolder(absOut);
+  console.table(validation.perRendition);
+  if (!validation.ok) {
+    throw new Error(`Encoded HLS failed validation: BROKEN (${validation.reasons.join(", ")})`);
+  }
+  console.log("OK: Encoded HLS passed all validation checks.");
+  return { outDir: absOut, renditions: renditions.map((r) => r.name), durationMinutes: media.durationMinutes };
+}
+
+const isCli =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+
+if (isCli) {
+  const inputArg = process.argv[2];
+  const outputArg = process.argv[3];
+  if (!inputArg || inputArg === "--help" || inputArg === "-h") {
+    console.log("Usage: node tools/video-cli/encode-hls.mjs <input-video.mp4> [output-dir]");
+    process.exit(inputArg ? 0 : 1);
+  }
+  const baseName = path.basename(inputArg, path.extname(inputArg));
+  const outDir = outputArg || path.join(path.dirname(path.resolve(inputArg)), `${baseName}-hls`);
+  await encodeHls({ inputPath: inputArg, outDir });
+}

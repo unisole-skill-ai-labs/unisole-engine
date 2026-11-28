@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { analyzeHlsFolder } from "../hls-doctor.mjs";
+import { encodeHls } from "../encode-hls.mjs";
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -228,31 +228,11 @@ async function main() {
   };
 
   try {
-    console.log("1/4 Probing duration...");
-    const durationMinutes = getDurationMinutes(absInput);
-
-    console.log("2/4 Encoding adaptive HLS (360p/480p/720p)...");
-    const useHw = hasVideoToolbox();
-    console.log(`    Encoder: ${useHw ? "h264_videotoolbox" : "libx264"}`);
-    const ffArgs = buildFfmpegArgs(absInput, outDir, useHw);
-    const ff = spawnSync("ffmpeg", ffArgs, { stdio: "inherit" });
-    if (ff.status !== 0) {
-      throw new Error(`ffmpeg exited with code ${ff.status}`);
-    }
-
-    console.log("    Validating encoded HLS with hls-doctor...");
-    const doctor = analyzeHlsFolder(outDir);
-    for (const w of doctor.warnings) {
-      console.warn(`    [WARN] ${w}`);
-    }
-    if (!doctor.ok) {
-      throw new Error(
-        `HLS validation failed:\n  - ${doctor.errors.join("\n  - ")}\nRe-encode with: node tools/video-cli/encode-hls.mjs "${absInput}"`
-      );
-    }
+    console.log("1/3 Encoding & validating adaptive HLS (360p/480p/720p)...");
+    const { durationMinutes } = await encodeHls({ inputPath: absInput, outDir });
 
     const files = collectFiles(outDir);
-    console.log(`3/4 Requesting upload URLs for ${files.length} HLS files...`);
+    console.log(`2/3 Requesting upload URLs for ${files.length} HLS files...`);
     const { uploadUrls } = await fetchJson(`${baseApi}/upload-urls`, {
       method: "POST",
       headers: authHeaders,
